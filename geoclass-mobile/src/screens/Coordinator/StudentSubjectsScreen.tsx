@@ -81,24 +81,24 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
   };
 
   const renderItem = ({ item }: { item: SubjectData }) => (
-    <View className="bg-white p-4 rounded-xl mb-4 shadow-sm border border-gray-100">
-      <View className="flex-row items-start justify-between border-b border-gray-100 pb-3 mb-3">
+    <View className="bg-white dark:bg-slate-800 p-4 rounded-xl mb-4 shadow-sm border border-gray-100 dark:border-slate-700">
+      <View className="flex-row items-start justify-between border-b border-gray-100 dark:border-slate-700 pb-3 mb-3">
         <View className="flex-1 pr-2">
-          <Text className="text-lg font-bold text-gray-800">{item.subject}</Text>
+          <Text className="text-lg font-bold text-gray-800 dark:text-slate-100">{item.subject}</Text>
           <View className="flex-row items-center mt-2">
             <Feather name="map-pin" size={14} color="#64748b" />
-            <Text className="text-gray-500 ml-1 font-medium">{item.room_name}</Text>
+            <Text className="text-gray-500 dark:text-slate-400 ml-1 font-medium">{item.room_name}</Text>
           </View>
         </View>
 
-        <View className="items-end bg-gray-50 p-2 rounded-lg">
+        <View className="items-end bg-gray-50 dark:bg-slate-900 p-2 rounded-lg">
           <Text className="text-xs text-gray-400 mb-1">Aulas Previstas</Text>
           <Text className="text-md font-bold text-gray-700">{item.total_classes}</Text>
         </View>
       </View>
 
       <View className="flex-row items-center justify-between">
-        <Text className="text-gray-600 font-medium">Índice de Faltas</Text>
+        <Text className="text-gray-600 dark:text-slate-300 font-medium">Índice de Faltas</Text>
         <Text className={`text-xl font-black ${item.absencePercentage >= 25 ? 'text-red-500' : 'text-emerald-500'}`}>
           {item.absencePercentage}%
         </Text>
@@ -121,7 +121,7 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
   if (loading) return <LoadingOverlay message="Carregando matérias..." />;
 
   return (
-    <View className="flex-1 bg-gray-50 pt-14 px-4">
+    <View className="flex-1 bg-gray-50 dark:bg-slate-900 pt-14 px-4">
       {exporting && <LoadingOverlay message="Gerando relatório..." />}
       <ScreenHeader
         title="Detalhes do Aluno"
@@ -135,8 +135,8 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
       />
 
       <View className="mb-6">
-        <Text className="text-sm text-gray-500 uppercase tracking-wider font-bold mb-1">Aluno</Text>
-        <Text className="text-xl font-black text-gray-800">{studentName}</Text>
+        <Text className="text-sm text-gray-500 dark:text-slate-400 uppercase tracking-wider font-bold mb-1">Aluno</Text>
+        <Text className="text-xl font-black text-gray-800 dark:text-slate-100">{studentName}</Text>
         <Text className="text-sky-600 font-medium mt-1">Semestre {semesterId}</Text>
       </View>
 

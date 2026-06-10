@@ -62,15 +62,15 @@ export default function ChangeRoomModal({ visible, classId, scheduleTime, onClos
   return (
     <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
       <View className="flex-1 justify-end bg-black/50">
-        <View className="bg-white rounded-t-3xl p-6 min-h-[50%] max-h-[80%]">
+        <View className="bg-white dark:bg-slate-800 rounded-t-3xl p-6 min-h-[50%] max-h-[80%]">
           <View className="flex-row justify-between items-center mb-4">
-            <Text className="text-xl font-bold text-gray-800">Trocar Sala da Aula</Text>
+            <Text className="text-xl font-bold text-gray-800 dark:text-slate-100">Trocar Sala da Aula</Text>
             <TouchableOpacity onPress={onClose} className="p-2 bg-gray-100 rounded-full">
               <Feather name="x" size={20} color="#64748b" />
             </TouchableOpacity>
           </View>
 
-          <Text className="text-sm text-gray-500 mb-4">
+          <Text className="text-sm text-gray-500 dark:text-slate-400 mb-4">
             A troca afetará o Geofencing apenas na data de hoje ({new Date(selectedDate).toLocaleDateString('pt-BR')}) para o horário das {scheduleTime}.
           </Text>
 
@@ -88,12 +88,12 @@ export default function ChangeRoomModal({ visible, classId, scheduleTime, onClos
           
           {loading ? (
             <View className="py-8 items-center">
-              <Text className="text-gray-500">Buscando salas livres...</Text>
+              <Text className="text-gray-500 dark:text-slate-400">Buscando salas livres...</Text>
             </View>
           ) : rooms.length === 0 ? (
-            <View className="py-8 items-center bg-gray-50 rounded-xl">
+            <View className="py-8 items-center bg-gray-50 dark:bg-slate-900 rounded-xl">
               <Feather name="info" size={24} color="#94a3b8" />
-              <Text className="text-gray-500 mt-2">Nenhuma sala livre para este horário.</Text>
+              <Text className="text-gray-500 dark:text-slate-400 mt-2">Nenhuma sala livre para este horário.</Text>
             </View>
           ) : (
             <FlatList
@@ -104,11 +104,11 @@ export default function ChangeRoomModal({ visible, classId, scheduleTime, onClos
                 <TouchableOpacity 
                   disabled={saving}
                   onPress={() => handleConfirm(item.id)}
-                  className="bg-gray-50 p-4 rounded-xl mb-2 flex-row items-center justify-between border border-gray-200"
+                  className="bg-gray-50 dark:bg-slate-900 p-4 rounded-xl mb-2 flex-row items-center justify-between border border-gray-200 dark:border-slate-700"
                 >
                   <View className="flex-row items-center">
                     <Feather name="map-pin" size={18} color="#0ea5e9" />
-                    <Text className="text-gray-800 font-bold ml-3 text-base">{item.name}</Text>
+                    <Text className="text-gray-800 dark:text-slate-100 font-bold ml-3 text-base">{item.name}</Text>
                   </View>
                   <Feather name="chevron-right" size={18} color="#cbd5e1" />
                 </TouchableOpacity>

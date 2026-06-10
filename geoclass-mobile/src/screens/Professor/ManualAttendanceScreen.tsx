@@ -86,10 +86,10 @@ export default function ManualAttendanceScreen({ navigation, route }: Props) {
     const isPresent = attendanceState[item.id];
     
     return (
-      <View className="bg-white p-4 rounded-xl mb-3 border border-gray-100 flex-row items-center justify-between shadow-sm">
+      <View className="bg-white dark:bg-slate-800 p-4 rounded-xl mb-3 border border-gray-100 dark:border-slate-700 flex-row items-center justify-between shadow-sm">
         <View className="flex-1 pr-4">
-          <Text className="text-lg font-bold text-gray-800">{item.name}</Text>
-          <Text className="text-gray-500 mt-1">RA: {item.ra}</Text>
+          <Text className="text-lg font-bold text-gray-800 dark:text-slate-100">{item.name}</Text>
+          <Text className="text-gray-500 dark:text-slate-400 mt-1">RA: {item.ra}</Text>
         </View>
         <View className="items-center">
           <Switch
@@ -109,7 +109,7 @@ export default function ManualAttendanceScreen({ navigation, route }: Props) {
   if (loading) return <LoadingOverlay message="Carregando alunos..." />;
 
   return (
-    <View className="flex-1 bg-gray-50 pt-14 px-4">
+    <View className="flex-1 bg-gray-50 dark:bg-slate-900 pt-14 px-4">
       {saving && <LoadingOverlay message="Salvando chamada..." />}
       
       <ScreenHeader 

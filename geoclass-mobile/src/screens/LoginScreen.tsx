@@ -48,19 +48,19 @@ export default function LoginScreen({ navigation }: Props) {
   };
 
   return (
-    <View className="flex-1 justify-center items-center bg-white p-6">
+    <View className="flex-1 justify-center items-center bg-white dark:bg-slate-800 p-6">
       <Image
         source={require('../../assets/images/logo.jpg')}
         className="w-24 h-24 mb-6"
         resizeMode="contain"
       />
 
-      <Text className="text-3xl font-bold text-gray-800 mb-8">GeoClass</Text>
+      <Text className="text-3xl font-bold text-gray-800 dark:text-slate-100 mb-8">GeoClass</Text>
 
       <View className="w-full max-w-sm mb-4">
-        <Text className="text-gray-600 mb-2 font-medium">E-mail</Text>
+        <Text className="text-gray-600 dark:text-slate-300 mb-2 font-medium">E-mail</Text>
         <TextInput
-          className="w-full bg-gray-100 rounded-lg p-4 text-gray-800 border border-gray-200"
+          className="w-full bg-gray-100 rounded-lg p-4 text-gray-800 dark:text-slate-100 border border-gray-200 dark:border-slate-700"
           placeholder="Digite seu e-mail"
           keyboardType="email-address"
           autoCapitalize="none"
@@ -70,9 +70,9 @@ export default function LoginScreen({ navigation }: Props) {
       </View>
 
       <View className="w-full max-w-sm mb-8">
-        <Text className="text-gray-600 mb-2 font-medium">Senha</Text>
+        <Text className="text-gray-600 dark:text-slate-300 mb-2 font-medium">Senha</Text>
         <TextInput
-          className="w-full bg-gray-100 rounded-lg p-4 text-gray-800 border border-gray-200"
+          className="w-full bg-gray-100 rounded-lg p-4 text-gray-800 dark:text-slate-100 border border-gray-200 dark:border-slate-700"
           placeholder="Digite sua senha"
           secureTextEntry
           value={password}

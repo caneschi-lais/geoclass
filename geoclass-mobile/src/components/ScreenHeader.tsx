@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { ThemeToggle } from './ThemeToggle';
+import { useTheme } from '../context/ThemeContext';
 
 type ScreenHeaderProps = {
   title: string;
@@ -23,16 +25,18 @@ export default function ScreenHeader({
   rightButton
 }: ScreenHeaderProps) {
 
+  const { isDark } = useTheme();
+
   const getRightButtonStyles = () => {
     if (!rightButton) return { container: '', text: '', iconColor: '' };
     switch (rightButton.variant) {
       case 'danger':
-        return { container: 'bg-red-100 px-3 py-2', text: 'text-red-600', iconColor: '#dc2626' };
+        return { container: 'bg-red-100 dark:bg-red-900/30 px-3 py-2', text: 'text-red-600 dark:text-red-400', iconColor: isDark ? '#f87171' : '#dc2626' };
       case 'info':
-        return { container: 'bg-sky-100 p-2', text: 'text-sky-600 px-2', iconColor: '#0ea5e9' };
+        return { container: 'bg-sky-100 dark:bg-sky-900/30 p-2', text: 'text-sky-600 dark:text-sky-400 px-2', iconColor: isDark ? '#38bdf8' : '#0ea5e9' };
       case 'white':
       default:
-        return { container: 'bg-white p-2 border border-gray-100 shadow-sm', text: 'text-gray-800 px-2', iconColor: '#334155' };
+        return { container: 'bg-white dark:bg-slate-800 p-2 border border-gray-100 dark:border-slate-700 shadow-sm', text: 'text-gray-800 dark:text-slate-200 px-2', iconColor: isDark ? '#cbd5e1' : '#334155' };
     }
   };
 
@@ -43,30 +47,33 @@ export default function ScreenHeader({
       {showBackButton && (
         <TouchableOpacity
           onPress={onBackPress}
-          className="mr-3 bg-white p-2 rounded-full shadow-sm border border-gray-100"
+          className="mr-3 bg-white dark:bg-slate-800 p-2 rounded-full shadow-sm border border-gray-100 dark:border-slate-700"
         >
-          <Feather name="arrow-left" size={24} color="#334155" />
+          <Feather name="arrow-left" size={24} color={isDark ? "#cbd5e1" : "#334155"} />
         </TouchableOpacity>
       )}
 
       <View className="flex-1">
-        <Text className="text-2xl font-extrabold text-gray-800" numberOfLines={1}>{title}</Text>
-        {subtitle && <Text className="text-gray-500 font-medium">{subtitle}</Text>}
+        <Text className="text-2xl font-extrabold text-gray-800 dark:text-slate-100" numberOfLines={1}>{title}</Text>
+        {subtitle && <Text className="text-gray-500 dark:text-slate-400 font-medium">{subtitle}</Text>}
       </View>
 
-      {rightButton && (
-        <TouchableOpacity
-          onPress={rightButton.onPress}
-          className={`rounded-lg flex-row items-center ${rightBtnStyle.container} ${rightButton.label ? '' : 'rounded-full'}`}
-        >
-          {rightButton.icon && <Feather name={rightButton.icon} size={20} color={rightBtnStyle.iconColor} />}
-          {rightButton.label && (
-            <Text className={`font-bold ${rightBtnStyle.text} ${rightButton.icon ? 'ml-1' : ''}`}>
-              {rightButton.label}
-            </Text>
-          )}
-        </TouchableOpacity>
-      )}
+      <View className="flex-row items-center gap-3">
+        <ThemeToggle />
+        {rightButton && (
+          <TouchableOpacity
+            onPress={rightButton.onPress}
+            className={`rounded-lg flex-row items-center ${rightBtnStyle.container} ${rightButton.label ? '' : 'rounded-full'}`}
+          >
+            {rightButton.icon && <Feather name={rightButton.icon} size={20} color={rightBtnStyle.iconColor} />}
+            {rightButton.label && (
+              <Text className={`font-bold ${rightBtnStyle.text} ${rightButton.icon ? 'ml-1' : ''}`}>
+                {rightButton.label}
+              </Text>
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 }

@@ -113,7 +113,7 @@ export default function StudentsListScreen({ navigation, route }: Props) {
 
   const renderItem = ({ item }: { item: StudentData }) => (
     <TouchableOpacity 
-      className="bg-white p-4 rounded-xl mb-3 shadow-sm flex-row items-center justify-between border border-gray-100"
+      className="bg-white dark:bg-slate-800 p-4 rounded-xl mb-3 shadow-sm flex-row items-center justify-between border border-gray-100 dark:border-slate-700"
       onPress={() => navigation.navigate('StudentSubjects', { 
         studentId: item.id, 
         studentName: item.name,
@@ -125,8 +125,8 @@ export default function StudentsListScreen({ navigation, route }: Props) {
           <Feather name="user" size={24} color={item.absencePercentage >= 25 ? '#ef4444' : '#10b981'} />
         </View>
         <View className="flex-1 pr-2">
-          <Text className="text-lg font-bold text-gray-800" numberOfLines={1}>{item.name}</Text>
-          <Text className="text-gray-500 mt-1">RA: {item.ra}</Text>
+          <Text className="text-lg font-bold text-gray-800 dark:text-slate-100" numberOfLines={1}>{item.name}</Text>
+          <Text className="text-gray-500 dark:text-slate-400 mt-1">RA: {item.ra}</Text>
         </View>
       </View>
       
@@ -142,7 +142,7 @@ export default function StudentsListScreen({ navigation, route }: Props) {
   if (loading) return <LoadingOverlay message="Carregando alunos..." />;
 
   return (
-    <View className="flex-1 bg-gray-50 pt-14 px-4">
+    <View className="flex-1 bg-gray-50 dark:bg-slate-900 pt-14 px-4">
       {exporting && <LoadingOverlay message="Gerando relatório..." />}
       <ScreenHeader 
         title={`Alunos - ${semesterId}`} 
@@ -156,10 +156,10 @@ export default function StudentsListScreen({ navigation, route }: Props) {
       />
 
       {/* Search Bar */}
-      <View className="bg-white rounded-lg p-3 mb-4 border border-gray-200 flex-row items-center">
+      <View className="bg-white dark:bg-slate-800 rounded-lg p-3 mb-4 border border-gray-200 dark:border-slate-700 flex-row items-center">
         <Feather name="search" size={20} color="#94a3b8" />
         <TextInput
-          className="flex-1 ml-2 text-gray-800 font-medium"
+          className="flex-1 ml-2 text-gray-800 dark:text-slate-100 font-medium"
           placeholder="Buscar por RA ou Nome"
           value={searchQuery}
           onChangeText={handleSearch}

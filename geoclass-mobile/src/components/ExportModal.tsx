@@ -18,19 +18,19 @@ export default function ExportModal({ visible, onClose, onExport, showDetailsOpt
   return (
     <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
       <View className="flex-1 justify-end bg-black/50">
-        <View className="bg-white rounded-t-3xl p-6">
+        <View className="bg-white dark:bg-slate-800 rounded-t-3xl p-6">
           <View className="flex-row justify-between items-center mb-6">
-            <Text className="text-xl font-bold text-gray-800">{title}</Text>
+            <Text className="text-xl font-bold text-gray-800 dark:text-slate-100">{title}</Text>
             <TouchableOpacity onPress={onClose} className="p-2 bg-gray-100 rounded-full">
               <Feather name="x" size={20} color="#64748b" />
             </TouchableOpacity>
           </View>
 
           {showDetailsOption && (
-            <View className="flex-row items-center justify-between bg-gray-50 p-4 rounded-xl mb-6 border border-gray-100">
+            <View className="flex-row items-center justify-between bg-gray-50 dark:bg-slate-900 p-4 rounded-xl mb-6 border border-gray-100 dark:border-slate-700">
               <View className="flex-1 pr-4">
-                <Text className="text-base font-bold text-gray-800">Incluir detalhes aprofundados</Text>
-                <Text className="text-sm text-gray-500 mt-1">Gera um relatório mais completo (ex: lista todas as matérias de cada aluno).</Text>
+                <Text className="text-base font-bold text-gray-800 dark:text-slate-100">Incluir detalhes aprofundados</Text>
+                <Text className="text-sm text-gray-500 dark:text-slate-400 mt-1">Gera um relatório mais completo (ex: lista todas as matérias de cada aluno).</Text>
               </View>
               <Switch
                 value={includeDetails}
@@ -41,7 +41,7 @@ export default function ExportModal({ visible, onClose, onExport, showDetailsOpt
             </View>
           )}
 
-          <Text className="text-sm font-bold text-gray-500 mb-3 uppercase tracking-wider">Escolha o formato</Text>
+          <Text className="text-sm font-bold text-gray-500 dark:text-slate-400 mb-3 uppercase tracking-wider">Escolha o formato</Text>
           
           <View className="flex-row space-x-4 mb-4">
             <TouchableOpacity 

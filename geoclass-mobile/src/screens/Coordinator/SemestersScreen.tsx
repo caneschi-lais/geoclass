@@ -129,7 +129,7 @@ export default function SemestersScreen({ navigation }: Props) {
 
   const renderItem = ({ item }: { item: SemesterData }) => (
     <TouchableOpacity 
-      className="bg-white p-4 rounded-xl mb-3 shadow-sm flex-row items-center justify-between border border-gray-100"
+      className="bg-white dark:bg-slate-800 p-4 rounded-xl mb-3 shadow-sm flex-row items-center justify-between border border-gray-100 dark:border-slate-700"
       onPress={() => navigation.navigate('StudentsList', { semesterId: item.id })}
     >
       <View className="flex-row items-center">
@@ -137,8 +137,8 @@ export default function SemestersScreen({ navigation }: Props) {
           <Feather name="calendar" size={24} color="#0ea5e9" />
         </View>
         <View>
-          <Text className="text-lg font-bold text-gray-800">Semestre {item.name}</Text>
-          <Text className="text-gray-500 mt-1">Clique para ver alunos</Text>
+          <Text className="text-lg font-bold text-gray-800 dark:text-slate-100">Semestre {item.name}</Text>
+          <Text className="text-gray-500 dark:text-slate-400 mt-1">Clique para ver alunos</Text>
         </View>
       </View>
       
@@ -154,7 +154,7 @@ export default function SemestersScreen({ navigation }: Props) {
   if (loading) return <LoadingOverlay message="Carregando semestres..." />;
 
   return (
-    <View className="flex-1 bg-gray-50 pt-14 px-4">
+    <View className="flex-1 bg-gray-50 dark:bg-slate-900 pt-14 px-4">
       {exporting && <LoadingOverlay message="Gerando relatório..." />}
       
       <ScreenHeader 
@@ -169,21 +169,21 @@ export default function SemestersScreen({ navigation }: Props) {
       {/* Acordeão de Cadastro de Sala */}
       <View className="mb-4">
         <TouchableOpacity 
-          className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex-row justify-between items-center"
+          className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 flex-row justify-between items-center"
           onPress={() => setIsAccordionOpen(!isAccordionOpen)}
         >
           <View className="flex-row items-center">
             <Feather name="plus-circle" size={20} color="#0ea5e9" />
-            <Text className="text-gray-800 font-bold ml-2">Cadastrar Nova Sala</Text>
+            <Text className="text-gray-800 dark:text-slate-100 font-bold ml-2">Cadastrar Nova Sala</Text>
           </View>
           <Feather name={isAccordionOpen ? "chevron-up" : "chevron-down"} size={20} color="#94a3b8" />
         </TouchableOpacity>
 
         {isAccordionOpen && (
-          <View className="bg-white p-4 mt-2 rounded-xl shadow-sm border border-gray-100">
-            <Text className="text-xs font-bold text-gray-500 uppercase mb-1">Nome da Sala</Text>
+          <View className="bg-white dark:bg-slate-800 p-4 mt-2 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700">
+            <Text className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Nome da Sala</Text>
             <TextInput 
-              className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3 text-gray-800"
+              className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg p-3 mb-3 text-gray-800 dark:text-slate-100"
               placeholder="Ex: Lab de Informática 1"
               value={roomName}
               onChangeText={setRoomName}
@@ -191,9 +191,9 @@ export default function SemestersScreen({ navigation }: Props) {
 
             <View className="flex-row justify-between mb-4">
               <View className="flex-1 mr-2">
-                <Text className="text-xs font-bold text-gray-500 uppercase mb-1">Latitude</Text>
+                <Text className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Latitude</Text>
                 <TextInput 
-                  className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-gray-800"
+                  className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg p-3 text-gray-800 dark:text-slate-100"
                   placeholder="Ex: -23.5505"
                   keyboardType="numeric"
                   value={roomLat}
@@ -201,9 +201,9 @@ export default function SemestersScreen({ navigation }: Props) {
                 />
               </View>
               <View className="flex-1 ml-2">
-                <Text className="text-xs font-bold text-gray-500 uppercase mb-1">Longitude</Text>
+                <Text className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Longitude</Text>
                 <TextInput 
-                  className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-gray-800"
+                  className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg p-3 text-gray-800 dark:text-slate-100"
                   placeholder="Ex: -46.6333"
                   keyboardType="numeric"
                   value={roomLon}
@@ -224,7 +224,7 @@ export default function SemestersScreen({ navigation }: Props) {
       </View>
 
       <View className="flex-row justify-between items-center mb-4">
-        <Text className="text-xl font-bold text-gray-800">Semestres Ativos</Text>
+        <Text className="text-xl font-bold text-gray-800 dark:text-slate-100">Semestres Ativos</Text>
         <TouchableOpacity 
           className="flex-row items-center bg-gray-200 px-3 py-2 rounded-lg"
           onPress={() => setExportModalVisible(true)}

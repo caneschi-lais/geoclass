@@ -7,7 +7,7 @@ type Props = {
 
 export default function EmptyState({ message }: Props) {
   return (
-    <Text className="text-center text-gray-500 mt-10">
+    <Text className="text-center text-gray-500 dark:text-slate-400 mt-10">
       {message}
     </Text>
   );

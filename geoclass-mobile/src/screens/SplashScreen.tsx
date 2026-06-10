@@ -35,7 +35,7 @@ export default function SplashScreen({ navigation }: Props) {
   }, [navigation]);
 
   return (
-    <View className="flex-1 justify-center items-center bg-white">
+    <View className="flex-1 justify-center items-center bg-white dark:bg-slate-800">
       <Image 
         source={require('../../assets/images/logo.jpg')} 
         className="w-48 h-48 mb-8"

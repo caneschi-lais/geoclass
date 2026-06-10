@@ -50,12 +50,12 @@ export default function ProfessorClassesScreen({ navigation }: Props) {
 
   const renderItem = ({ item }: { item: ClassData }) => (
     //Cartão das classes
-    <View className="bg-white rounded-xl p-5 mb-4 shadow-sm border border-gray-100">
+    <View className="bg-white dark:bg-slate-800 rounded-xl p-5 mb-4 shadow-sm border border-gray-100 dark:border-slate-700">
       <TouchableOpacity className="flex-row justify-between items-center mb-4"
         onPress={() => navigation.navigate('Attendance', { classId: item.id, subjectName: item.subject })}>
         <View className="flex-1 pr-4">
-          <Text className="text-xl font-bold text-gray-800">{item.subject}</Text>
-          <Text className="text-gray-500 font-medium mt-1">{item.time} - {item.room}</Text>
+          <Text className="text-xl font-bold text-gray-800 dark:text-slate-100">{item.subject}</Text>
+          <Text className="text-gray-500 dark:text-slate-400 font-medium mt-1">{item.time} - {item.room}</Text>
         </View>
 
         <Feather name="chevron-right" size={24} color="#94a3b8" />
@@ -64,11 +64,11 @@ export default function ProfessorClassesScreen({ navigation }: Props) {
       {/* Botões para trocar de sala ou aula EAD */}
       <View className="flex-row justify-between mt-2">
         <TouchableOpacity
-          className="flex-1 flex-row items-center justify-center bg-gray-50 py-3 rounded-lg border border-gray-200 mr-2"
+          className="flex-1 flex-row items-center justify-center bg-gray-50 dark:bg-slate-900 py-3 rounded-lg border border-gray-200 dark:border-slate-700 mr-2"
           onPress={() => openChangeRoomModal(item.id, item.time)}
         >
           <Feather name="map" size={16} color="#64748b" />
-          <Text className="text-gray-600 font-bold ml-2 text-xs">Trocar Sala</Text>
+          <Text className="text-gray-600 dark:text-slate-300 font-bold ml-2 text-xs">Trocar Sala</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -85,7 +85,7 @@ export default function ProfessorClassesScreen({ navigation }: Props) {
   if (loading) return <LoadingOverlay />;
 
   return (
-    <View className="flex-1 bg-gray-50 pt-14 px-4">
+    <View className="flex-1 bg-gray-50 dark:bg-slate-900 pt-14 px-4">
       {/* Cabeçalho com título e botão de sair */}
       <ScreenHeader
         title="Minhas Turmas"

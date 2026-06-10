@@ -34,7 +34,7 @@ export default function ClassAttendanceScreen({ route, navigation }: Props) {
   if (loading) return <LoadingOverlay />;
 
   return (
-    <View className="flex-1 bg-gray-50 pt-14 px-4">
+    <View className="flex-1 bg-gray-50 dark:bg-slate-900 pt-14 px-4">
       <ScreenHeader 
         title={subjectName}
         subtitle="Presenças de Hoje"
