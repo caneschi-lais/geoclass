@@ -25,14 +25,12 @@ export default function SemestersScreen({ navigation }: Props) {
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  // Estados para Cadastro de Sala
   const [isAccordionOpen, setIsAccordionOpen] = useState(false);
   const [roomName, setRoomName] = useState('');
   const [roomLat, setRoomLat] = useState('');
   const [roomLon, setRoomLon] = useState('');
   const [creatingRoom, setCreatingRoom] = useState(false);
 
-  // Estados opcionais de Atribuição de Classe
   const [assignClass, setAssignClass] = useState(false);
   const [subjectName, setSubjectName] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
@@ -105,7 +103,6 @@ export default function SemestersScreen({ navigation }: Props) {
           }
         });
 
-        // Criando dados para o gráfico baseado na visão atual (Semestres)
         let chartData: { label: string, value: number }[] = data.map((s: any) => ({
           label: `Semestre ${s.semester}`,
           value: s.absencePercentage
@@ -198,7 +195,6 @@ export default function SemestersScreen({ navigation }: Props) {
         }}
       />
 
-      {/* Acordeão de Cadastro de Sala */}
       <View className="mb-4">
         <TouchableOpacity
           className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 flex-row justify-between items-center"
@@ -244,7 +240,6 @@ export default function SemestersScreen({ navigation }: Props) {
               </View>
             </View>
 
-            {/* Checkbox para vincular turma */}
             <TouchableOpacity
               className="flex-row items-center mb-3 bg-gray-50 dark:bg-slate-900/60 p-3 rounded-lg border border-gray-200/50 dark:border-slate-700/50"
               onPress={() => setAssignClass(!assignClass)}
@@ -324,7 +319,6 @@ export default function SemestersScreen({ navigation }: Props) {
         title="Exportar Visão Geral"
       />
 
-      {/* Modal de Seleção de Professor */}
       <Modal
         visible={profModalVisible}
         transparent={true}

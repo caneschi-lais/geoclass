@@ -20,7 +20,6 @@ export default function ClassAttendanceScreen({ route, navigation }: Props) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [initialLoaded, setInitialLoaded] = useState(false);
 
-  // Estados do modal de calendário
   const [calendarVisible, setCalendarVisible] = useState(false);
   const [currentYear, setCurrentYear] = useState<number>(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState<number>(new Date().getMonth());
@@ -119,7 +118,6 @@ export default function ClassAttendanceScreen({ route, navigation }: Props) {
         onBackPress={() => navigation.goBack()}
       />
 
-      {/* Seletor de Data por Calendário */}
       <TouchableOpacity 
         onPress={() => {
           setCurrentMonth(selectedDate.getMonth());
@@ -164,7 +162,6 @@ export default function ClassAttendanceScreen({ route, navigation }: Props) {
         ListEmptyComponent={<EmptyState message="Nenhum registro de presença ainda." />}
       />
 
-      {/* Modal do Calendário */}
       <Modal
         visible={calendarVisible}
         transparent={true}
@@ -173,7 +170,6 @@ export default function ClassAttendanceScreen({ route, navigation }: Props) {
       >
         <View className="flex-1 justify-center items-center bg-black/50 p-6">
           <View className="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-sm shadow-xl border border-gray-150 dark:border-slate-700">
-            {/* Cabeçalho do Calendário */}
             <View className="flex-row justify-between items-center mb-4">
               <TouchableOpacity onPress={() => changeMonth(-1)} className="p-1">
                 <Feather name="chevron-left" size={24} color="#0ea5e9" />
@@ -186,7 +182,6 @@ export default function ClassAttendanceScreen({ route, navigation }: Props) {
               </TouchableOpacity>
             </View>
 
-            {/* Dias da Semana */}
             <View className="flex-row justify-between mb-2">
               {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day, idx) => (
                 <View key={idx} style={{ width: 36, alignItems: 'center' }}>
@@ -195,7 +190,6 @@ export default function ClassAttendanceScreen({ route, navigation }: Props) {
               ))}
             </View>
 
-            {/* Grid de Dias */}
             <View className="h-64 justify-center items-center">
               <FlatList
                 data={getDaysInMonth(currentYear, currentMonth)}
@@ -239,7 +233,6 @@ export default function ClassAttendanceScreen({ route, navigation }: Props) {
               />
             </View>
 
-            {/* Botões de Ação */}
             <View className="flex-row justify-between mt-4 border-t border-gray-150 dark:border-slate-700/80 pt-4">
               <TouchableOpacity
                 onPress={() => {

@@ -103,8 +103,6 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
           {item.absencePercentage}%
         </Text>
       </View>
-
-      {/* Barra de Progresso Visual */}
       <View className="w-full h-2 bg-gray-200 rounded-full mt-3 overflow-hidden flex-row">
         <View
           className="h-full bg-emerald-400"

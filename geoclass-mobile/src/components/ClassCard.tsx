@@ -49,7 +49,7 @@ export default function ClassCard({ aula, onConfirm, isLoading }: ClassCardProps
         </View>
       </View>
 
-      {/* Botão Pressionável com Feedback de Preenchimento Visual */}
+      {/* Componente press-and-hold para evitar toques acidentais */}
       <Pressable
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
@@ -66,7 +66,6 @@ export default function ClassCard({ aula, onConfirm, isLoading }: ClassCardProps
           }
         ]}
       >
-        {/* Barra de Progresso Animada */}
         {!isLoading && (
           <Animated.View
             style={{
@@ -74,7 +73,7 @@ export default function ClassCard({ aula, onConfirm, isLoading }: ClassCardProps
               left: 0,
               top: 0,
               bottom: 0,
-              backgroundColor: '#059669', // emerald-600 para dar contraste ao preenchimento
+              backgroundColor: '#059669',
               width: progress.interpolate({
                 inputRange: [0, 1],
                 outputRange: ['0%', '100%']

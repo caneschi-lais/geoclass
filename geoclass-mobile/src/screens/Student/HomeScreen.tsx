@@ -116,7 +116,6 @@ export default function HomeScreen({ navigation }: Props) {
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-slate-900 pt-14 px-4">
-      {/* Cabeçalho com título e botão de configurações */}
       <ScreenHeader
         title="Aulas de Hoje"
         rightButton={{
@@ -126,7 +125,6 @@ export default function HomeScreen({ navigation }: Props) {
         }}
       />
 
-      {/* Catões para alunos marcarem a presença nas materias */}
       <FlatList
         data={classes}
         keyExtractor={(item) => item.id}

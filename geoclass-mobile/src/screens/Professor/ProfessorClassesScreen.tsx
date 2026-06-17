@@ -49,7 +49,6 @@ export default function ProfessorClassesScreen({ navigation }: Props) {
   };
 
   const renderItem = ({ item }: { item: ClassData }) => (
-    //Cartão das classes
     <View className="bg-white dark:bg-slate-800 rounded-xl p-5 mb-4 shadow-sm border border-gray-100 dark:border-slate-700">
       <TouchableOpacity className="flex-row justify-between items-center mb-3"
         onPress={() => navigation.navigate('Attendance', { classId: item.id, subjectName: item.subject })}>
@@ -62,7 +61,6 @@ export default function ProfessorClassesScreen({ navigation }: Props) {
         <Feather name="chevron-right" size={24} color="#94a3b8" />
       </TouchableOpacity>
 
-      {/* Botões para trocar de sala ou aula EAD */}
       <View className="flex-row justify-between mt-1">
         <TouchableOpacity
           className="flex-1 flex-row items-center justify-center bg-gray-50 dark:bg-slate-900 py-3 rounded-lg border border-gray-200 dark:border-slate-700 mr-2"
@@ -87,7 +85,6 @@ export default function ProfessorClassesScreen({ navigation }: Props) {
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-slate-900 pt-14 px-4">
-      {/* Cabeçalho com título e botão de sair */}
       <ScreenHeader
         title="Minhas Turmas"
         subtitle=""
@@ -106,7 +103,6 @@ export default function ProfessorClassesScreen({ navigation }: Props) {
         ListEmptyComponent={<EmptyState message="Nenhuma turma cadastrada." />}
       />
 
-      {/* Modal para trocar de sala */}
       <ChangeRoomModal
         visible={modalVisible}
         classId={selectedClassId}

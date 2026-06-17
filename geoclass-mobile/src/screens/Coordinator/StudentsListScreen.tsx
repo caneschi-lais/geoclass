@@ -29,7 +29,6 @@ export default function StudentsListScreen({ navigation, route }: Props) {
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  // Estados para Matérias & Professores
   const [activeTab, setActiveTab] = useState<'students' | 'classes'>('students');
   const [classes, setClasses] = useState<any[]>([]);
   const [filteredClasses, setFilteredClasses] = useState<any[]>([]);
@@ -216,7 +215,6 @@ export default function StudentsListScreen({ navigation, route }: Props) {
         }}
       />
 
-      {/* Tabs */}
       <View className="flex-row bg-gray-100 dark:bg-slate-800 p-1 rounded-xl mb-4 border border-gray-200 dark:border-gray-200/20 ">
         <TouchableOpacity
           className={`flex-1 py-2.5 rounded-lg items-center ${activeTab === 'students' ? 'bg-white dark:bg-slate-700 shadow-sm' : ''}`}
@@ -236,7 +234,6 @@ export default function StudentsListScreen({ navigation, route }: Props) {
         </TouchableOpacity>
       </View>
 
-      {/* Search Bar */}
       <View className="bg-white dark:bg-slate-800 rounded-lg p-3 mb-4 border border-gray-200 dark:border-slate-700 flex-row items-center">
         <Feather name="search" size={20} color="#94a3b8" />
         <TextInput
