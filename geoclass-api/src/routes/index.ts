@@ -38,8 +38,10 @@ router.get('/professor/salas-disponiveis', roomController.getAvailableRooms);
 // --- Rotas do Coordenador ---
 router.get('/coordenador/semestres', coordinatorController.getSemesters);
 router.get('/coordenador/semestre/:id/alunos', coordinatorController.getStudentsBySemester);
+router.get('/coordenador/semestre/:id/turmas', coordinatorController.getClassesBySemester);
 router.get('/coordenador/aluno/:id/materias', coordinatorController.getStudentSubjects);
 router.get('/coordenador/relatorio', coordinatorController.getReportData);
 router.post('/coordenador/sala', coordinatorController.createRoom);
+router.get('/coordenador/professores', coordinatorController.getProfessors);
 
 export default router;

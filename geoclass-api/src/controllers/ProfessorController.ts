@@ -16,6 +16,9 @@ export class ProfessorController {
         include: {
           temporaryLocs: {
             where: { date: todayStr }
+          },
+          _count: {
+            select: { enrollments: true }
           }
         }
       });
@@ -26,7 +29,8 @@ export class ProfessorController {
           id: c.id,
           subject: c.subject,
           time: c.schedule_time,
-          room: tempRoom || c.room_name
+          room: tempRoom || c.room_name,
+          enrolledCount: c._count.enrollments
         };
       });
 
@@ -39,14 +43,29 @@ export class ProfessorController {
 
   async getPresencasTurma(req: AuthRequest, res: Response) {
     const classId = req.params.id;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const { date } = req.query as { date?: string };
+
+    let targetDate: Date;
+    if (date && typeof date === 'string') {
+      const parts = date.split('-');
+      if (parts.length === 3) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10);
+        const day = parseInt(parts[2], 10);
+        targetDate = new Date(year, month - 1, day);
+      } else {
+        targetDate = new Date();
+      }
+    } else {
+      targetDate = new Date();
+    }
+    targetDate.setHours(0, 0, 0, 0);
 
     try {
       const attendances = await prisma.attendance.findMany({
         where: {
           class_id: classId,
-          date: today,
+          date: targetDate,
           status: 'PRESENTE'
         },
         include: {

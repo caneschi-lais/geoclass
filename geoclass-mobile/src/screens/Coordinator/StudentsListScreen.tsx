@@ -29,8 +29,14 @@ export default function StudentsListScreen({ navigation, route }: Props) {
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [exporting, setExporting] = useState(false);
 
+  // Estados para Matérias & Professores
+  const [activeTab, setActiveTab] = useState<'students' | 'classes'>('students');
+  const [classes, setClasses] = useState<any[]>([]);
+  const [filteredClasses, setFilteredClasses] = useState<any[]>([]);
+
   useEffect(() => {
     loadStudents();
+    loadClasses();
   }, [semesterId]);
 
   const loadStudents = async () => {
@@ -45,17 +51,46 @@ export default function StudentsListScreen({ navigation, route }: Props) {
     }
   };
 
+  const loadClasses = async () => {
+    try {
+      const response = await api.get(`/coordenador/semestre/${semesterId}/turmas`);
+      setClasses(response.data);
+      setFilteredClasses(response.data);
+    } catch (error) {
+      console.log('Error loading classes', error);
+    }
+  };
+
   const handleSearch = (text: string) => {
     setSearchQuery(text);
-    if (text.trim() === '') {
-      setFilteredStudents(students);
+    if (activeTab === 'students') {
+      if (text.trim() === '') {
+        setFilteredStudents(students);
+      } else {
+        const filtered = students.filter(
+          s => s.ra.toLowerCase().includes(text.toLowerCase()) ||
+            s.name.toLowerCase().includes(text.toLowerCase())
+        );
+        setFilteredStudents(filtered);
+      }
     } else {
-      const filtered = students.filter(
-        s => s.ra.toLowerCase().includes(text.toLowerCase()) || 
-             s.name.toLowerCase().includes(text.toLowerCase())
-      );
-      setFilteredStudents(filtered);
+      if (text.trim() === '') {
+        setFilteredClasses(classes);
+      } else {
+        const filtered = classes.filter(
+          c => c.subject.toLowerCase().includes(text.toLowerCase()) ||
+            c.professor.name.toLowerCase().includes(text.toLowerCase())
+        );
+        setFilteredClasses(filtered);
+      }
     }
+  };
+
+  const handleTabSwitch = (tab: 'students' | 'classes') => {
+    setActiveTab(tab);
+    setSearchQuery('');
+    setFilteredStudents(students);
+    setFilteredClasses(classes);
   };
 
   const handleExport = async (format: 'pdf' | 'excel', includeDetails: boolean) => {
@@ -64,7 +99,7 @@ export default function StudentsListScreen({ navigation, route }: Props) {
     try {
       const response = await api.get(`/coordenador/relatorio?level=students&semesterId=${semesterId}&includeDetails=${includeDetails}`);
       const data = response.data;
-      
+
       if (format === 'excel') {
         let excelData: any[] = [];
         data.forEach((s: any) => {
@@ -93,10 +128,10 @@ export default function StudentsListScreen({ navigation, route }: Props) {
             }
           }
         });
-        
+
         // Criando dados para o gráfico (Top 5 alunos com mais faltas)
         const sortedData = [...data].sort((a: any, b: any) => b.absencePercentage - a.absencePercentage).slice(0, 5);
-        let chartData: {label: string, value: number}[] = sortedData.map((s: any) => ({
+        let chartData: { label: string, value: number }[] = sortedData.map((s: any) => ({
           label: s.name,
           value: s.absencePercentage
         }));
@@ -112,12 +147,12 @@ export default function StudentsListScreen({ navigation, route }: Props) {
   };
 
   const renderItem = ({ item }: { item: StudentData }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       className="bg-white dark:bg-slate-800 p-4 rounded-xl mb-3 shadow-sm flex-row items-center justify-between border border-gray-100 dark:border-slate-700"
-      onPress={() => navigation.navigate('StudentSubjects', { 
-        studentId: item.id, 
+      onPress={() => navigation.navigate('StudentSubjects', {
+        studentId: item.id,
         studentName: item.name,
-        semesterId 
+        semesterId
       })}
     >
       <View className="flex-row items-center flex-1">
@@ -125,11 +160,11 @@ export default function StudentsListScreen({ navigation, route }: Props) {
           <Feather name="user" size={24} color={item.absencePercentage >= 25 ? '#ef4444' : '#10b981'} />
         </View>
         <View className="flex-1 pr-2">
-          <Text className="text-lg font-bold text-gray-800 dark:text-slate-100" numberOfLines={1}>{item.name}</Text>
-          <Text className="text-gray-500 dark:text-slate-400 mt-1">RA: {item.ra}</Text>
+          <Text className="text-md font-bold text-gray-800 dark:text-slate-100" numberOfLines={1}>{item.name}</Text>
+          <Text className="text-xs text-gray-500 dark:text-slate-400 mt-1">RA: {item.ra}</Text>
         </View>
       </View>
-      
+
       <View className="items-end">
         <Text className="text-xs text-gray-400 mb-1">Faltas Totais</Text>
         <Text className={`text-lg font-black ${item.absencePercentage >= 25 ? 'text-red-500' : 'text-emerald-500'}`}>
@@ -139,13 +174,39 @@ export default function StudentsListScreen({ navigation, route }: Props) {
     </TouchableOpacity>
   );
 
-  if (loading) return <LoadingOverlay message="Carregando alunos..." />;
+  const renderClassItem = ({ item }: { item: any }) => (
+    <View className="bg-white dark:bg-slate-800 p-4 rounded-xl mb-3 shadow-sm border border-gray-100 dark:border-slate-700 flex-row items-center justify-between">
+      <View className="flex-row items-center flex-1">
+        <View className="p-3 rounded-full mr-4 bg-sky-100 dark:bg-sky-900/30">
+          <Feather name="book-open" size={24} color="#0284c7" />
+        </View>
+        <View className="flex-1 pr-2">
+          <Text className="text-md font-bold text-gray-800 dark:text-slate-100" numberOfLines={1}>
+            {item.subject}
+          </Text>
+          <Text className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Prof. {item.professor.name}
+          </Text>
+          <Text className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            {item.room_name} • Horário: {item.schedule_time}
+          </Text>
+        </View>
+      </View>
+      <View className="bg-gray-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-gray-100 dark:border-slate-700/50">
+        <Text className="text-xs text-gray-500 dark:text-slate-400 font-bold uppercase">
+          {item.total_classes} Aulas
+        </Text>
+      </View>
+    </View>
+  );
+
+  if (loading) return <LoadingOverlay message="Carregando dados..." />;
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-slate-900 pt-14 px-4">
       {exporting && <LoadingOverlay message="Gerando relatório..." />}
-      <ScreenHeader 
-        title={`Alunos - ${semesterId}`} 
+      <ScreenHeader
+        title={`${semesterId}`}
         showBackButton={true}
         onBackPress={() => navigation.goBack()}
         rightButton={{
@@ -155,25 +216,51 @@ export default function StudentsListScreen({ navigation, route }: Props) {
         }}
       />
 
+      {/* Tabs */}
+      <View className="flex-row bg-gray-100 dark:bg-slate-800 p-1 rounded-xl mb-4 border border-gray-200 dark:border-gray-200/20 ">
+        <TouchableOpacity
+          className={`flex-1 py-2.5 rounded-lg items-center ${activeTab === 'students' ? 'bg-white dark:bg-slate-700 shadow-sm' : ''}`}
+          onPress={() => handleTabSwitch('students')}
+        >
+          <Text className={`font-bold text-xs ${activeTab === 'students' ? 'text-gray-800 dark:text-slate-100' : 'text-gray-500 dark:text-slate-400'}`}>
+            Alunos
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          className={`flex-1 py-2.5 rounded-lg items-center ${activeTab === 'classes' ? 'bg-white dark:bg-slate-700 shadow-sm' : ''}`}
+          onPress={() => handleTabSwitch('classes')}
+        >
+          <Text className={`font-bold text-xs ${activeTab === 'classes' ? 'text-gray-800 dark:text-slate-100' : 'text-gray-500 dark:text-slate-400'}`}>
+            Matérias & Professores
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Search Bar */}
       <View className="bg-white dark:bg-slate-800 rounded-lg p-3 mb-4 border border-gray-200 dark:border-slate-700 flex-row items-center">
         <Feather name="search" size={20} color="#94a3b8" />
         <TextInput
           className="flex-1 ml-2 text-gray-800 dark:text-slate-100 font-medium"
-          placeholder="Buscar por RA ou Nome"
+          placeholder={activeTab === 'students' ? "Buscar por RA ou Nome" : "Buscar por Matéria ou Professor"}
           value={searchQuery}
           onChangeText={handleSearch}
         />
       </View>
 
       <FlatList
-        data={filteredStudents}
+        data={activeTab === 'students' ? filteredStudents : filteredClasses}
         keyExtractor={(item) => item.id}
-        renderItem={renderItem}
+        renderItem={activeTab === 'students' ? renderItem : renderClassItem}
         contentContainerStyle={{ paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <EmptyState message={searchQuery ? 'Nenhum aluno encontrado.' : 'Nenhum aluno matriculado.'} />
+          <EmptyState
+            message={
+              activeTab === 'students'
+                ? (searchQuery ? 'Nenhum aluno encontrado.' : 'Nenhum aluno matriculado.')
+                : (searchQuery ? 'Nenhuma matéria encontrada.' : 'Nenhuma matéria cadastrada.')
+            }
+          />
         }
       />
 

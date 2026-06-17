@@ -7,6 +7,7 @@ export interface ClassData {
   longitude: number;
   radiusMeters: number;
   room?: string;
+  enrolledCount?: number;
 }
 
 export interface DashboardStat {

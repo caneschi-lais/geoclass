@@ -237,7 +237,7 @@ export class CoordinatorController {
 
   // 5. Cadastrar nova sala
   async createRoom(req: AuthRequest, res: Response) {
-    const { name, latitude, longitude } = req.body;
+    const { name, latitude, longitude, assignClass, subject, schedule_time, professor_id } = req.body;
 
     if (!name || latitude === undefined || longitude === undefined) {
       return res.status(400).json({ error: 'Nome, latitude e longitude são obrigatórios' });
@@ -252,6 +252,18 @@ export class CoordinatorController {
         return res.status(400).json({ error: 'Já existe uma sala com esse nome' });
       }
 
+      if (assignClass) {
+        if (!subject || !schedule_time || !professor_id) {
+          return res.status(400).json({ error: 'Matéria, horário e professor são obrigatórios para vincular à turma' });
+        }
+        const professor = await prisma.user.findFirst({
+          where: { id: professor_id, role: 'PROFESSOR' }
+        });
+        if (!professor) {
+          return res.status(404).json({ error: 'Professor selecionado não foi encontrado' });
+        }
+      }
+
       const room = await prisma.room.create({
         data: {
           name,
@@ -260,10 +272,76 @@ export class CoordinatorController {
         }
       });
 
-      return res.status(201).json({ message: 'Sala cadastrada com sucesso!', room });
+      let createdClass = null;
+      if (assignClass) {
+        createdClass = await prisma.class.create({
+          data: {
+            subject,
+            schedule_time,
+            professor_id,
+            latitude: parseFloat(String(latitude)),
+            longitude: parseFloat(String(longitude)),
+            room_name: name,
+            radius_meters: 50,
+            semester: '2026.1',
+            total_classes: 40
+          }
+        });
+      }
+
+      return res.status(201).json({ 
+        message: 'Sala cadastrada com sucesso!', 
+        room,
+        class: createdClass 
+      });
     } catch (error) {
       console.error('Erro createRoom', error);
       return res.status(500).json({ error: 'Erro ao cadastrar a sala' });
     }
   }
+
+  // 6. Obter lista de professores cadastrados
+  async getProfessors(req: AuthRequest, res: Response) {
+    try {
+      const professors = await prisma.user.findMany({
+        where: { role: 'PROFESSOR' },
+        select: {
+          id: true,
+          name: true,
+          email: true
+        },
+        orderBy: { name: 'asc' }
+      });
+      return res.json(professors);
+    } catch (error) {
+      console.error('Erro getProfessors', error);
+      return res.status(500).json({ error: 'Erro ao buscar professores' });
+    }
+  }
+
+  // 7. Obter todas as turmas (matérias e professores) de um semestre
+  async getClassesBySemester(req: AuthRequest, res: Response) {
+    const { id: semester } = req.params;
+
+    try {
+      const classes = await prisma.class.findMany({
+        where: { semester, active: true },
+        include: {
+          professor: {
+            select: {
+              name: true,
+              email: true
+            }
+          }
+        },
+        orderBy: { subject: 'asc' }
+      });
+
+      return res.json(classes);
+    } catch (error) {
+      console.error('Erro getClassesBySemester', error);
+      return res.status(500).json({ error: 'Erro ao buscar turmas do semestre' });
+    }
+  }
 }
+

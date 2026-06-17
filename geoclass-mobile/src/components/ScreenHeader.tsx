@@ -31,12 +31,12 @@ export default function ScreenHeader({
     if (!rightButton) return { container: '', text: '', iconColor: '' };
     switch (rightButton.variant) {
       case 'danger':
-        return { container: 'bg-red-100 dark:bg-red-900/30 px-3 py-2', text: 'text-red-600 dark:text-red-400', iconColor: isDark ? '#f87171' : '#dc2626' };
+        return { container: 'bg-red-100 dark:bg-red-900/30 px-2 py-1', text: 'text-sm text-red-600 dark:text-red-400', iconColor: isDark ? '#f87171' : '#dc2626' };
       case 'info':
-        return { container: 'bg-sky-100 dark:bg-sky-900/30 p-2', text: 'text-sky-600 dark:text-sky-400 px-2', iconColor: isDark ? '#38bdf8' : '#0ea5e9' };
+        return { container: 'bg-sky-100 dark:bg-sky-900/30 p-1', text: 'text-sm text-sky-600 dark:text-sky-400', iconColor: isDark ? '#38bdf8' : '#0ea5e9' };
       case 'white':
       default:
-        return { container: 'bg-white dark:bg-slate-800 p-2 border border-gray-100 dark:border-slate-700 shadow-sm', text: 'text-gray-800 dark:text-slate-200 px-2', iconColor: isDark ? '#cbd5e1' : '#334155' };
+        return { container: 'bg-white dark:bg-slate-800 p-1 border border-gray-100 dark:border-slate-700 shadow-sm', text: 'text-sm text-gray-800 dark:text-slate-200', iconColor: isDark ? '#cbd5e1' : '#334155' };
     }
   };
 
@@ -47,14 +47,14 @@ export default function ScreenHeader({
       {showBackButton && (
         <TouchableOpacity
           onPress={onBackPress}
-          className="mr-3 bg-white dark:bg-slate-800 p-2 rounded-full shadow-sm border border-gray-100 dark:border-slate-700"
+          className="mr-2 bg-white dark:bg-slate-800 p-1.5 rounded-full shadow-sm border border-gray-100 dark:border-slate-700"
         >
-          <Feather name="arrow-left" size={24} color={isDark ? "#cbd5e1" : "#334155"} />
+          <Feather name="arrow-left" size={18} color={isDark ? "#cbd5e1" : "#334155"} />
         </TouchableOpacity>
       )}
 
       <View className="flex-1">
-        <Text className="text-2xl font-extrabold text-gray-800 dark:text-slate-100" numberOfLines={1}>{title}</Text>
+        <Text className="text-xl font-extrabold text-gray-800 dark:text-slate-100" numberOfLines={1}>{title}</Text>
         {subtitle && <Text className="text-gray-500 dark:text-slate-400 font-medium">{subtitle}</Text>}
       </View>
 

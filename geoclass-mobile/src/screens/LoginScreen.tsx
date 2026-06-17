@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, Image } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import api from '../services/api';
 import { saveToken, saveRole } from '../services/authStorage';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { UserRole } from '../types';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
@@ -24,14 +23,12 @@ export default function LoginScreen({ navigation }: Props) {
     setLoading(true);
     try {
       const response = await api.post('/login', { email, password });
-
       const { token, user } = response.data;
 
       if (token && user?.role) {
         await saveToken(token);
         await saveRole(user.role);
 
-        // Redireciona para o fluxo principal baseado no Role
         if (user.role === 'PROFESSOR') navigation.replace('ProfessorApp');
         else if (user.role === 'COORDENADOR') navigation.replace('CoordinatorApp');
         else navigation.replace('AlunoApp');
@@ -48,20 +45,27 @@ export default function LoginScreen({ navigation }: Props) {
   };
 
   return (
-    <View className="flex-1 justify-center items-center bg-white dark:bg-slate-800 p-6">
-      <Image
-        source={require('../../assets/images/logo.jpg')}
-        className="w-24 h-24 mb-6"
-        resizeMode="contain"
-      />
+    <View className="flex-1 justify-center items-center bg-slate-800 p-6">
+      <View className="items-center justify-center mb-4">
+        <View className="items-center justify-center mb-6">
+          <Image className='rounded-2xl'
+            source={require('../../assets/images/logo.jpg')}
+            style={{ width: 100, height: 100 }}
+            resizeMode="contain"
+          />
+        </View>
+      </View>
 
-      <Text className="text-3xl font-bold text-gray-800 dark:text-slate-100 mb-8">GeoClass</Text>
+      <Text className="text-3xl font-bold text-slate-100 mb-8 text-center">
+        GeoClass
+      </Text>
 
       <View className="w-full max-w-sm mb-4">
-        <Text className="text-gray-600 dark:text-slate-300 mb-2 font-medium">E-mail</Text>
+        <Text className="text-slate-300 mb-2 font-medium">E-mail</Text>
         <TextInput
-          className="w-full bg-gray-100 rounded-lg p-4 text-gray-800 dark:text-slate-100 border border-gray-200 dark:border-slate-700"
+          className="w-full bg-slate-700 rounded-lg p-4 text-slate-100 border border-slate-600"
           placeholder="Digite seu e-mail"
+          placeholderTextColor="#94a3b8"
           keyboardType="email-address"
           autoCapitalize="none"
           value={email}
@@ -70,10 +74,11 @@ export default function LoginScreen({ navigation }: Props) {
       </View>
 
       <View className="w-full max-w-sm mb-8">
-        <Text className="text-gray-600 dark:text-slate-300 mb-2 font-medium">Senha</Text>
+        <Text className="text-slate-300 mb-2 font-medium">Senha</Text>
         <TextInput
-          className="w-full bg-gray-100 rounded-lg p-4 text-gray-800 dark:text-slate-100 border border-gray-200 dark:border-slate-700"
+          className="w-full bg-slate-700 rounded-lg p-4 text-slate-100 border border-slate-600"
           placeholder="Digite sua senha"
+          placeholderTextColor="#94a3b8"
           secureTextEntry
           value={password}
           onChangeText={setPassword}

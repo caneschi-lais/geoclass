@@ -33,7 +33,7 @@ export default function DashboardScreen() {
       {/* Cabeçalho com título e subtítulo */}
       <ScreenHeader
         title="Meu Desempenho"
-        subtitle="Acompanhe sua frequência nas disciplinas."
+        subtitle="Acompanhe sua frequência."
       />
 
       {/* Cards com estatísticas de frequência */}
