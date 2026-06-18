@@ -13,7 +13,7 @@ export type RootStackParamList = {
   AlunoApp: undefined;
   ProfessorApp: undefined;
   CoordinatorApp: undefined;
-  Privacy: undefined;
+  Privacy: { fromLogin?: boolean } | undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();

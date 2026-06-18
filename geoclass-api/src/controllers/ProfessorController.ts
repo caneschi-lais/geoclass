@@ -278,4 +278,58 @@ export class ProfessorController {
       return res.status(500).json({ error: 'Erro ao salvar a chamada manual' });
     }
   }
+
+  async resetDeviceBinding(req: AuthRequest, res: Response) {
+    const userRole = req.user?.role;
+
+    if (userRole !== 'PROFESSOR' && userRole !== 'COORDENADOR') {
+      return res.status(403).json({ error: 'Acesso negado. Apenas professores ou coordenadores podem realizar esta ação.' });
+    }
+
+    const { attendanceId, studentId, classId } = req.body;
+
+    if (!attendanceId && (!studentId || !classId)) {
+      return res.status(400).json({ error: 'Informe o attendanceId ou (studentId e classId)' });
+    }
+
+    try {
+      let attendance;
+
+      if (attendanceId) {
+        attendance = await prisma.attendance.findUnique({
+          where: { id: attendanceId }
+        });
+      } else {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        attendance = await prisma.attendance.findUnique({
+          where: {
+            student_id_class_id_date: {
+              student_id: studentId,
+              class_id: classId,
+              date: today
+            }
+          }
+        });
+      }
+
+      if (!attendance) {
+        return res.status(404).json({ error: 'Registro de presença não encontrado.' });
+      }
+
+      const updated = await prisma.attendance.update({
+        where: { id: attendance.id },
+        data: { device_id: null }
+      });
+
+      return res.json({
+        message: 'Vínculo de dispositivo liberado com sucesso!',
+        attendance: updated
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao resetar vínculo de dispositivo.' });
+    }
+  }
 }

@@ -31,9 +31,13 @@ export default function LoginScreen({ navigation }: Props) {
         await saveToken(token);
         await saveRole(user.role);
 
-        if (user.role === 'PROFESSOR') navigation.replace('ProfessorApp');
-        else if (user.role === 'COORDENADOR') navigation.replace('CoordinatorApp');
-        else navigation.replace('AlunoApp');
+        if (!user.privacy_terms_accepted_at) {
+          navigation.replace('Privacy', { fromLogin: true });
+        } else {
+          if (user.role === 'PROFESSOR') navigation.replace('ProfessorApp');
+          else if (user.role === 'COORDENADOR') navigation.replace('CoordinatorApp');
+          else navigation.replace('AlunoApp');
+        }
       } else {
         Alert.alert('Erro', 'Token ou perfil não retornado pelo servidor.');
       }

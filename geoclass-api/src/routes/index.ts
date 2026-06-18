@@ -36,6 +36,7 @@ router.get('/professor/turma/:id/alunos', professorController.getEnrolledStudent
 router.post('/professor/turma/:id/chamada-manual', professorController.registerManualAttendance);
 router.post('/professor/turma/:id/trocar-sala', professorController.changeRoomTemporarily);
 router.get('/professor/salas-disponiveis', roomController.getAvailableRooms);
+router.post('/professor/presenca/reset-device', professorController.resetDeviceBinding);
 
 // --- Rotas do Coordenador ---
 router.get('/coordenador/semestres', coordinatorController.getSemesters);

@@ -77,7 +77,7 @@ export function useStudentHome() {
     setProcessingId(aula.id);
 
     // 1. Obter GPS
-    let lat: number, lon: number;
+    let lat: number, lon: number, accuracy: number | undefined;
     try {
       const { status } = await Location.getForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -92,12 +92,14 @@ export function useStudentHome() {
       if (Platform.OS === 'web') {
         lat = aula.latitude;
         lon = aula.longitude;
+        accuracy = 0;
       } else {
         const location = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.High
         });
         lat = location.coords.latitude;
         lon = location.coords.longitude;
+        accuracy = location.coords.accuracy ?? undefined;
 
         if (location.mocked === true) {
           Alert.alert(
@@ -123,7 +125,8 @@ export function useStudentHome() {
         classId: aula.id,
         lat,
         lon,
-        deviceId
+        deviceId,
+        accuracy
       });
 
       if (Platform.OS === 'web') {
@@ -141,9 +144,10 @@ export function useStudentHome() {
         // Fallback: Modo Offline com validação de Geofencing local e assinatura criptográfica
         const distance = getDistanceFromLatLonInMeters(lat, lon, aula.latitude, aula.longitude);
         const radiusLimit = aula.radiusMeters || 50;
+        const localAccuracy = accuracy || 0;
 
-        if (distance > radiusLimit) {
-          const msg = `Você está fora da área permitida. Distância: ${Math.round(distance)}m. Limite: ${radiusLimit}m.`;
+        if (distance - localAccuracy > radiusLimit) {
+          const msg = `Você está fora da área permitida. Distância (ajustada): ${Math.round(distance - localAccuracy)}m. Limite: ${radiusLimit}m.`;
           if (Platform.OS === 'web') {
             window.alert('Presença offline recusada: ' + msg);
           } else {

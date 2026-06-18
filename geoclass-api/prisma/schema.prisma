@@ -8,77 +8,78 @@ datasource db {
 }
 
 model User {
-  id            String       @id @default(uuid())
-  name          String
-  email         String       @unique
-  password_hash String
-  role          Role         @default(ALUNO)
-  ra            String?      @unique
-  
-  classesTaught Class[]      @relation("ProfessorClasses")
+  id                        String    @id @default(uuid())
+  name                      String
+  email                     String    @unique
+  password_hash             String
+  role                      Role      @default(ALUNO)
+  ra                        String?   @unique
+  privacy_terms_accepted_at DateTime?
+
+  classesTaught Class[]        @relation("ProfessorClasses")
   enrollments   Enrollment[]
   attendances   Attendance[]
   notifications Notification[]
 
-  created_at    DateTime     @default(now())
+  created_at DateTime @default(now())
 }
 
 model Class {
-  id            String       @id @default(uuid())
+  id            String  @id @default(uuid())
   subject       String
-  schedule_time String       // Ex: "08:00"
+  schedule_time String // Ex: "08:00"
   latitude      Float
   longitude     Float
   radius_meters Int
-  active        Boolean      @default(true)
-  
-  semester      String       @default("2026.1") // Ex: "2026.1"
-  room_name     String       @default("Sala Padrão") // Ex: "Lab 1"
-  total_classes Int          @default(40) // Quantidade total de aulas previstas
-  
-  professor_id  String
-  professor     User         @relation("ProfessorClasses", fields: [professor_id], references: [id])
-  
-  enrollments   Enrollment[]
-  attendances   Attendance[]
+  active        Boolean @default(true)
 
-  created_at    DateTime     @default(now())
+  semester      String @default("2026.1") // Ex: "2026.1"
+  room_name     String @default("Sala Padrão") // Ex: "Lab 1"
+  total_classes Int    @default(40) // Quantidade total de aulas previstas
+
+  professor_id String
+  professor    User   @relation("ProfessorClasses", fields: [professor_id], references: [id])
+
+  enrollments Enrollment[]
+  attendances Attendance[]
+
+  created_at    DateTime                 @default(now())
   temporaryLocs TemporaryClassLocation[]
 }
 
 model Enrollment {
-  id         String   @id @default(uuid())
-  
+  id String @id @default(uuid())
+
   student_id String
-  student    User     @relation(fields: [student_id], references: [id])
-  
-  class_id   String
-  class      Class    @relation(fields: [class_id], references: [id])
+  student    User   @relation(fields: [student_id], references: [id])
+
+  class_id String
+  class    Class  @relation(fields: [class_id], references: [id])
 
   @@unique([student_id, class_id])
 }
 
 model Attendance {
-  id                String   @id @default(uuid())
-  
-  student_id        String
-  student           User     @relation(fields: [student_id], references: [id])
-  
-  class_id          String
-  class             Class    @relation(fields: [class_id], references: [id])
-  
-  date              DateTime @db.Date
-  check_in_time     DateTime
-  device_id         String?
-  status            Status   @default(PRESENTE)
-  
+  id String @id @default(uuid())
+
+  student_id String
+  student    User   @relation(fields: [student_id], references: [id])
+
+  class_id String
+  class    Class  @relation(fields: [class_id], references: [id])
+
+  date          DateTime @db.Date
+  check_in_time DateTime
+  device_id     String?
+  status        Status   @default(PRESENTE)
+
   student_latitude  Float?
   student_longitude Float?
-  
-  is_remote         Boolean  @default(false)
-  manual_attendance Boolean  @default(false)
-  
-  created_at        DateTime @default(now())
+
+  is_remote         Boolean @default(false)
+  manual_attendance Boolean @default(false)
+
+  created_at DateTime @default(now())
 
   @@unique([student_id, class_id, date])
 }
@@ -96,22 +97,22 @@ enum Status {
 }
 
 model Room {
-  id        String   @id @default(uuid())
-  name      String   @unique
+  id        String @id @default(uuid())
+  name      String @unique
   latitude  Float
   longitude Float
 }
 
 model TemporaryClassLocation {
-  id        String   @id @default(uuid())
+  id        String @id @default(uuid())
   class_id  String
-  class     Class    @relation(fields: [class_id], references: [id])
-  date      String   // Ex: "2026-05-12"
+  class     Class  @relation(fields: [class_id], references: [id])
+  date      String // Ex: "2026-05-12"
   room_id   String
   room_name String
   latitude  Float
   longitude Float
-  
+
   @@unique([class_id, date])
 }
 

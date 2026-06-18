@@ -27,7 +27,8 @@ function deg2rad(deg: number) {
 export class AttendanceController {
   async registrarPresenca(req: AuthRequest, res: Response) {
     const studentId = req.user?.id;
-    const { classId, lat, lon, deviceId, timestamp, signature } = req.body;
+    const { classId, lat, lon, deviceId, timestamp, signature, accuracy } = req.body;
+    const gpsAccuracy = accuracy !== undefined && accuracy !== null ? Number(accuracy) : 0;
 
     if (!studentId || !classId || !lat || !lon) {
       return res.status(400).json({ error: 'Dados incompletos' });
@@ -124,9 +125,9 @@ export class AttendanceController {
 
       const distance = getDistanceFromLatLonInMeters(lat, lon, targetLatitude, targetLongitude);
       
-      if (distance > targetRadius) {
+      if (distance - gpsAccuracy > targetRadius) {
         return res.status(400).json({ 
-          error: `Você está fora da área permitida. Distância atual: ${Math.round(distance)}m. Máximo: ${targetRadius}m.` 
+          error: `Você está fora da área permitida. Distância atual (ajustada): ${Math.round(distance - gpsAccuracy)}m. Máximo: ${targetRadius}m.` 
         });
       }
 

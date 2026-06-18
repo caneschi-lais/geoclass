@@ -36,7 +36,8 @@ export class AuthController {
           id: user.id,
           name: user.name,
           email: user.email,
-          role: user.role
+          role: user.role,
+          privacy_terms_accepted_at: user.privacy_terms_accepted_at
         },
         token
       });
