@@ -36,7 +36,7 @@ export default function ManualAttendanceScreen({ navigation, route }: Props) {
       const response = await api.get(`/professor/turma/${classId}/alunos`);
       const studentsData = response.data;
       setStudents(studentsData);
-      
+
       // Inicializar todo mundo como PRESENTE por padrão para facilitar
       const initialAttendance: Record<string, boolean> = {};
       studentsData.forEach((s: EnrolledStudent) => {
@@ -66,7 +66,7 @@ export default function ManualAttendanceScreen({ navigation, route }: Props) {
       }));
 
       await api.post(`/professor/turma/${classId}/chamada-manual`, { attendances: payload });
-      
+
       if (Platform.OS === 'web') {
         window.alert('Chamada remota salva com sucesso!');
         navigation.goBack();
@@ -84,7 +84,7 @@ export default function ManualAttendanceScreen({ navigation, route }: Props) {
 
   const renderItem = ({ item }: { item: EnrolledStudent }) => {
     const isPresent = attendanceState[item.id];
-    
+
     return (
       <View className="bg-white dark:bg-slate-800 p-4 rounded-xl mb-3 border border-gray-100 dark:border-slate-700 flex-row items-center justify-between shadow-sm">
         <View className="flex-1 pr-4">
@@ -111,16 +111,16 @@ export default function ManualAttendanceScreen({ navigation, route }: Props) {
   return (
     <View className="flex-1 bg-gray-50 dark:bg-slate-900 pt-14 px-4">
       {saving && <LoadingOverlay message="Salvando chamada..." />}
-      
-      <ScreenHeader 
+
+      <ScreenHeader
         title="Chamada EAD"
         subtitle={subjectName}
         showBackButton={true}
         onBackPress={() => navigation.goBack()}
       />
 
-      <View className="bg-sky-50 border border-sky-100 p-4 rounded-xl mb-4">
-        <Text className="text-sky-800 font-medium">
+      <View className="bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 p-4 rounded-xl mb-4">
+        <Text className="text-gray-800 dark:text-gray-100 font-medium">
           Em aulas remotas, o Geofencing dos alunos é desabilitado. Defina quem está presente na aula de hoje e salve.
         </Text>
       </View>
@@ -134,8 +134,8 @@ export default function ManualAttendanceScreen({ navigation, route }: Props) {
       />
 
       <View className="absolute bottom-6 left-4 right-4">
-        <TouchableOpacity 
-          className="bg-sky-500 py-4 rounded-xl items-center shadow-md shadow-sky-200"
+        <TouchableOpacity
+          className="bg-sky-500 py-4 rounded-xl items-center shadow-md"
           onPress={handleSave}
           disabled={saving}
         >

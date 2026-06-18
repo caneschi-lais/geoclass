@@ -123,6 +123,7 @@ O projeto faz uso de um ecossistema TypeScript de ponta a ponta para maior segur
 * **Segurança e Criptografia:** Autenticação via tokens JWT (JSON Web Tokens) e hashes `bcryptjs` para senhas.
 * **Tarefas Agendadas (Jobs):** `node-cron` para controle de rotinas automáticas de segurança.
 * **Interface Mobile:** React Native, Expo SDK e NativeWind (implementação de TailwindCSS).
+* **Padrões de Projeto (Mobile):** Custom Hooks para separação clara entre a lógica e a camada de apresentação JSX (arquitetura limpa).
 
 ---
 
@@ -236,7 +237,8 @@ geoclass/
 │
 ├── geoclass-mobile/            # Aplicativo Mobile (React Native/Expo/TypeScript)
 │   ├── src/
-│   │   ├── components/         # Componentes visuais atômicos reutilizáveis
+│   │   ├── components/         # Componentes visuais atômicos e modais reutilizáveis
+│   │   ├── hooks/              # Custom Hooks contendo a lógica de estado e consumo de APIs
 │   │   ├── navigation/         # Pilhas de rotas (Stack e Tabs)
 │   │   ├── screens/            # Telas de visualização (Login, Dashboard, Chamadas)
 │   │   ├── services/           # Cliente HTTP configurado para requisições (Axios)

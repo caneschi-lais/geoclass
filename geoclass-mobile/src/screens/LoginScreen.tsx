@@ -4,12 +4,14 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import api from '../services/api';
 import { saveToken, saveRole } from '../services/authStorage';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { useTheme } from '../context/ThemeContext';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
 };
 
 export default function LoginScreen({ navigation }: Props) {
+  const { isDark } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -49,16 +51,17 @@ export default function LoginScreen({ navigation }: Props) {
       <View className="items-center justify-center mb-4">
         <View className="items-center justify-center mb-6">
           <Image className='rounded-2xl'
-            source={require('../../assets/images/logo.jpg')}
-            style={{ width: 100, height: 100 }}
+            source={isDark ? require('../../assets/images/dark-logo.png') : require('../../assets/images/logo.jpg')}
+            style={{ width: 110, height: 110 }}
             resizeMode="contain"
           />
         </View>
       </View>
 
-      <Text className="text-3xl font-bold text-slate-100 mb-8 text-center">
-        GeoClass
-      </Text>
+      <View className="flex-row items-center justify-center mb-8">
+        <Text className="text-3xl font-extrabold text-[#0096c7]">Geo</Text>
+        <Text className="text-3xl font-extrabold text-[#00b489]">Class</Text>
+      </View>
 
       <View className="w-full max-w-sm mb-4">
         <Text className="text-slate-300 mb-2 font-medium">E-mail</Text>

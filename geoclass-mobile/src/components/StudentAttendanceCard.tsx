@@ -9,7 +9,7 @@ type Props = {
 
 export default function StudentAttendanceCard({ item }: Props) {
   return (
-    <View className="bg-white dark:bg-slate-800 rounded-xl p-4 mb-3 shadow-sm border-l-4 border-l-emerald-500 border border-y-gray-100 border-r-gray-100 flex-row justify-between items-center">
+    <View className="bg-white dark:bg-slate-800 rounded-xl p-4 mb-3 shadow-sm border-l-4 border-l-emerald-500 border border-y-gray-100 dark:border-y-slate-700 border-r-gray-100 dark:border-r-gray-700 flex-row justify-between items-center">
       <View>
         <Text className="text-lg font-bold text-gray-800 dark:text-slate-100">{item.name}</Text>
         <Text className="text-gray-500 dark:text-slate-400 font-medium text-sm mt-1">RA: {item.ra}</Text>
