@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import cron from 'node-cron';
 import { lgpdWiperJob } from './jobs/LgpdWiperJob';
+import { notificationJob } from './jobs/NotificationJob';
 import router from './routes';
 
 dotenv.config();
@@ -30,4 +31,12 @@ app.listen(PORT, () => {
     lgpdWiperJob();
   });
   console.log('⏰ Cron Job LGPD agendado para as 03:00 AM diariamente.');
+
+  // Iniciar Cron Job de Notificações
+  // Expressão cron '* * * * *' = Roda a cada minuto
+  cron.schedule('* * * * *', () => {
+    console.log('[CRON] Iniciando rotina de processamento de notificações...');
+    notificationJob();
+  });
+  console.log('⏰ Cron Job de Notificações agendado para rodar a cada minuto.');
 });

@@ -69,6 +69,13 @@ export default function ClassAttendanceScreen({ route, navigation }: Props) {
         </TouchableOpacity>
       )}
 
+      <View className="bg-sky-50 dark:bg-sky-950/20 border border-sky-100 dark:border-sky-900/50 p-4 rounded-xl mb-4 flex-row justify-between items-center shadow-sm">
+        <Text className="text-gray-700 dark:text-slate-300 font-bold text-xs uppercase tracking-wider">Presenças hoje</Text>
+        <View className="bg-sky-500 dark:bg-sky-600 px-3 py-1 rounded-full">
+          <Text className="text-white font-extrabold text-xs">{students.length} Alunos</Text>
+        </View>
+      </View>
+
       <FlatList
         data={students}
         keyExtractor={(item) => item.id}

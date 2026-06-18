@@ -1,8 +1,10 @@
 import { Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middlewares/authMiddleware';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
+const OFFLINE_SECRET = process.env.OFFLINE_SECRET || 'geoclass_offline_secret_key_2026';
 
 // Função utilitária: Fórmula de Haversine para calcular distância em metros
 function getDistanceFromLatLonInMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -25,7 +27,7 @@ function deg2rad(deg: number) {
 export class AttendanceController {
   async registrarPresenca(req: AuthRequest, res: Response) {
     const studentId = req.user?.id;
-    const { classId, lat, lon, deviceId } = req.body;
+    const { classId, lat, lon, deviceId, timestamp, signature } = req.body;
 
     if (!studentId || !classId || !lat || !lon) {
       return res.status(400).json({ error: 'Dados incompletos' });
@@ -39,6 +41,47 @@ export class AttendanceController {
 
       if (!classData) {
         return res.status(404).json({ error: 'Aula não encontrada' });
+      }
+
+      // 1.2 Validação de Assinatura Digital para Sincronização Offline
+      if (signature && timestamp) {
+        const payloadString = `${classId}${lat}${lon}${timestamp}${deviceId || ''}${OFFLINE_SECRET}`;
+        const expectedSignature = crypto.createHash('sha256').update(payloadString).digest('hex');
+        
+        if (signature !== expectedSignature) {
+          return res.status(403).json({ error: 'Assinatura digital inválida. Os dados de localização ou horário foram adulterados.' });
+        }
+      }
+
+      // Determinar o momento do registro de presença
+      const checkInTime = timestamp ? new Date(timestamp) : new Date();
+      const checkInDate = new Date(checkInTime);
+      checkInDate.setHours(0, 0, 0, 0);
+
+      // 1.5 Validação de Janela de Horário Estrita
+      const [schedHours, schedMinutes] = classData.schedule_time.split(':').map(Number);
+      
+      const startTime = new Date(checkInTime);
+      startTime.setHours(schedHours, schedMinutes, 0, 0);
+
+      const endTime = new Date(startTime);
+      endTime.setMinutes(startTime.getMinutes() + 15); // Tolerância de 15 minutos
+
+      if (checkInTime < startTime) {
+        return res.status(403).json({ 
+          error: `A chamada para esta aula ainda não foi aberta. Horário de início: ${classData.schedule_time}.` 
+        });
+      }
+
+      if (checkInTime > endTime) {
+        const formatTime = (date: Date) => {
+          const hours = String(date.getHours()).padStart(2, '0');
+          const minutes = String(date.getMinutes()).padStart(2, '0');
+          return `${hours}:${minutes}`;
+        };
+        return res.status(403).json({ 
+          error: `A tolerância de 15 minutos para registrar presença nesta aula expirou. Horário limite: ${formatTime(endTime)}.` 
+        });
       }
 
       // 2. Verificar se o aluno está matriculado nesta turma
@@ -56,13 +99,10 @@ export class AttendanceController {
       }
 
       // 2.5 Verificar se a aula já foi registrada como EAD/Manual hoje pelo professor
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
       const manualAttendanceExists = await prisma.attendance.findFirst({
         where: {
           class_id: classId,
-          date: today,
+          date: checkInDate,
           manual_attendance: true
         }
       });
@@ -72,10 +112,10 @@ export class AttendanceController {
       }
 
       // 3. Validação de Localização (Haversine)
-      // Checa se há uma troca de sala para hoje
-      const todayStr = new Date().toISOString().split('T')[0];
+      // Checa se há uma troca de sala para a data informada
+      const checkInDateStr = checkInTime.toISOString().split('T')[0];
       const tempRoom = await prisma.temporaryClassLocation.findUnique({
-        where: { class_id_date: { class_id: classId, date: todayStr } }
+        where: { class_id_date: { class_id: classId, date: checkInDateStr } }
       });
 
       const targetLatitude = tempRoom ? tempRoom.latitude : classData.latitude;
@@ -90,12 +130,12 @@ export class AttendanceController {
         });
       }
 
-      // 4. Checagem de Fraude de Dispositivo (Opcional, verifica se o mesmo aparelho bateu ponto pra outro aluno hoje)
+      // 4. Checagem de Fraude de Dispositivo (Opcional)
       if (deviceId) {
         const deviceUsedByOther = await prisma.attendance.findFirst({
           where: {
             device_id: deviceId,
-            date: today,
+            date: checkInDate,
             student_id: { not: studentId }
           }
         });
@@ -106,17 +146,26 @@ export class AttendanceController {
       }
 
       // 5. Registrar no Banco de Dados
-      // A lat/lon do aluno é salva para a auditoria de 6 meses (LGPD), depois o Cron apagará
       const attendance = await prisma.attendance.create({
         data: {
           student_id: studentId,
           class_id: classId,
-          date: today,
-          check_in_time: new Date(),
+          date: checkInDate,
+          check_in_time: checkInTime,
           device_id: deviceId,
-          status: 'PRESENTE', // Pode ser ajustado com lógica de horário (Atrasado)
+          status: 'PRESENTE',
           student_latitude: lat,
           student_longitude: lon
+        }
+      });
+
+      // Notificar o aluno sobre a confirmação da presença
+      const formattedDate = checkInDate.toLocaleDateString('pt-BR');
+      await prisma.notification.create({
+        data: {
+          user_id: studentId,
+          title: `Presença Confirmada: ${classData.subject}`,
+          body: `Sua presença na aula de ${classData.subject} em ${formattedDate} foi registrada com sucesso!`
         }
       });
 
@@ -124,7 +173,6 @@ export class AttendanceController {
     } catch (error: any) {
       console.error(error);
       
-      // Tratamento para violação Unique constraint (tentou bater o ponto 2x no mesmo dia)
       if (error.code === 'P2002') {
         return res.status(400).json({ error: 'Você já registrou presença nesta aula hoje.' });
       }

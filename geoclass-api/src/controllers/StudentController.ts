@@ -25,9 +25,21 @@ export class StudentController {
         }
       });
 
-      const aulas = enrollments.map(e => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const aulas = await Promise.all(enrollments.map(async (e) => {
         const c = e.class;
         const tempLoc = c.temporaryLocs && c.temporaryLocs.length > 0 ? c.temporaryLocs[0] : null;
+        
+        const attendanceExists = await prisma.attendance.findFirst({
+          where: {
+            student_id: studentId,
+            class_id: c.id,
+            date: today,
+            status: 'PRESENTE'
+          }
+        });
         
         return {
           id: c.id,
@@ -37,9 +49,10 @@ export class StudentController {
           room: tempLoc ? tempLoc.room_name : c.room_name,
           latitude: tempLoc ? tempLoc.latitude : c.latitude,
           longitude: tempLoc ? tempLoc.longitude : c.longitude,
-          radiusMeters: c.radius_meters
+          radiusMeters: c.radius_meters,
+          alreadyCheckedIn: attendanceExists !== null
         };
-      });
+      }));
 
       return res.json(aulas);
     } catch (error) {

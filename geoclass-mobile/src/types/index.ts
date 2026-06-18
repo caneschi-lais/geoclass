@@ -8,6 +8,7 @@ export interface ClassData {
   radiusMeters: number;
   room?: string;
   enrolledCount?: number;
+  alreadyCheckedIn?: boolean;
 }
 
 export interface DashboardStat {
@@ -44,4 +45,14 @@ export interface StudentRisk {
   ra: string;
   attendancePercentage: number;
 }
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  title: string;
+  body: string;
+  read: boolean;
+  created_at: string;
+}
+
 

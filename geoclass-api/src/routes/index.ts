@@ -5,6 +5,7 @@ import { StudentController } from '../controllers/StudentController';
 import { ProfessorController } from '../controllers/ProfessorController';
 import { RoomController } from '../controllers/RoomController';
 import { CoordinatorController } from '../controllers/CoordinatorController';
+import { NotificationController } from '../controllers/NotificationController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 
 const router = Router();
@@ -14,6 +15,7 @@ const studentController = new StudentController();
 const professorController = new ProfessorController();
 const coordinatorController = new CoordinatorController();
 const roomController = new RoomController();
+const notificationController = new NotificationController();
 
 // Rotas Públicas
 router.post('/login', authController.login);
@@ -43,5 +45,9 @@ router.get('/coordenador/aluno/:id/materias', coordinatorController.getStudentSu
 router.get('/coordenador/relatorio', coordinatorController.getReportData);
 router.post('/coordenador/sala', coordinatorController.createRoom);
 router.get('/coordenador/professores', coordinatorController.getProfessors);
+
+// --- Rotas de Notificações ---
+router.get('/notificacoes', notificationController.getNotifications);
+router.put('/notificacoes/ler', notificationController.markAsRead);
 
 export default router;

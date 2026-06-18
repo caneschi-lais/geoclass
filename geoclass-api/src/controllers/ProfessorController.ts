@@ -96,15 +96,31 @@ export class ProfessorController {
     }
 
     try {
+      const classData = await prisma.class.findUnique({
+        where: { id: classId },
+        include: { enrollments: true }
+      });
+      if (!classData) return res.status(404).json({ error: 'Turma não encontrada' });
+
       if (!roomId) {
         // Restaurar sala padrão deletando a entrada temporária
         await prisma.temporaryClassLocation.deleteMany({
           where: { class_id: classId, date: String(date) }
         });
+
+        // Notificar alunos sobre o retorno à sala padrão
+        for (const enrollment of classData.enrollments) {
+          await prisma.notification.create({
+            data: {
+              user_id: enrollment.student_id,
+              title: `Troca de Sala: ${classData.subject}`,
+              body: `Atenção: A aula de hoje da matéria ${classData.subject} retornou para a sala padrão ${classData.room_name}.`
+            }
+          });
+        }
+
         return res.json({ message: 'Sala padrão restaurada com sucesso!' });
       }
-      const classData = await prisma.class.findUnique({ where: { id: classId } });
-      if (!classData) return res.status(404).json({ error: 'Turma não encontrada' });
       
       const roomData = await prisma.room.findUnique({ where: { id: roomId } });
       if (!roomData) return res.status(404).json({ error: 'Sala não encontrada' });
@@ -155,6 +171,17 @@ export class ProfessorController {
         }
       });
 
+      // Notificar alunos sobre a alteração de sala
+      for (const enrollment of classData.enrollments) {
+        await prisma.notification.create({
+          data: {
+            user_id: enrollment.student_id,
+            title: `Troca de Sala: ${classData.subject}`,
+            body: `Atenção: A sala da aula de hoje da matéria ${classData.subject} foi alterada temporariamente para ${roomData.name}.`
+          }
+        });
+      }
+
       return res.json({ message: 'Sala alterada com sucesso!', tempLoc });
     } catch (error) {
       console.error(error);
@@ -201,6 +228,13 @@ export class ProfessorController {
     today.setHours(0, 0, 0, 0);
 
     try {
+      const classInfo = await prisma.class.findUnique({
+        where: { id: classId },
+        select: { subject: true }
+      });
+
+      const formattedDate = today.toLocaleDateString('pt-BR');
+
       // Registrar tudo de uma vez usando loop (Prisma UPSERT não suporta transação em lote direto com data dinâmica fácil)
       for (const record of attendances) {
         await prisma.attendance.upsert({
@@ -226,6 +260,16 @@ export class ProfessorController {
             manual_attendance: true
           }
         });
+
+        if (record.isPresent) {
+          await prisma.notification.create({
+            data: {
+              user_id: record.studentId,
+              title: `Presença Confirmada: ${classInfo?.subject}`,
+              body: `Sua presença na aula de ${classInfo?.subject} em ${formattedDate} foi registrada pelo professor.`
+            }
+          });
+        }
       }
 
       return res.json({ message: 'Chamada manual registrada com sucesso!' });

@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { ThemeToggle } from './ThemeToggle';
 import { useTheme } from '../context/ThemeContext';
+import { useNotifications } from '../hooks/useNotifications';
+import NotificationsModal from './NotificationsModal';
 
 type ScreenHeaderProps = {
   title: string;
@@ -26,6 +28,8 @@ export default function ScreenHeader({
 }: ScreenHeaderProps) {
 
   const { isDark } = useTheme();
+  const [modalVisible, setModalVisible] = useState(false);
+  const { notifications, unreadCount, markAsRead } = useNotifications();
 
   const getRightButtonStyles = () => {
     if (!rightButton) return { container: '', text: '', iconColor: '' };
@@ -59,6 +63,19 @@ export default function ScreenHeader({
       </View>
 
       <View className="flex-row items-center gap-3">
+        {/* Ícone de Notificações */}
+        <TouchableOpacity
+          onPress={() => setModalVisible(true)}
+          className="relative p-2 bg-white dark:bg-slate-800 rounded-full shadow-sm border border-gray-100 dark:border-slate-700"
+        >
+          <Feather name="bell" size={18} color={isDark ? "#cbd5e1" : "#334155"} />
+          {unreadCount > 0 && (
+            <View className="absolute top-0 right-0 bg-red-500 rounded-full w-4 h-4 items-center justify-center border border-white dark:border-slate-800">
+              <Text className="text-white text-[9px] font-extrabold">{unreadCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
         <ThemeToggle />
         {rightButton && (
           <TouchableOpacity
@@ -74,6 +91,13 @@ export default function ScreenHeader({
           </TouchableOpacity>
         )}
       </View>
+
+      <NotificationsModal
+        visible={modalVisible}
+        notifications={notifications}
+        onClose={() => setModalVisible(false)}
+        onMarkAsRead={markAsRead}
+      />
     </View>
   );
 }
