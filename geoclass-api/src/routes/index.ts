@@ -23,6 +23,8 @@ router.post('/login', authController.login);
 // Rotas Privadas (Protegidas por JWT)
 router.use(authMiddleware);
 
+router.post('/accept-privacy-terms', authController.acceptPrivacyTerms);
+
 // --- Rotas do Aluno ---
 router.post('/aluno/presenca', attendanceController.registrarPresenca);
 router.get('/aluno/aulas/hoje', studentController.getAulasHoje);
@@ -46,6 +48,8 @@ router.get('/coordenador/aluno/:id/materias', coordinatorController.getStudentSu
 router.get('/coordenador/relatorio', coordinatorController.getReportData);
 router.post('/coordenador/sala', coordinatorController.createRoom);
 router.get('/coordenador/professores', coordinatorController.getProfessors);
+router.get('/coordenador/alunos', coordinatorController.getAllStudents);
+router.post('/coordenador/matricular', coordinatorController.enrollStudent);
 
 // --- Rotas de Notificações ---
 router.get('/notificacoes', notificationController.getNotifications);

@@ -33,14 +33,29 @@ export default function ScreenHeader({
 
   const getRightButtonStyles = () => {
     if (!rightButton) return { container: '', text: '', iconColor: '' };
+    const hasLabel = !!rightButton.label;
     switch (rightButton.variant) {
       case 'danger':
-        return { container: 'bg-red-100 dark:bg-red-900/30 px-2 py-1', text: 'text-sm text-red-600 dark:text-red-400', iconColor: isDark ? '#f87171' : '#dc2626' };
+        return {
+          container: hasLabel ? 'bg-red-100 dark:bg-red-900/30 px-2.5 py-1.5 rounded-lg' : 'bg-red-100 dark:bg-red-900/30 p-2 rounded-full',
+          text: 'text-sm text-red-600 dark:text-red-400',
+          iconColor: isDark ? '#f87171' : '#dc2626'
+        };
       case 'info':
-        return { container: 'bg-sky-100 dark:bg-sky-900/30 p-1', text: 'text-sm text-sky-600 dark:text-sky-400', iconColor: isDark ? '#38bdf8' : '#0ea5e9' };
+        return {
+          container: hasLabel ? 'bg-sky-100 dark:bg-sky-900/30 px-2.5 py-1.5 rounded-lg' : 'bg-sky-100 dark:bg-sky-900/30 p-2 rounded-full',
+          text: 'text-sm text-sky-600 dark:text-sky-400',
+          iconColor: isDark ? '#38bdf8' : '#0ea5e9'
+        };
       case 'white':
       default:
-        return { container: 'bg-white dark:bg-slate-800 p-1 border border-gray-100 dark:border-slate-700 shadow-sm', text: 'text-sm text-gray-800 dark:text-slate-200', iconColor: isDark ? '#cbd5e1' : '#334155' };
+        return {
+          container: hasLabel 
+            ? 'bg-white dark:bg-slate-800 px-2.5 py-1.5 border border-gray-100 dark:border-slate-700 shadow-sm rounded-lg' 
+            : 'bg-white dark:bg-slate-800 p-2 border border-gray-100 dark:border-slate-700 shadow-sm rounded-full',
+          text: 'text-sm text-gray-800 dark:text-slate-200',
+          iconColor: isDark ? '#cbd5e1' : '#334155'
+        };
     }
   };
 
@@ -80,11 +95,11 @@ export default function ScreenHeader({
         {rightButton && (
           <TouchableOpacity
             onPress={rightButton.onPress}
-            className={`rounded-lg flex-row items-center ${rightBtnStyle.container} ${rightButton.label ? '' : 'rounded-full'}`}
+            className={`flex-row items-center justify-center ${rightBtnStyle.container}`}
           >
-            {rightButton.icon && <Feather name={rightButton.icon} size={20} color={rightBtnStyle.iconColor} />}
+            {rightButton.icon && <Feather name={rightButton.icon} size={18} color={rightBtnStyle.iconColor} />}
             {rightButton.label && (
-              <Text className={`font-bold ${rightBtnStyle.text} ${rightButton.icon ? 'ml-1' : ''}`}>
+              <Text className={`font-bold ${rightBtnStyle.text} ${rightButton.icon ? 'ml-1.5' : ''}`}>
                 {rightButton.label}
               </Text>
             )}

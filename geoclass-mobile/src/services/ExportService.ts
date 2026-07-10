@@ -2,7 +2,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
-import XLSX from 'xlsx';
+import * as XLSX from 'xlsx';
 
 export class ExportService {
   /**

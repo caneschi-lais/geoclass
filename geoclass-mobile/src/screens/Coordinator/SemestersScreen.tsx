@@ -71,9 +71,9 @@ export default function SemestersScreen({ navigation }: Props) {
       <ScreenHeader
         title="Gestão Acadêmica"
         rightButton={{
-          label: 'Sair',
+          icon: 'log-out',
           onPress: handleLogout,
-          variant: 'danger'
+          variant: 'white'
         }}
       />
 

@@ -8,11 +8,11 @@
 
 Para testar as diferentes interfaces e permissões do sistema no aplicativo móvel e nas rotas administrativas, utilize as credenciais padrão geradas pelo script de povoamento (`seed`):
 
-| Perfil | E-mail de Acesso | Senha | Detalhes / Papel |
-| :--- | :--- | :--- | :--- |
-| **Aluno** | `aluno@teste.com` | `123456` | RA: `123456789` (João Silva) |
-| **Professor** | `prof@teste.com` | `123456` | Professor Carlos |
-| **Professor** | `profa@teste.com` | `123456` | Professora Ana |
+| Perfil          | E-mail de Acesso  | Senha    | Detalhes / Papel                        |
+| :----------------| :------------------| :---------| :----------------------------------------|
+| **Aluno**       | `aluno@teste.com` | `123456` | RA: `123456789` (João Silva)            |
+| **Professor**   | `prof@teste.com`  | `123456` | Professor Carlos                        |
+| **Professor**   | `profa@teste.com` | `123456` | Professora Ana                          |
 | **Coordenador** | `coord@teste.com` | `123456` | Acesso administrativo completo (Márcia) |
 
 ---

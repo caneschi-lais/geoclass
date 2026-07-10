@@ -343,5 +343,81 @@ export class CoordinatorController {
       return res.status(500).json({ error: 'Erro ao buscar turmas do semestre' });
     }
   }
+
+  // 8. Obter todos os alunos cadastrados
+  async getAllStudents(req: AuthRequest, res: Response) {
+    try {
+      const students = await prisma.user.findMany({
+        where: { role: 'ALUNO' },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          ra: true,
+        },
+        orderBy: { name: 'asc' }
+      });
+      return res.json(students);
+    } catch (error) {
+      console.error('Erro getAllStudents', error);
+      return res.status(500).json({ error: 'Erro ao buscar todos os alunos' });
+    }
+  }
+
+  // 9. Matricular aluno em uma turma/matéria
+  async enrollStudent(req: AuthRequest, res: Response) {
+    const { student_id, class_id } = req.body;
+
+    if (!student_id || !class_id) {
+      return res.status(400).json({ error: 'ID do aluno e ID da matéria são obrigatórios' });
+    }
+
+    try {
+      // Verificar se o aluno existe e é aluno
+      const student = await prisma.user.findFirst({
+        where: { id: student_id, role: 'ALUNO' }
+      });
+      if (!student) {
+        return res.status(404).json({ error: 'Aluno não encontrado' });
+      }
+
+      // Verificar se a matéria existe
+      const cls = await prisma.class.findFirst({
+        where: { id: class_id, active: true }
+      });
+      if (!cls) {
+        return res.status(404).json({ error: 'Matéria/Turma não encontrada' });
+      }
+
+      // Verificar matrícula existente
+      const existingEnrollment = await prisma.enrollment.findUnique({
+        where: {
+          student_id_class_id: {
+            student_id,
+            class_id
+          }
+        }
+      });
+
+      if (existingEnrollment) {
+        return res.status(400).json({ error: 'Aluno já matriculado nesta matéria' });
+      }
+
+      const enrollment = await prisma.enrollment.create({
+        data: {
+          student_id,
+          class_id
+        }
+      });
+
+      return res.status(201).json({
+        message: 'Aluno matriculado com sucesso!',
+        enrollment
+      });
+    } catch (error) {
+      console.error('Erro enrollStudent', error);
+      return res.status(500).json({ error: 'Erro ao matricular o aluno' });
+    }
+  }
 }
 

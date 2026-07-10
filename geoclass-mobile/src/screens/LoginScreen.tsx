@@ -5,6 +5,7 @@ import api from '../services/api';
 import { saveToken, saveRole } from '../services/authStorage';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../context/ThemeContext';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
@@ -51,7 +52,11 @@ export default function LoginScreen({ navigation }: Props) {
   };
 
   return (
-    <View className="flex-1 justify-center items-center bg-slate-800 p-6">
+    <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900 p-6">
+      <View className="absolute top-14 right-6">
+        <ThemeToggle />
+      </View>
+
       <View className="items-center justify-center mb-4">
         <View className="items-center justify-center mb-6">
           <Image className='rounded-2xl'
@@ -68,9 +73,9 @@ export default function LoginScreen({ navigation }: Props) {
       </View>
 
       <View className="w-full max-w-sm mb-4">
-        <Text className="text-slate-300 mb-2 font-medium">E-mail</Text>
+        <Text className="text-gray-600 dark:text-slate-300 mb-2 font-medium">E-mail</Text>
         <TextInput
-          className="w-full bg-slate-700 rounded-lg p-4 text-slate-100 border border-slate-600"
+          className="w-full bg-white dark:bg-slate-800 rounded-lg p-4 text-gray-800 dark:text-slate-100 border border-gray-200 dark:border-slate-700"
           placeholder="Digite seu e-mail"
           placeholderTextColor="#94a3b8"
           keyboardType="email-address"
@@ -81,9 +86,9 @@ export default function LoginScreen({ navigation }: Props) {
       </View>
 
       <View className="w-full max-w-sm mb-8">
-        <Text className="text-slate-300 mb-2 font-medium">Senha</Text>
+        <Text className="text-gray-600 dark:text-slate-300 mb-2 font-medium">Senha</Text>
         <TextInput
-          className="w-full bg-slate-700 rounded-lg p-4 text-slate-100 border border-slate-600"
+          className="w-full bg-white dark:bg-slate-800 rounded-lg p-4 text-gray-800 dark:text-slate-100 border border-gray-200 dark:border-slate-700"
           placeholder="Digite sua senha"
           placeholderTextColor="#94a3b8"
           secureTextEntry

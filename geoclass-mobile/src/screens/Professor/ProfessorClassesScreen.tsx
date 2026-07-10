@@ -89,7 +89,7 @@ export default function ProfessorClassesScreen({ navigation }: Props) {
         title="Minhas Turmas"
         subtitle=""
         rightButton={{
-          label: 'Sair',
+          icon: 'log-out',
           onPress: handleLogout,
           variant: 'danger'
         }}

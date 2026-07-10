@@ -61,7 +61,7 @@ export default function ClassCard({ aula, onConfirm, isLoading }: ClassCardProps
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           disabled={isLoading}
-          className={`mt-2 py-3.5 rounded-lg overflow-hidden flex-row justify-center items-center ${isLoading ? 'bg-emerald-400' : 'bg-emerald-500/80 active:bg-emerald-500'
+          className={`unselectable mt-2 py-3.5 rounded-lg overflow-hidden flex-row justify-center items-center ${isLoading ? 'bg-emerald-400' : 'bg-emerald-500/80 active:bg-emerald-500'
             }`}
           style={({ pressed }) => [
             {

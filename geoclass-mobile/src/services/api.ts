@@ -30,7 +30,9 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     // Lógica para deslogar usuário caso o token expire (401 Unauthorized)
-    if (error.response && error.response.status === 401) {
+    // Ignorar erros de credenciais inválidas na rota de login
+    const isLoginRequest = error.config?.url?.endsWith('/login');
+    if (error.response && error.response.status === 401 && !isLoginRequest) {
       console.log('Token expirado ou inválido. O usuário deve ser deslogado.');
       // O AppNavigator ou um contexto global lidaria com o redirecionamento aqui
     }

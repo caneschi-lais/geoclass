@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, TextInput } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useStudentsList } from '../../hooks/useStudentsList';
@@ -6,6 +6,7 @@ import ScreenHeader from '../../components/ScreenHeader';
 import LoadingOverlay from '../../components/LoadingOverlay';
 import EmptyState from '../../components/EmptyState';
 import ExportModal from '../../components/ExportModal';
+import EnrollStudentForm from '../../components/EnrollStudentForm';
 
 type StudentData = {
   id: string;
@@ -32,8 +33,12 @@ export default function StudentsListScreen({ navigation, route }: Props) {
     classes,
     handleSearch,
     handleTabSwitch,
-    handleExport
+    handleExport,
+    loadStudents,
+    loadClasses
   } = useStudentsList(semesterId);
+
+  const [isEnrollOpen, setIsEnrollOpen] = useState(false);
 
   const renderItem = ({ item }: { item: StudentData }) => (
     <TouchableOpacity
@@ -102,6 +107,16 @@ export default function StudentsListScreen({ navigation, route }: Props) {
           label: 'Exportar',
           onPress: () => setExportModalVisible(true),
           variant: 'info'
+        }}
+      />
+
+      <EnrollStudentForm
+        isOpen={isEnrollOpen}
+        onToggle={() => setIsEnrollOpen(!isEnrollOpen)}
+        classes={classes}
+        onSuccess={() => {
+          loadStudents();
+          loadClasses();
         }}
       />
 
