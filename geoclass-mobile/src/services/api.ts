@@ -1,12 +1,10 @@
 import axios from 'axios';
 import { getToken } from './authStorage';
 
-// ATENÇÃO: Substitua pelo seu IP da rede Wi-Fi! Ex: http://192.168.0.15:3000/api
-// Se usar Emulador Android nativo sem Expo, pode usar http://10.0.2.2:3000/api
+// URL de Produção no Render
 const api = axios.create({
-  // baseURL: 'http://192.168.X.X:3000/api', 
-  baseURL: 'http://localhost:3000/api',
-  timeout: 10000,
+  baseURL: 'https://geoclass-backend.onrender.com/api',
+  timeout: 30000, // 30 segundos (recomendado para acomodar o "spin down" do plano gratuito do Render)
 });
 
 api.interceptors.request.use(

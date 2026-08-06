@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "GeoClass",
+    "slug": "geoclass",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/images/logo.jpg",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/images/logo.jpg",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -16,12 +16,17 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.geoclass.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -34,6 +39,11 @@
           "locationAlwaysAndWhenInUsePermission": "O GeoClass precisa da sua localização estritamente para confirmar sua presença no raio da sala de aula. Seus dados não são rastreadados fora deste momento e são excluídos periodicamente do servidor."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "54378c0a-edbf-4031-b27c-707d9801df69"
+      }
+    }
   }
 }

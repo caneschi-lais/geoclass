@@ -94,7 +94,7 @@ Preencha os campos exatamente como detalhado abaixo para garantir que o monorepo
 | **Branch** | `main` (ou sua branch de produção) | Branch que o Render monitorará para deploys automáticos. |
 | **Root Directory** | `geoclass-api` | **CRÍTICO:** Define que a API está nesta subpasta. Evita erros de dependências não encontradas. |
 | **Runtime** | `Node` | Tecnologia do servidor. |
-| **Build Command** | `npm install && npx prisma generate && npm run build` | Instala dependências, gera o cliente Prisma e compila o TypeScript. |
+| **Build Command** | `npm install --include=dev && npx prisma generate && npm run build` | Instala dependências (incluindo devDependencies como os `@types`), gera o cliente Prisma e compila o TypeScript. |
 | **Start Command** | `npm start` | Executa o servidor compilado (`node dist/server.js`). |
 | **Instance Type** | `Free` | Plano gratuito (suficiente para testes e portfólio). |
 
