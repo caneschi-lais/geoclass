@@ -74,7 +74,7 @@ export default function ScreenHeader({
 
       <View className="flex-1">
         <Text className="text-xl font-extrabold text-gray-800 dark:text-slate-100" numberOfLines={1}>{title}</Text>
-        {subtitle && <Text className="text-gray-500 dark:text-slate-400 font-medium">{subtitle}</Text>}
+        {!!subtitle && <Text className="text-gray-500 dark:text-slate-400 font-medium">{subtitle}</Text>}
       </View>
 
       <View className="flex-row items-center gap-3">
@@ -92,13 +92,13 @@ export default function ScreenHeader({
         </TouchableOpacity>
 
         <ThemeToggle />
-        {rightButton && (
+        {!!rightButton && (
           <TouchableOpacity
             onPress={rightButton.onPress}
             className={`flex-row items-center justify-center ${rightBtnStyle.container}`}
           >
-            {rightButton.icon && <Feather name={rightButton.icon} size={18} color={rightBtnStyle.iconColor} />}
-            {rightButton.label && (
+            {!!rightButton.icon && <Feather name={rightButton.icon} size={18} color={rightBtnStyle.iconColor} />}
+            {!!rightButton.label && (
               <Text className={`font-bold ${rightBtnStyle.text} ${rightButton.icon ? 'ml-1.5' : ''}`}>
                 {rightButton.label}
               </Text>

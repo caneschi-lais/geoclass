@@ -44,12 +44,12 @@ Antes de iniciar, garanta que seu ambiente possui as seguintes ferramentas insta
    ```
 
 3. **Configure as variáveis de ambiente:**
-   Crie um arquivo chamado `.env` na raiz do diretório `geoclass-api/` seguindo a estrutura abaixo:
+   Crie um arquivo chamado `.env` na raiz do diretório `geoclass-api/` ou utilize o arquivo base `.env.example` na raiz do projeto/pasta da API como referência:
    ```env
    DATABASE_URL="postgresql://usuario:senha@localhost:5432/geoclass?schema=public"
    JWT_SECRET="sua_chave_secreta_jwt_para_seguranca"
    ```
-   *Substitua `usuario` e `senha` pelas credenciais do seu banco PostgreSQL local.*
+   *Substitua `usuario` e `senha` pelas credenciais do seu banco PostgreSQL local (ou use um banco em nuvem como o Neon).*
 
 4. **Sincronize o banco de dados e popule com dados de teste:**
    Execute os comandos do Prisma ORM para empurrar o schema ao PostgreSQL e rodar o script de seed:
@@ -109,6 +109,8 @@ O GeoClass foi planejado a partir de uma modelagem de Engenharia de Requisitos s
 * **RF07 (Dashboard Administrativo):** Painel para o Coordenador visualizar semestres letivos ativos e acompanhar a taxa geral de evasão escolar.
 * **RF08 (Relatórios Gerenciais):** Geração e exportação de planilhas consolidadas (`.XLSX`) e documentos analíticos em `.PDF` com gráficos interativos.
 * **RF09 (Cadastro de Infraestrutura):** Cadastro de blocos, salas e laboratórios mapeando suas coordenadas geográficas de referência.
+* **RF10 (Sistema de Notificações Inteligentes):** Central de avisos locais para alertar os alunos sobre início de aulas, professores sobre fechamento de chamadas e coordenadores sobre tendências de evasão escolar.
+* **RF11 (Acessibilidade Visual / Dark Mode):** Suporte a tema escuro dinâmico integrado para melhor conforto visual e economia de energia do aparelho.
 
 ---
 
@@ -206,6 +208,13 @@ Caso a distância exceda o raio configurado para a sala de aula (`radius_meters`
 
 ### 2. Impressão Digital Física (Device Binding)
 Para impedir que um aluno leve os celulares de colegas e bata ponto por todos na sala, o sistema coleta o identificador físico exclusivo de hardware (`Device ID` obtido com a biblioteca `expo-application`). O backend impede o registro de mais de um número de matrícula (RA) atrelado ao mesmo hardware do aparelho no mesmo dia letivo.
+
+### 3. Registro Offline com Assinatura Criptográfica SHA-256
+Para lidar com ausência de sinal de internet nas salas de aula:
+* **Verificação Local:** O aplicativo móvel realiza o cálculo preliminar de Geofencing e só permite a batida se o aluno estiver fisicamente no raio permitido.
+* **Assinatura Digital:** Se válido, o app gera uma assinatura SHA-256 combinando `{classId, lat, lon, timestamp, deviceId}` mais a chave secreta `OFFLINE_SECRET`.
+* **Fila de Sincronização Local (`SecureStore`):** O registro criptografado e seguro fica armazenado no dispositivo.
+* **Sincronização Segura:** Assim que o sinal de internet retorna, o aplicativo envia os dados assinados para a API. O backend verifica a assinatura digital recalculando a hash com base na chave secreta do servidor, processando a presença com data retroativa somente se a assinatura for válida e se a tentativa tiver ocorrido no horário da aula (dentro da tolerância de 15 minutos).
 
 ---
 

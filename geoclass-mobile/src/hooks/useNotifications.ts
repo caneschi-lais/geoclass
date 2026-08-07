@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../services/api';
 import { Notification } from '../types';
+import { getToken } from '../services/authStorage';
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -8,6 +9,9 @@ export function useNotifications() {
   const isMounted = useRef(true);
 
   const fetchNotifications = useCallback(async (silent = false) => {
+    const token = await getToken();
+    if (!token) return;
+
     if (!silent) setLoading(true);
     try {
       const response = await api.get<Notification[]>('/notificacoes');
@@ -23,6 +27,9 @@ export function useNotifications() {
 
   const markAsRead = useCallback(async (id?: string) => {
     try {
+      const token = await getToken();
+      if (!token) return;
+
       await api.put('/notificacoes/ler', { id });
       
       // Atualiza o estado localmente sem precisar de uma nova requisição
