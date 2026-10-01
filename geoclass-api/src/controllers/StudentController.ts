@@ -8,6 +8,10 @@ export class StudentController {
   async getAulasHoje(req: AuthRequest, res: Response) {
     const studentId = req.user?.id;
 
+    if (!studentId) {
+      return res.status(401).json({ error: 'Não autorizado' });
+    }
+
     try {
       const todayStr = new Date().toISOString().split('T')[0];
 
@@ -28,7 +32,16 @@ export class StudentController {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const aulas = await Promise.all(enrollments.map(async (e) => {
+      const daysOfWeekMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+      const currentDayName = daysOfWeekMap[today.getDay()];
+
+      const filteredEnrollments = enrollments.filter((e) => {
+        if (!e.class.week_days) return true;
+        const days = e.class.week_days.toLowerCase().split(',').map((d) => d.trim());
+        return days.includes(currentDayName);
+      });
+
+      const aulas = await Promise.all(filteredEnrollments.map(async (e) => {
         const c = e.class;
         const tempLoc = c.temporaryLocs && c.temporaryLocs.length > 0 ? c.temporaryLocs[0] : null;
         
@@ -41,16 +54,29 @@ export class StudentController {
           }
         });
         
+        const userCourse = c.course_name ? await prisma.userCourse.findUnique({
+          where: {
+            user_id_course_name: {
+              user_id: studentId,
+              course_name: c.course_name
+            }
+          }
+        }) : null;
+
+        const isCourseCompleted = userCourse?.is_completed || false;
+
         return {
           id: c.id,
           subject: c.subject,
+          course_name: c.course_name,
           professor: c.professor.name,
           time: c.schedule_time,
           room: tempLoc ? tempLoc.room_name : c.room_name,
           latitude: tempLoc ? tempLoc.latitude : c.latitude,
           longitude: tempLoc ? tempLoc.longitude : c.longitude,
           radiusMeters: c.radius_meters,
-          alreadyCheckedIn: attendanceExists !== null
+          alreadyCheckedIn: attendanceExists !== null,
+          isCourseCompleted
         };
       }));
 

@@ -74,6 +74,16 @@ export function useStudentHome() {
   };
 
   const handleConfirmAttendance = async (aula: ClassData) => {
+    if (aula.isCourseCompleted) {
+      const msg = 'Você já concluiu o curso desta disciplina. Os dados estão disponíveis em Modo Leitura para consulta de histórico.';
+      if (Platform.OS === 'web') {
+        window.alert(msg);
+      } else {
+        Alert.alert('Curso Concluído', msg);
+      }
+      return;
+    }
+
     setProcessingId(aula.id);
 
     // 1. Obter GPS

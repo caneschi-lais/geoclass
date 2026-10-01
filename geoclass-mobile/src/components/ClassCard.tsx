@@ -42,8 +42,15 @@ export default function ClassCard({ aula, onConfirm, isLoading }: ClassCardProps
     <View className="bg-white dark:bg-slate-800 rounded-xl p-5 mb-4 shadow-sm border border-gray-100 dark:border-slate-700">
       <View className="flex-row justify-between items-start mb-3">
         <View className="flex-1 pr-2">
-          <Text className="text-lg font-bold text-gray-800 dark:text-slate-100">{aula.subject}</Text>
-          <Text className="text-gray-500 dark:text-slate-400 font-medium mt-1">{aula.professor} - {aula.room}</Text>
+          <View className="flex-row items-center flex-wrap gap-1 mb-1">
+            <Text className="text-lg font-bold text-gray-800 dark:text-slate-100">{aula.subject}</Text>
+            {aula.course_name ? (
+              <View className="bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">
+                <Text className="text-[10px] font-semibold text-slate-600 dark:text-slate-300">{aula.course_name}</Text>
+              </View>
+            ) : null}
+          </View>
+          <Text className="text-gray-500 dark:text-slate-400 font-medium mt-0.5">{aula.professor} - {aula.room}</Text>
         </View>
         <View className="bg-sky-100 dark:bg-sky-950/40 px-3 py-1 rounded-full">
           <Text className="text-sky-700 dark:text-sky-400 font-bold">{aula.time}</Text>
@@ -54,6 +61,11 @@ export default function ClassCard({ aula, onConfirm, isLoading }: ClassCardProps
         <View className="mt-2 py-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 rounded-lg flex-row justify-center items-center">
           <Feather name="check-circle" size={18} color="#10b981" />
           <Text className="text-emerald-700 dark:text-emerald-400 font-bold ml-2 text-sm">Presença Confirmada</Text>
+        </View>
+      ) : aula.isCourseCompleted ? (
+        <View className="mt-2 py-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-lg flex-row justify-center items-center">
+          <Feather name="lock" size={18} color="#d97706" />
+          <Text className="text-amber-700 dark:text-amber-400 font-bold ml-2 text-sm">Curso Concluído (Modo Leitura)</Text>
         </View>
       ) : (
         /* Componente press-and-hold para evitar toques acidentais */

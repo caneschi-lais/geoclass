@@ -59,30 +59,44 @@ export class AttendanceController {
       const checkInDate = new Date(checkInTime);
       checkInDate.setHours(0, 0, 0, 0);
 
-      // 1.5 Validação de Janela de Horário Estrita
-      const [schedHours, schedMinutes] = classData.schedule_time.split(':').map(Number);
-      
-      const startTime = new Date(checkInTime);
-      startTime.setHours(schedHours, schedMinutes, 0, 0);
+      // 1.5 Validação de Janela de Horário Estrita por Slots (Suporta múltiplos horários separados por vírgula)
+      const slots = classData.schedule_time.split(',').map((s) => s.trim());
+      let activeSlot: string | null = null;
 
-      const endTime = new Date(startTime);
-      endTime.setMinutes(startTime.getMinutes() + 15); // Tolerância de 15 minutos
+      for (const slotStr of slots) {
+        const [schedHours, schedMinutes] = slotStr.split(':').map(Number);
+        if (isNaN(schedHours) || isNaN(schedMinutes)) continue;
 
-      if (checkInTime < startTime) {
+        const startTime = new Date(checkInTime);
+        startTime.setHours(schedHours, schedMinutes, 0, 0);
+
+        const endTime = new Date(startTime);
+        endTime.setMinutes(startTime.getMinutes() + 15); // Tolerância de 15 minutos
+
+        if (checkInTime >= startTime && checkInTime <= endTime) {
+          activeSlot = slotStr;
+          break;
+        }
+      }
+
+      if (!activeSlot) {
         return res.status(403).json({ 
-          error: `A chamada para esta aula ainda não foi aberta. Horário de início: ${classData.schedule_time}.` 
+          error: `Não há chamada aberta neste momento. Horários da disciplina: ${classData.schedule_time}. Cada chamada fica aberta por 15min a partir do horário.` 
         });
       }
 
-      if (checkInTime > endTime) {
-        const formatTime = (date: Date) => {
-          const hours = String(date.getHours()).padStart(2, '0');
-          const minutes = String(date.getMinutes()).padStart(2, '0');
-          return `${hours}:${minutes}`;
-        };
-        return res.status(403).json({ 
-          error: `A tolerância de 15 minutos para registrar presença nesta aula expirou. Horário limite: ${formatTime(endTime)}.` 
-        });
+      // Verificar se a presença para este horário específico (slot) já foi registrada hoje
+      const existingSlotAttendance = await prisma.attendance.findFirst({
+        where: {
+          student_id: studentId,
+          class_id: classId,
+          date: checkInDate,
+          slot_time: activeSlot
+        }
+      });
+
+      if (existingSlotAttendance) {
+        return res.status(400).json({ error: `Você já registrou presença para o horário das ${activeSlot} hoje.` });
       }
 
       // 2. Verificar se o aluno está matriculado nesta turma
@@ -97,6 +111,24 @@ export class AttendanceController {
 
       if (!enrollment) {
         return res.status(403).json({ error: 'Aluno não matriculado nesta turma' });
+      }
+
+      // 2.1 Verificar se o aluno já concluiu o curso desta disciplina (Curso Concluído = Somente Leitura)
+      if (classData.course_name) {
+        const userCourse = await prisma.userCourse.findUnique({
+          where: {
+            user_id_course_name: {
+              user_id: studentId,
+              course_name: classData.course_name
+            }
+          }
+        });
+
+        if (userCourse?.is_completed) {
+          return res.status(403).json({ 
+            error: `Você já concluiu o curso de ${classData.course_name}. Não é possível registrar novas presenças para disciplinas deste curso (Modo Leitura/Histórico).` 
+          });
+        }
       }
 
       // 2.5 Verificar se a aula já foi registrada como EAD/Manual hoje pelo professor
@@ -152,6 +184,7 @@ export class AttendanceController {
           student_id: studentId,
           class_id: classId,
           date: checkInDate,
+          slot_time: activeSlot,
           check_in_time: checkInTime,
           device_id: deviceId,
           status: 'PRESENTE',
@@ -169,6 +202,34 @@ export class AttendanceController {
           body: `Sua presença na aula de ${classData.subject} em ${formattedDate} foi registrada com sucesso!`
         }
       });
+
+      // Checar se a frequência está em zona de risco (< 75%) e notificar o aluno
+      const presencesCount = await prisma.attendance.count({
+        where: { student_id: studentId, class_id: classId, status: { in: ['PRESENTE', 'ATRASADO'] } }
+      });
+      const totalClasses = classData.total_classes || 40;
+      const attendancePercentage = Math.round((presencesCount / totalClasses) * 100);
+
+      if (attendancePercentage < 75) {
+        const riskTitle = `Alerta de Risco de Frequência: ${classData.subject}`;
+        const alreadyAlertedToday = await prisma.notification.findFirst({
+          where: {
+            user_id: studentId,
+            title: riskTitle,
+            created_at: { gte: checkInDate }
+          }
+        });
+
+        if (!alreadyAlertedToday) {
+          await prisma.notification.create({
+            data: {
+              user_id: studentId,
+              title: riskTitle,
+              body: `Atenção: Você atingiu o limite crítico de faltas em ${classData.subject} (${attendancePercentage}% de presença). Mantenha sua frequência acima de 75% para não reprovar por falta.`
+            }
+          });
+        }
+      }
 
       return res.status(201).json({ message: 'Presença registrada com sucesso!', attendance });
     } catch (error: any) {

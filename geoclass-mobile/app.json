@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "GeoClass",
-    "slug": "geoclass",
+    "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/logo.jpg",
@@ -44,6 +44,7 @@
       "eas": {
         "projectId": "54378c0a-edbf-4031-b27c-707d9801df69"
       }
-    }
+    },
+    "owner": "caneschi-lais"
   }
 }

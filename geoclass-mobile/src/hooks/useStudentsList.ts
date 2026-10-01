@@ -2,12 +2,16 @@ import { useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 import api from '../services/api';
 import { ExportService } from '../services/ExportService';
+import { StudentRisk } from '../types';
 
-interface StudentData {
+export interface StudentData {
   id: string;
   name: string;
   ra: string;
   absencePercentage: number;
+  active?: boolean;
+  courses?: string[];
+  userCourses?: { course_name: string; semester?: string; is_completed?: boolean }[];
 }
 
 export function useStudentsList(semesterId: string) {
@@ -18,13 +22,16 @@ export function useStudentsList(semesterId: string) {
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'students' | 'classes'>('students');
+  const [activeTab, setActiveTab] = useState<'students' | 'risk' | 'classes'>('students');
   const [classes, setClasses] = useState<any[]>([]);
   const [filteredClasses, setFilteredClasses] = useState<any[]>([]);
+  const [riskStudents, setRiskStudents] = useState<StudentRisk[]>([]);
+  const [filteredRiskStudents, setFilteredRiskStudents] = useState<StudentRisk[]>([]);
 
   useEffect(() => {
     loadStudents();
     loadClasses();
+    loadRiskStudents();
   }, [semesterId]);
 
   const loadStudents = async () => {
@@ -49,6 +56,58 @@ export function useStudentsList(semesterId: string) {
     }
   };
 
+  const loadRiskStudents = async () => {
+    try {
+      const response = await api.get('/coordenador/alunos-em-risco');
+      setRiskStudents(response.data);
+      setFilteredRiskStudents(response.data);
+    } catch (error) {
+      console.log('Error loading risk students', error);
+    }
+  };
+
+  const toggleUserStatus = async (studentId: string, currentActive: boolean) => {
+    try {
+      const newStatus = !currentActive;
+      await api.put('/coordenador/aluno/status', { studentId, active: newStatus });
+      setStudents(prev =>
+        prev.map(s => (s.id === studentId ? { ...s, active: newStatus } : s))
+      );
+      setFilteredStudents(prev =>
+        prev.map(s => (s.id === studentId ? { ...s, active: newStatus } : s))
+      );
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível alterar o status do aluno.');
+    }
+  };
+
+  const toggleCourseCompletion = async (studentId: string, courseName: string, currentIsCompleted: boolean) => {
+    try {
+      const newCompleted = !currentIsCompleted;
+      await api.put('/coordenador/aluno/curso-status', {
+        studentId,
+        courseName,
+        isCompleted: newCompleted,
+      });
+
+      const updateCourses = (sList: StudentData[]) =>
+        sList.map(s => {
+          if (s.id === studentId && s.userCourses) {
+            const updatedUserCourses = s.userCourses.map(uc =>
+              uc.course_name === courseName ? { ...uc, is_completed: newCompleted } : uc
+            );
+            return { ...s, userCourses: updatedUserCourses };
+          }
+          return s;
+        });
+
+      setStudents(prev => updateCourses(prev));
+      setFilteredStudents(prev => updateCourses(prev));
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível alterar a conclusão do curso.');
+    }
+  };
+
   const handleSearch = (text: string) => {
     setSearchQuery(text);
     if (activeTab === 'students') {
@@ -60,6 +119,18 @@ export function useStudentsList(semesterId: string) {
             s.name.toLowerCase().includes(text.toLowerCase())
         );
         setFilteredStudents(filtered);
+      }
+    } else if (activeTab === 'risk') {
+      if (text.trim() === '') {
+        setFilteredRiskStudents(riskStudents);
+      } else {
+        const filtered = riskStudents.filter(
+          s => (s.ra && s.ra.toLowerCase().includes(text.toLowerCase())) ||
+            (s.studentName && s.studentName.toLowerCase().includes(text.toLowerCase())) ||
+            (s.name && s.name.toLowerCase().includes(text.toLowerCase())) ||
+            (s.subject && s.subject.toLowerCase().includes(text.toLowerCase()))
+        );
+        setFilteredRiskStudents(filtered);
       }
     } else {
       if (text.trim() === '') {
@@ -74,10 +145,11 @@ export function useStudentsList(semesterId: string) {
     }
   };
 
-  const handleTabSwitch = (tab: 'students' | 'classes') => {
+  const handleTabSwitch = (tab: 'students' | 'risk' | 'classes') => {
     setActiveTab(tab);
     setSearchQuery('');
     setFilteredStudents(students);
+    setFilteredRiskStudents(riskStudents);
     setFilteredClasses(classes);
   };
 
@@ -135,6 +207,7 @@ export function useStudentsList(semesterId: string) {
 
   return {
     students: filteredStudents,
+    riskStudents: filteredRiskStudents,
     searchQuery,
     loading,
     exportModalVisible,
@@ -146,6 +219,9 @@ export function useStudentsList(semesterId: string) {
     handleTabSwitch,
     handleExport,
     loadStudents,
-    loadClasses
+    loadClasses,
+    loadRiskStudents,
+    toggleUserStatus,
+    toggleCourseCompletion
   };
 }

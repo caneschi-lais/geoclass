@@ -13,7 +13,8 @@ export class AuthController {
 
     try {
       const user = await prisma.user.findUnique({
-        where: { email }
+        where: { email },
+        include: { userCourses: true }
       });
 
       if (!user) {
@@ -24,6 +25,10 @@ export class AuthController {
 
       if (!isValidPassword) {
         return res.status(401).json({ error: 'Credenciais inválidas' });
+      }
+
+      if (!user.active) {
+        return res.status(403).json({ error: 'Sua conta está inativa ou com o curso trancado. Entre em contato com a coordenação.' });
       }
 
       const token = jwt.sign(
@@ -38,6 +43,10 @@ export class AuthController {
           name: user.name,
           email: user.email,
           role: user.role,
+          courses: user.courses,
+          userCourses: user.userCourses,
+          student_semester: user.student_semester,
+          active: user.active,
           privacy_terms_accepted_at: user.privacy_terms_accepted_at
         },
         token

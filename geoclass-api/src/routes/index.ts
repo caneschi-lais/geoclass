@@ -50,6 +50,11 @@ router.post('/coordenador/sala', coordinatorController.createRoom);
 router.get('/coordenador/professores', coordinatorController.getProfessors);
 router.get('/coordenador/alunos', coordinatorController.getAllStudents);
 router.post('/coordenador/matricular', coordinatorController.enrollStudent);
+router.put('/coordenador/aluno/status', coordinatorController.toggleUserActiveStatus);
+router.put('/coordenador/aluno/curso-status', coordinatorController.toggleCourseCompletion);
+router.get('/coordenador/alunos-em-risco', coordinatorController.getStudentsAtRisk);
+router.get('/coordenador/semestre-atual', coordinatorController.getCurrentSemesterInfo);
+router.post('/coordenador/virada-semestre', coordinatorController.batchAdvanceSemester);
 
 // --- Rotas de Notificações ---
 router.get('/notificacoes', notificationController.getNotifications);

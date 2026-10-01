@@ -17,16 +17,30 @@ interface Professor {
 
 export function useSemesters() {
   const [semesters, setSemesters] = useState<SemesterData[]>([]);
+  const [currentSemester, setCurrentSemester] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [isAccordionOpen, setIsAccordionOpen] = useState(false);
   const [professors, setProfessors] = useState<Professor[]>([]);
+  const [executingVirada, setExecutingVirada] = useState(false);
 
   useEffect(() => {
     loadSemesters();
     loadProfessors();
+    loadCurrentSemester();
   }, []);
+
+  const loadCurrentSemester = async () => {
+    try {
+      const response = await api.get('/coordenador/semestre-atual');
+      if (response.data?.currentSemester) {
+        setCurrentSemester(response.data.currentSemester);
+      }
+    } catch (error) {
+      console.log('Error loading current semester info', error);
+    }
+  };
 
   const loadSemesters = async () => {
     try {
@@ -46,6 +60,36 @@ export function useSemesters() {
     } catch (error) {
       console.log('Error loading professors', error);
     }
+  };
+
+  const handleViradaSemestre = () => {
+    Alert.alert(
+      'Virada de Semestre',
+      `Confirma a virada de semestre letivo (${currentSemester || 'Novo Semestre'})?\n\nTodos os alunos ativos avançarão 1 semestre automaticamente (ex: 3º -> 4º) e os concluintes serão atualizados.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Confirmar Virada',
+          style: 'destructive',
+          onPress: async () => {
+            setExecutingVirada(true);
+            try {
+              const res = await api.post('/coordenador/virada-semestre');
+              Alert.alert(
+                'Sucesso!',
+                `${res.data.message}\n\nAlunos atualizados: ${res.data.updatedStudentsCount}\nNovos concluintes: ${res.data.completedStudentsCount}`
+              );
+              loadSemesters();
+              loadCurrentSemester();
+            } catch (err: any) {
+              Alert.alert('Erro', err.response?.data?.error || 'Erro ao realizar virada de semestre.');
+            } finally {
+              setExecutingVirada(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleExport = async (format: 'pdf' | 'excel', includeDetails: boolean) => {
@@ -100,14 +144,17 @@ export function useSemesters() {
 
   return {
     semesters,
+    currentSemester,
     loading,
     exportModalVisible,
     setExportModalVisible,
     exporting,
+    executingVirada,
     isAccordionOpen,
     setIsAccordionOpen,
     professors,
     loadSemesters,
+    handleViradaSemestre,
     handleExport
   };
 }

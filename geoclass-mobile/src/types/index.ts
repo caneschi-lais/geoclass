@@ -1,6 +1,13 @@
+export interface UserCourseInfo {
+  course_name: string;
+  semester?: string;
+  is_completed?: boolean;
+}
+
 export interface ClassData {
   id: string;
   subject: string;
+  course_name?: string;
   professor: string;
   time: string; // "HH:mm"
   latitude: number;
@@ -9,6 +16,7 @@ export interface ClassData {
   room?: string;
   enrolledCount?: number;
   alreadyCheckedIn?: boolean;
+  isCourseCompleted?: boolean;
 }
 
 export interface DashboardStat {
@@ -31,7 +39,12 @@ export interface StudentAttendance {
   id: string;
   name: string;
   ra: string;
-  time: string; // Hora que bateu o ponto
+  email?: string;
+  time?: string; // Hora que bateu o ponto
+  student_semester?: string;
+  courses?: string[];
+  userCourses?: UserCourseInfo[];
+  active?: boolean;
 }
 
 export interface CoordinatorAnalytics {
@@ -41,9 +54,19 @@ export interface CoordinatorAnalytics {
 
 export interface StudentRisk {
   id: string;
-  name: string;
+  classId?: string;
+  studentName?: string;
+  name?: string;
   ra: string;
+  email?: string;
+  subject?: string;
+  course_name?: string;
+  semester?: string;
+  presences?: number;
+  totalClasses?: number;
   attendancePercentage: number;
+  absencePercentage?: number;
+  status?: string;
 }
 
 export interface Notification {

@@ -8,6 +8,8 @@ type EnrolledStudent = {
   id: string;
   name: string;
   ra: string;
+  student_semester?: string;
+  courses?: string[];
 };
 
 type AttendanceRecord = {
@@ -84,12 +86,20 @@ export default function ManualAttendanceScreen({ navigation, route }: Props) {
 
   const renderItem = ({ item }: { item: EnrolledStudent }) => {
     const isPresent = attendanceState[item.id];
+    const semesterLabel = item.student_semester ? `${item.student_semester}º Sem.` : null;
 
     return (
       <View className="bg-white dark:bg-slate-800 p-4 rounded-xl mb-3 border border-gray-100 dark:border-slate-700 flex-row items-center justify-between shadow-sm">
         <View className="flex-1 pr-4">
           <Text className="text-lg font-bold text-gray-800 dark:text-slate-100">{item.name}</Text>
-          <Text className="text-gray-500 dark:text-slate-400 mt-1">RA: {item.ra}</Text>
+          <View className="flex-row items-center gap-2 mt-1">
+            <Text className="text-gray-500 dark:text-slate-400">RA: {item.ra}</Text>
+            {semesterLabel && (
+              <View className="bg-sky-100 dark:bg-sky-950/40 px-2 py-0.5 rounded">
+                <Text className="text-sky-700 dark:text-sky-400 font-bold text-[10px]">{semesterLabel}</Text>
+              </View>
+            )}
+          </View>
         </View>
         <View className="items-center">
           <Switch

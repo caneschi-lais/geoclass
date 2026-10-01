@@ -194,16 +194,34 @@ export class ProfessorController {
     const classId = req.params.id;
 
     try {
-      const enrollments = await prisma.enrollment.findMany({
-        where: { class_id: classId },
-        include: { student: true }
+      const classInfo = await prisma.class.findUnique({
+        where: { id: classId },
+        select: { course_name: true }
       });
 
-      const students = enrollments.map(e => ({
-        id: e.student.id,
-        name: e.student.name,
-        ra: e.student.ra || 'N/A'
-      }));
+      const enrollments = await prisma.enrollment.findMany({
+        where: { class_id: classId },
+        include: {
+          student: {
+            include: { userCourses: true }
+          }
+        }
+      });
+
+      const students = enrollments.map(e => {
+        const matchingCourse = e.student.userCourses?.find(uc => uc.course_name === classInfo?.course_name);
+        const specificSemester = matchingCourse?.semester || e.student.student_semester || 'Não informado';
+
+        return {
+          id: e.student.id,
+          name: e.student.name,
+          ra: e.student.ra || 'N/A',
+          courses: e.student.courses,
+          student_semester: specificSemester,
+          userCourses: e.student.userCourses,
+          active: e.student.active
+        };
+      });
 
       // Ordenar por nome
       students.sort((a, b) => a.name.localeCompare(b.name));
@@ -237,29 +255,37 @@ export class ProfessorController {
 
       // Registrar tudo de uma vez usando loop (Prisma UPSERT não suporta transação em lote direto com data dinâmica fácil)
       for (const record of attendances) {
-        await prisma.attendance.upsert({
+        const existing = await prisma.attendance.findFirst({
           where: {
-            student_id_class_id_date: {
-              student_id: record.studentId,
-              class_id: classId,
-              date: today
-            }
-          },
-          update: {
-            status: record.isPresent ? 'PRESENTE' : 'FALTA',
-            is_remote: true,
-            manual_attendance: true
-          },
-          create: {
             student_id: record.studentId,
             class_id: classId,
-            date: today,
-            check_in_time: new Date(),
-            status: record.isPresent ? 'PRESENTE' : 'FALTA',
-            is_remote: true,
-            manual_attendance: true
+            date: today
           }
         });
+
+        if (existing) {
+          await prisma.attendance.update({
+            where: { id: existing.id },
+            data: {
+              status: record.isPresent ? 'PRESENTE' : 'FALTA',
+              is_remote: true,
+              manual_attendance: true
+            }
+          });
+        } else {
+          await prisma.attendance.create({
+            data: {
+              student_id: record.studentId,
+              class_id: classId,
+              date: today,
+              slot_time: 'MANUAL',
+              check_in_time: new Date(),
+              status: record.isPresent ? 'PRESENTE' : 'FALTA',
+              is_remote: true,
+              manual_attendance: true
+            }
+          });
+        }
 
         if (record.isPresent) {
           await prisma.notification.create({
@@ -303,13 +329,11 @@ export class ProfessorController {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        attendance = await prisma.attendance.findUnique({
+        attendance = await prisma.attendance.findFirst({
           where: {
-            student_id_class_id_date: {
-              student_id: studentId,
-              class_id: classId,
-              date: today
-            }
+            student_id: studentId,
+            class_id: classId,
+            date: today
           }
         });
       }

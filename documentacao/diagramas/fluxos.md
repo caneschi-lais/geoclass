@@ -529,3 +529,99 @@ sequenceDiagram
         note over Server: O contador de 15 minutos de inatividade do Render é zerado,<br/>mantendo a API permanentemente aquecida e ativa!
     end
 ```
+
+---
+
+### 3.5 Virada de Semestre em Lote (Batch Increment) & Identificação Automática (YYYY.1/YYYY.2)
+Permite ao coordenador avançar em lote o semestre letivo de todos os alunos ativos da instituição e consultar o semestre corrente detectado por calendário.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Coordenador
+    participant Web as Painel Coordenador / App
+    participant API as Backend API (Render.com)
+    participant Util as Utilitário AcademicSemester
+    participant DB as Banco PostgreSQL (Neon.tech)
+
+    Coordenador->>Web: Carrega tela de Gestão Acadêmica
+    Web->>API: GET /api/coordenador/semestre-atual
+    API->>Util: getCurrentAcademicSemester()
+    Util-->>API: Retorna "2026.2" (Mês >= 7)
+    API-->>Web: Exibe Badge "Semestre Vigente: 2026.2"
+
+    Coordenador->>Web: Clica no botão "Executar Virada de Semestre (Batch)"
+    Web->>Coordenador: Exibe modal de confirmação de segurança
+    Coordenador->>Web: Confirma a virada de semestre
+
+    Web->>API: POST /api/coordenador/virada-semestre
+    API->>DB: Busca todos os alunos ativos (User.findMany role=ALUNO active=true)
+    DB-->>API: Retorna lista de alunos e seus UserCourses
+
+    loop Para cada aluno ativo
+        loop Para cada curso não concluído (is_completed=false)
+            API->>Util: incrementStudentSemester(currentSemester)
+            Util-->>API: Retorna { newSemester: "4º Semestre", isCompleted: false }
+            API->>DB: UPDATE UserCourse SET semester="4º Semestre", is_completed=false
+        end
+        API->>DB: UPDATE User SET student_semester=lastNewSemester
+    end
+
+    DB-->>API: Transação de lote concluída
+    API-->>Web: Retorna Sucesso 200 { message, updatedStudentsCount, completedStudentsCount }
+    Web-->>Coordenador: Exibe modal de sucesso com total de alunos promovidos e formados
+```
+
+---
+
+### 3.6 Gestão de Status Ativo (Trancamento) e Conclusão de Curso (Modo Leitura)
+Permite ao coordenador desativar a conta de um aluno (trancamento) ou marcar a conclusão de um curso específico.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Coordenador
+    participant Web as Painel Coordenador / App
+    participant API as Backend API (Render.com)
+    participant DB as Banco PostgreSQL (Neon.tech)
+
+    %% Alternar Status Ativo / Inativo
+    Coordenador->>Web: Alterna Switch "Ativo" de um Aluno
+    Web->>API: PUT /api/coordenador/aluno/status {userId, active: false}
+    API->>DB: UPDATE User SET active = false WHERE id = userId
+    DB-->>API: Registro atualizado
+    API-->>Web: Retorna status atualizado ("Conta desativada/trancada")
+    Web-->>Coordenador: Atualiza badge para "Inativo" na lista
+
+    %% Alternar Conclusão de Curso
+    Coordenador->>Web: Clica na Tag de Curso do Aluno ("Concluir Curso")
+    Web->>API: PUT /api/coordenador/aluno/curso-status {userId, course_name, is_completed: true}
+    API->>DB: UPSERT UserCourse SET is_completed = true
+    DB-->>API: Registro atualizado
+    API-->>Web: Retorna status ("Curso Concluído - Modo Leitura")
+    Web-->>Coordenador: Exibe tag com ícone de cadeado e status Concluído
+```
+
+---
+
+### 4.4 Disparo Automático de Alerta por Risco de Reprovação (<75% Presença)
+Varre a frequência dos estudantes a cada check-in e envia notificação push automática ao atingir a faixa crítica de faltas.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Aluno
+    participant API as Backend API (Render.com)
+    participant DB as Banco PostgreSQL (Neon.tech)
+
+    note over API: Processado durante o registro de presença ou job
+    API->>DB: Calcula porcentagem de presença acumulada da disciplina
+    DB-->>API: Retorna presenças = 28 / total_classes = 40 (70% Presença)
+
+    alt Presença entre 70% e 74% (Faixa Crítica)
+        API->>DB: INSERT INTO Notification (user_id, title, body) VALUES ("Atenção: Limite Crítico de Faltas (70% de presença em ADS)")
+        DB-->>API: Notificação gravada
+        note right of DB: Notificação enviada instantaneamente ao celular do aluno
+    end
+```
+

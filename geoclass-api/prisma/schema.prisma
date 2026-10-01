@@ -14,8 +14,12 @@ model User {
   password_hash             String
   role                      Role      @default(ALUNO)
   ra                        String?   @unique
+  courses                   String[]  @default([]) // Lista de cursos vinculados
+  student_semester          String?   // Ex: "6º Semestre" (legado / padrão)
+  active                    Boolean   @default(true)
   privacy_terms_accepted_at DateTime?
 
+  userCourses   UserCourse[]
   classesTaught Class[]        @relation("ProfessorClasses")
   enrollments   Enrollment[]
   attendances   Attendance[]
@@ -24,10 +28,23 @@ model User {
   created_at DateTime @default(now())
 }
 
+model UserCourse {
+  id           String  @id @default(uuid())
+  user_id      String
+  user         User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  course_name  String
+  semester     String? // Ex: "6º Semestre"
+  is_completed Boolean @default(false) // Indica se o aluno ja concluiu este curso
+
+  @@unique([user_id, course_name])
+}
+
 model Class {
   id            String  @id @default(uuid())
   subject       String
+  course_name   String? @default("Análise e Desenvolvimento de Sistemas") // Ex: "Análise e Desenvolvimento de Sistemas"
   schedule_time String // Ex: "08:00"
+  week_days     String? // Ex: "segunda", "terca,quarta", "quinta"
   latitude      Float
   longitude     Float
   radius_meters Int
@@ -69,6 +86,7 @@ model Attendance {
   class    Class  @relation(fields: [class_id], references: [id])
 
   date          DateTime @db.Date
+  slot_time     String?  // Ex: "19:00", "19:50", "20:50", "21:40"
   check_in_time DateTime
   device_id     String?
   status        Status   @default(PRESENTE)
@@ -81,7 +99,7 @@ model Attendance {
 
   created_at DateTime @default(now())
 
-  @@unique([student_id, class_id, date])
+  @@unique([student_id, class_id, date, slot_time])
 }
 
 enum Role {

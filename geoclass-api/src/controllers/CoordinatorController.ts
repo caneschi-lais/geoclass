@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middlewares/authMiddleware';
+import { getCurrentAcademicSemester, incrementStudentSemester } from '../utils/academicSemester';
 
 const prisma = new PrismaClient();
 
@@ -354,6 +355,9 @@ export class CoordinatorController {
           name: true,
           email: true,
           ra: true,
+          courses: true,
+          student_semester: true,
+          active: true,
         },
         orderBy: { name: 'asc' }
       });
@@ -417,6 +421,229 @@ export class CoordinatorController {
     } catch (error) {
       console.error('Erro enrollStudent', error);
       return res.status(500).json({ error: 'Erro ao matricular o aluno' });
+    }
+  }
+
+  // 10. Alternar status ativo/inativo do aluno (Toggle Active / Trancamento)
+  async toggleUserActiveStatus(req: AuthRequest, res: Response) {
+    const { userId, active } = req.body;
+
+    if (!userId || active === undefined) {
+      return res.status(400).json({ error: 'ID do usuário e novo status (active) são obrigatórios' });
+    }
+
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId }
+      });
+
+      if (!user) {
+        return res.status(404).json({ error: 'Usuário não encontrado' });
+      }
+
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: { active: Boolean(active) }
+      });
+
+      const statusMsg = updatedUser.active ? 'ativada' : 'desativada/trancada';
+
+      return res.json({
+        message: `Conta de ${updatedUser.name} foi ${statusMsg} com sucesso!`,
+        user: {
+          id: updatedUser.id,
+          name: updatedUser.name,
+          active: updatedUser.active
+        }
+      });
+    } catch (error) {
+      console.error('Erro toggleUserActiveStatus', error);
+      return res.status(500).json({ error: 'Erro ao alterar status da conta do usuário' });
+    }
+  }
+
+  // 11. Alternar status de conclusão de um curso do aluno (Concluído / Em Andamento)
+  async toggleCourseCompletion(req: AuthRequest, res: Response) {
+    const { userId, course_name, is_completed } = req.body;
+
+    if (!userId || !course_name || is_completed === undefined) {
+      return res.status(400).json({ error: 'userId, course_name e is_completed são obrigatórios' });
+    }
+
+    try {
+      const userCourse = await prisma.userCourse.upsert({
+        where: {
+          user_id_course_name: {
+            user_id: userId,
+            course_name: String(course_name),
+          }
+        },
+        update: {
+          is_completed: Boolean(is_completed)
+        },
+        create: {
+          user_id: userId,
+          course_name: String(course_name),
+          is_completed: Boolean(is_completed)
+        }
+      });
+
+      const statusText = userCourse.is_completed ? 'CONCLUÍDO (Somente Leitura)' : 'EM ANDAMENTO';
+
+      return res.json({
+        message: `Status do curso ${userCourse.course_name} atualizado para ${statusText}!`,
+        userCourse
+      });
+    } catch (error) {
+      console.error('Erro toggleCourseCompletion', error);
+      return res.status(500).json({ error: 'Erro ao alterar status de conclusão do curso' });
+    }
+  }
+
+  // 12. Obter lista de alunos em risco de reprovação por falta (< 75% de presença)
+  async getStudentsAtRisk(req: AuthRequest, res: Response) {
+    try {
+      const enrollments = await prisma.enrollment.findMany({
+        where: { class: { active: true } },
+        include: {
+          student: {
+            include: { userCourses: true }
+          },
+          class: true
+        }
+      });
+
+      const riskList: Array<any> = [];
+
+      for (const enr of enrollments) {
+        const student = enr.student;
+        const cls = enr.class;
+
+        const presences = await prisma.attendance.count({
+          where: {
+            student_id: student.id,
+            class_id: cls.id,
+            status: { in: ['PRESENTE', 'ATRASADO'] }
+          }
+        });
+
+        const totalClasses = cls.total_classes || 40;
+        const attendancePercentage = Math.round((presences / totalClasses) * 100);
+        const absencePercentage = 100 - attendancePercentage;
+
+        // Critério de risco: frequência < 75%
+        if (attendancePercentage < 75) {
+          const matchingCourse = student.userCourses?.find(uc => uc.course_name === cls.course_name);
+          const semesterInfo = matchingCourse?.semester || student.student_semester || cls.semester;
+
+          riskList.push({
+            id: student.id,
+            classId: cls.id,
+            studentName: student.name,
+            ra: student.ra || 'N/A',
+            email: student.email,
+            subject: cls.subject,
+            course_name: cls.course_name || 'Geral',
+            semester: semesterInfo,
+            presences,
+            totalClasses,
+            attendancePercentage,
+            absencePercentage,
+            status: attendancePercentage < 60 ? 'Reprovado por Falta' : 'Em Risco'
+          });
+        }
+      }
+
+      // Ordenar por menor porcentagem de presença (maior risco) primeiro
+      riskList.sort((a, b) => a.attendancePercentage - b.attendancePercentage);
+
+      return res.json(riskList);
+    } catch (error) {
+      console.error('Erro getStudentsAtRisk', error);
+      return res.status(500).json({ error: 'Erro ao buscar alunos em risco de reprovação' });
+    }
+  }
+
+  // 13. Identificador de Semestre Atual Automático (YYYY.1 ou YYYY.2)
+  async getCurrentSemesterInfo(req: AuthRequest, res: Response) {
+    try {
+      const currentSemester = getCurrentAcademicSemester();
+      const date = new Date();
+      return res.json({
+        currentSemester,
+        year: date.getFullYear(),
+        period: date.getMonth() + 1 <= 6 ? 1 : 2,
+      });
+    } catch (error) {
+      console.error('Erro getCurrentSemesterInfo', error);
+      return res.status(500).json({ error: 'Erro ao identificar semestre atual' });
+    }
+  }
+
+  // 14. Ação de "Virada de Semestre" (Batch Increment)
+  async batchAdvanceSemester(req: AuthRequest, res: Response) {
+    try {
+      // Buscar todos os alunos ativos da instituição
+      const activeStudents = await prisma.user.findMany({
+        where: { role: 'ALUNO', active: true },
+        include: { userCourses: true }
+      });
+
+      let updatedStudentsCount = 0;
+      let completedStudentsCount = 0;
+
+      for (const student of activeStudents) {
+        let hasUpdated = false;
+        let lastNewSemester = student.student_semester;
+
+        if (student.userCourses && student.userCourses.length > 0) {
+          for (const uc of student.userCourses) {
+            // Se o curso já não estava marcado como concluído, avança 1 semestre
+            if (!uc.is_completed) {
+              const { newSemester, isCompleted } = incrementStudentSemester(uc.semester);
+
+              await prisma.userCourse.update({
+                where: { id: uc.id },
+                data: {
+                  semester: newSemester,
+                  is_completed: isCompleted,
+                }
+              });
+
+              lastNewSemester = newSemester;
+              hasUpdated = true;
+              if (isCompleted) {
+                completedStudentsCount++;
+              }
+            }
+          }
+        } else if (student.student_semester) {
+          // Fallback se não tiver userCourses gravados
+          const { newSemester } = incrementStudentSemester(student.student_semester);
+          lastNewSemester = newSemester;
+          hasUpdated = true;
+        }
+
+        if (hasUpdated) {
+          await prisma.user.update({
+            where: { id: student.id },
+            data: { student_semester: lastNewSemester }
+          });
+          updatedStudentsCount++;
+        }
+      }
+
+      const currentSemester = getCurrentAcademicSemester();
+
+      return res.json({
+        message: `Virada de semestre (${currentSemester}) concluída com sucesso!`,
+        updatedStudentsCount,
+        completedStudentsCount,
+        currentSemester
+      });
+    } catch (error) {
+      console.error('Erro batchAdvanceSemester', error);
+      return res.status(500).json({ error: 'Erro ao realizar a virada de semestre' });
     }
   }
 }

@@ -22,14 +22,17 @@ type Props = {
 export default function SemestersScreen({ navigation }: Props) {
   const {
     semesters,
+    currentSemester,
     loading,
     exportModalVisible,
     setExportModalVisible,
     exporting,
+    executingVirada,
     isAccordionOpen,
     setIsAccordionOpen,
     professors,
     loadSemesters,
+    handleViradaSemestre,
     handleExport
   } = useSemesters();
 
@@ -67,6 +70,7 @@ export default function SemestersScreen({ navigation }: Props) {
   return (
     <View className="flex-1 bg-gray-50 dark:bg-slate-900 pt-14 px-4">
       {exporting && <LoadingOverlay message="Gerando relatório..." />}
+      {executingVirada && <LoadingOverlay message="Processando virada de semestre..." />}
 
       <ScreenHeader
         title="Gestão Acadêmica"
@@ -76,6 +80,32 @@ export default function SemestersScreen({ navigation }: Props) {
           variant: 'white'
         }}
       />
+
+      {/* Card do Semestre Atual Vigente e Ação de Virada */}
+      <View className="bg-sky-50 dark:bg-sky-950/30 border border-sky-100 dark:border-sky-900/50 p-4 rounded-xl mb-4 shadow-sm">
+        <View className="flex-row justify-between items-center mb-2">
+          <View className="flex-row items-center">
+            <View className="bg-sky-500 p-1.5 rounded-lg mr-2">
+              <Feather name="clock" size={16} color="#ffffff" />
+            </View>
+            <Text className="text-sky-900 dark:text-sky-200 font-bold text-sm">
+              Semestre Vigente: <Text className="font-extrabold text-sky-600 dark:text-sky-400">{currentSemester || 'Carregando...'}</Text>
+            </Text>
+          </View>
+        </View>
+
+        <Text className="text-gray-600 dark:text-slate-400 text-xs mb-3">
+          Detectado automaticamente pela data atual do servidor.
+        </Text>
+
+        <TouchableOpacity
+          className="bg-sky-500 active:bg-sky-600 py-2.5 px-4 rounded-lg flex-row items-center justify-center shadow-sm"
+          onPress={handleViradaSemestre}
+        >
+          <Feather name="rotate-cw" size={16} color="#ffffff" />
+          <Text className="text-white font-bold text-xs ml-2">Executar Virada de Semestre (Batch)</Text>
+        </TouchableOpacity>
+      </View>
 
       <CreateRoomForm
         isOpen={isAccordionOpen}
