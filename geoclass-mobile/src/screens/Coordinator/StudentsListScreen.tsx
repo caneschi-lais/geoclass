@@ -229,8 +229,9 @@ export default function StudentsListScreen({ navigation, route }: Props) {
       </View>
 
       <FlatList
+        key={activeTab}
         data={getListData()}
-        keyExtractor={(item, index) => item.id || String(index)}
+        keyExtractor={(item, index) => `${activeTab}-${item.id || item.classId || index}-${index}`}
         renderItem={getRenderItem() as any}
         contentContainerStyle={{ paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}

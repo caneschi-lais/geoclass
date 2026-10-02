@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, Alert } from 'react-native';
+import { View, Text, FlatList, Alert, TouchableOpacity, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import api from '../../services/api';
 import { ExportService } from '../../services/ExportService';
@@ -14,6 +14,7 @@ type SubjectData = {
   room_name: string;
   total_classes: number;
   absencePercentage: number;
+  is_completed?: boolean;
 };
 
 type Props = {
@@ -43,6 +44,36 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
     }
   };
 
+  const toggleSubjectCompletion = async (classId: string, currentCompleted: boolean) => {
+    try {
+      const newStatus = !currentCompleted;
+      const response = await api.put('/coordenador/aluno/materia-status', {
+        studentId,
+        classId,
+        is_completed: newStatus
+      });
+
+      setSubjects(prev =>
+        prev.map(s => s.classId === classId ? { ...s, is_completed: newStatus } : s)
+      );
+
+      const msg = response.data?.message || 'Status da matéria atualizado!';
+      if (Platform.OS === 'web') {
+        window.alert(msg);
+      } else {
+        Alert.alert('Sucesso', msg);
+      }
+    } catch (error: any) {
+      console.log('Error toggling subject completion:', error);
+      const errMsg = error.response?.data?.error || 'Não foi possível alterar o status da matéria.';
+      if (Platform.OS === 'web') {
+        window.alert(`Erro: ${errMsg}`);
+      } else {
+        Alert.alert('Erro', errMsg);
+      }
+    }
+  };
+
   const handleExport = async (format: 'pdf' | 'excel') => {
     setExportModalVisible(false);
     setExporting(true);
@@ -52,14 +83,16 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
           'Matéria': s.subject,
           'Sala': s.room_name,
           'Aulas Previstas': s.total_classes,
-          'Faltas (%)': s.absencePercentage
+          'Faltas (%)': s.absencePercentage,
+          'Status': s.is_completed ? 'Concluída (Modo Leitura)' : 'Em Andamento'
         }));
         await ExportService.exportToExcel(excelData, `Relatorio_Materias_${studentName.replace(/\s+/g, '_')}`);
       } else {
-        const headers = ['Matéria', 'Sala', 'Aulas Previstas', 'Faltas (%)'];
+        const headers = ['Matéria', 'Sala', 'Aulas Previstas', 'Faltas (%)', 'Status'];
         const rows = subjects.map(s => {
           const percHtml = s.absencePercentage >= 25 ? `<span class="high-absence">${s.absencePercentage}%</span>` : `${s.absencePercentage}%`;
-          return [s.subject, s.room_name, s.total_classes.toString(), percHtml];
+          const statusText = s.is_completed ? 'Concluída' : 'Em Andamento';
+          return [s.subject, s.room_name, s.total_classes.toString(), percHtml, statusText];
         });
 
         // Gráfico com as matérias com mais faltas
@@ -93,7 +126,7 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
 
         <View className="items-end bg-gray-50 dark:bg-slate-900 p-2 rounded-lg">
           <Text className="text-xs text-gray-400 mb-1">Aulas Previstas</Text>
-          <Text className="text-md font-bold text-gray-700">{item.total_classes}</Text>
+          <Text className="text-md font-bold text-gray-700 dark:text-slate-200">{item.total_classes}</Text>
         </View>
       </View>
 
@@ -103,7 +136,7 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
           {item.absencePercentage}%
         </Text>
       </View>
-      <View className="w-full h-2 bg-gray-200 rounded-full mt-3 overflow-hidden flex-row">
+      <View className="w-full h-2 bg-gray-200 dark:bg-slate-700 rounded-full mt-3 overflow-hidden flex-row">
         <View
           className="h-full bg-emerald-400"
           style={{ width: `${100 - item.absencePercentage}%` }}
@@ -112,6 +145,34 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
           className="h-full bg-red-400"
           style={{ width: `${item.absencePercentage}%` }}
         />
+      </View>
+
+      {/* Ação do Coordenador: Alternar Conclusão da Matéria */}
+      <View className="mt-4 pt-3 border-t border-gray-100 dark:border-slate-700 flex-row justify-between items-center">
+        <View className="flex-row items-center gap-1.5">
+          <Feather
+            name={item.is_completed ? "check-circle" : "clock"}
+            size={16}
+            color={item.is_completed ? "#d97706" : "#64748b"}
+          />
+          <Text className={`text-xs font-bold ${item.is_completed ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'}`}>
+            {item.is_completed ? 'Concluída (Modo Leitura)' : 'Em Andamento'}
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          onPress={() => toggleSubjectCompletion(item.classId, !!item.is_completed)}
+          className={`px-3 py-1.5 rounded-lg flex-row items-center gap-1 border ${
+            item.is_completed
+              ? 'bg-gray-100 border-gray-300 dark:bg-slate-700 dark:border-slate-600'
+              : 'bg-amber-500 border-amber-600 active:bg-amber-600'
+          }`}
+        >
+          <Feather name={item.is_completed ? "rotate-ccw" : "check"} size={14} color={item.is_completed ? "#475569" : "#ffffff"} />
+          <Text className={`text-xs font-bold ${item.is_completed ? 'text-slate-700 dark:text-slate-200' : 'text-white'}`}>
+            {item.is_completed ? 'Reabrir Matéria' : 'Marcar Concluída'}
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
   );

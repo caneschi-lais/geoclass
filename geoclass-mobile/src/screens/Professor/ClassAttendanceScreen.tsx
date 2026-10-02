@@ -22,6 +22,7 @@ export default function ClassAttendanceScreen({ route, navigation }: Props) {
     setSelectedDate,
     calendarVisible,
     setCalendarVisible,
+    attendanceDates,
     formatDateDisplay,
     isToday
   } = useClassAttendance(classId);
@@ -89,6 +90,7 @@ export default function ClassAttendanceScreen({ route, navigation }: Props) {
         onClose={() => setCalendarVisible(false)}
         selectedDate={selectedDate}
         onSelectDate={setSelectedDate}
+        attendanceDates={attendanceDates}
       />
     </View>
   );

@@ -8,6 +8,7 @@ import LoadingOverlay from '../../components/LoadingOverlay';
 import EmptyState from '../../components/EmptyState';
 import ExportModal from '../../components/ExportModal';
 import CreateRoomForm from '../../components/CreateRoomForm';
+import CreateSubjectForm from '../../components/CreateSubjectForm';
 
 type SemesterData = {
   id: string;
@@ -35,6 +36,8 @@ export default function SemestersScreen({ navigation }: Props) {
     handleViradaSemestre,
     handleExport
   } = useSemesters();
+
+  const [isSubjectAccordionOpen, setIsSubjectAccordionOpen] = React.useState(false);
 
   const handleLogout = async () => {
     await deleteToken();
@@ -103,15 +106,29 @@ export default function SemestersScreen({ navigation }: Props) {
           onPress={handleViradaSemestre}
         >
           <Feather name="rotate-cw" size={16} color="#ffffff" />
-          <Text className="text-white font-bold text-xs ml-2">Executar Virada de Semestre (Batch)</Text>
+          <Text className="text-white font-bold text-xs ml-2">Executar Virada de Semestre</Text>
         </TouchableOpacity>
       </View>
 
       <CreateRoomForm
         isOpen={isAccordionOpen}
-        onToggle={() => setIsAccordionOpen(!isAccordionOpen)}
+        onToggle={() => {
+          setIsAccordionOpen(!isAccordionOpen);
+          if (!isAccordionOpen) setIsSubjectAccordionOpen(false);
+        }}
         professors={professors}
         onSuccess={loadSemesters}
+      />
+
+      <CreateSubjectForm
+        isOpen={isSubjectAccordionOpen}
+        onToggle={() => {
+          setIsSubjectAccordionOpen(!isSubjectAccordionOpen);
+          if (!isSubjectAccordionOpen) setIsAccordionOpen(false);
+        }}
+        professors={professors}
+        onSuccess={loadSemesters}
+        currentSemester={currentSemester}
       />
 
       <View className="flex-row justify-between items-center mb-4">

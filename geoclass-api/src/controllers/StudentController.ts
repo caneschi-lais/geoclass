@@ -54,6 +54,15 @@ export class StudentController {
           }
         });
         
+        const enrollment = await prisma.enrollment.findUnique({
+          where: {
+            student_id_class_id: {
+              student_id: studentId,
+              class_id: c.id
+            }
+          }
+        });
+
         const userCourse = c.course_name ? await prisma.userCourse.findUnique({
           where: {
             user_id_course_name: {
@@ -63,7 +72,7 @@ export class StudentController {
           }
         }) : null;
 
-        const isCourseCompleted = userCourse?.is_completed || false;
+        const isCourseCompleted = userCourse?.is_completed || enrollment?.is_completed || false;
 
         return {
           id: c.id,
@@ -97,8 +106,7 @@ export class StudentController {
       });
 
       const stats = await Promise.all(enrollments.map(async (e) => {
-        // Lógica simplificada: Total de aulas dadas = 20 (fixo para o MVP, ideal seria contar dias desde o inicio do semestre)
-        const totalAulasDadas = 20; 
+        const totalClasses = e.class.total_classes || 40; 
         
         const presencas = await prisma.attendance.count({
           where: {
@@ -108,7 +116,7 @@ export class StudentController {
           }
         });
 
-        const percentage = Math.round((presencas / totalAulasDadas) * 100);
+        const percentage = Math.round((presencas / totalClasses) * 100);
         
         let status = 'Aprovado';
         if (percentage < 75 && percentage >= 60) status = 'Em Risco';
@@ -118,7 +126,9 @@ export class StudentController {
           id: e.class.id,
           subject: e.class.subject,
           attendancePercentage: percentage,
-          status
+          status,
+          attendedClasses: presencas,
+          totalClasses
         };
       }));
 

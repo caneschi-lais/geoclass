@@ -7,9 +7,10 @@ interface CalendarModalProps {
   onClose: () => void;
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
+  attendanceDates?: string[];
 }
 
-export default function CalendarModal({ visible, onClose, selectedDate, onSelectDate }: CalendarModalProps) {
+export default function CalendarModal({ visible, onClose, selectedDate, onSelectDate, attendanceDates = [] }: CalendarModalProps) {
   const [currentYear, setCurrentYear] = useState<number>(selectedDate.getFullYear());
   const [currentMonth, setCurrentMonth] = useState<number>(selectedDate.getMonth());
 
@@ -34,6 +35,13 @@ export default function CalendarModal({ visible, onClose, selectedDate, onSelect
 
   const isToday = (date: Date) => {
     return isSameDay(new Date(), date);
+  };
+
+  const formatDateKey = (d: Date) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   const getDaysInMonth = (year: number, month: number) => {
@@ -109,6 +117,23 @@ export default function CalendarModal({ visible, onClose, selectedDate, onSelect
                 }
                 const isSelected = isSameDay(selectedDate, item);
                 const isTodayDate = isToday(item);
+                const dateKey = formatDateKey(item);
+                const hasAttendance = attendanceDates.includes(dateKey);
+
+                let bgStyle = 'bg-transparent';
+                let textStyle = 'text-gray-800 dark:text-slate-200';
+
+                if (isSelected) {
+                  bgStyle = 'bg-sky-500 shadow-sm';
+                  textStyle = 'text-white';
+                } else if (hasAttendance) {
+                  bgStyle = 'bg-emerald-100 dark:bg-emerald-900/40 border border-emerald-300 dark:border-emerald-700/60';
+                  textStyle = 'text-emerald-700 dark:text-emerald-400 font-bold';
+                } else if (isTodayDate) {
+                  bgStyle = 'border border-sky-500 bg-sky-50 dark:bg-sky-950/20';
+                  textStyle = 'text-sky-600 dark:text-sky-400';
+                }
+
                 return (
                   <TouchableOpacity
                     onPress={() => {
@@ -116,21 +141,9 @@ export default function CalendarModal({ visible, onClose, selectedDate, onSelect
                       onClose();
                     }}
                     style={{ width: 36, height: 36, margin: 2 }}
-                    className={`rounded-full items-center justify-center ${
-                      isSelected 
-                        ? 'bg-sky-500 shadow-sm' 
-                        : isTodayDate 
-                          ? 'border border-sky-500 bg-sky-50 dark:bg-sky-950/20' 
-                          : 'bg-transparent'
-                    }`}
+                    className={`rounded-full items-center justify-center ${bgStyle}`}
                   >
-                    <Text className={`font-bold text-sm ${
-                      isSelected 
-                        ? 'text-white' 
-                        : isTodayDate 
-                          ? 'text-sky-600 dark:text-sky-400' 
-                          : 'text-gray-800 dark:text-slate-200'
-                    }`}>
+                    <Text className={`font-bold text-sm ${textStyle}`}>
                       {item.getDate()}
                     </Text>
                   </TouchableOpacity>
@@ -140,7 +153,19 @@ export default function CalendarModal({ visible, onClose, selectedDate, onSelect
             />
           </View>
 
-          <View className="flex-row justify-between mt-4 border-t border-gray-150 dark:border-slate-700/80 pt-4">
+          {/* Legenda sutil */}
+          <View className="flex-row items-center justify-center gap-4 my-2">
+            <View className="flex-row items-center gap-1.5">
+              <View className="w-2.5 h-2.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 border border-emerald-400" />
+              <Text className="text-[11px] text-gray-500 dark:text-slate-400 font-medium">Houve chamada</Text>
+            </View>
+            <View className="flex-row items-center gap-1.5">
+              <View className="w-2.5 h-2.5 rounded-full bg-sky-500" />
+              <Text className="text-[11px] text-gray-500 dark:text-slate-400 font-medium">Selecionado</Text>
+            </View>
+          </View>
+
+          <View className="flex-row justify-between mt-2 border-t border-gray-150 dark:border-slate-700/80 pt-4">
             <TouchableOpacity
               onPress={() => {
                 onSelectDate(new Date());

@@ -10,6 +10,21 @@ export function useClassAttendance(classId: string) {
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [calendarVisible, setCalendarVisible] = useState(false);
 
+  const [attendanceDates, setAttendanceDates] = useState<string[]>([]);
+
+  useEffect(() => {
+    loadAttendanceDates();
+  }, [classId]);
+
+  const loadAttendanceDates = async () => {
+    try {
+      const response = await api.get(`/professor/turma/${classId}/datas-chamada`);
+      setAttendanceDates(response.data);
+    } catch (error) {
+      console.log('Error loading attendance dates', error);
+    }
+  };
+
   useEffect(() => {
     loadAttendance(selectedDate, !initialLoaded);
     if (!initialLoaded) setInitialLoaded(true);
@@ -25,6 +40,8 @@ export function useClassAttendance(classId: string) {
       const dateStr = formatDateApi(dateToLoad);
       const response = await api.get(`/professor/turma/${classId}/presencas?date=${dateStr}`);
       setStudents(response.data);
+      // Atualizar as datas com chamada para refletir qualquer chamada recente
+      loadAttendanceDates();
     } catch (error) {
       console.log('Error loading attendance', error);
     } finally {
@@ -65,7 +82,9 @@ export function useClassAttendance(classId: string) {
     setSelectedDate,
     calendarVisible,
     setCalendarVisible,
+    attendanceDates,
     loadAttendance,
+    loadAttendanceDates,
     formatDateDisplay,
     isToday
   };

@@ -113,6 +113,12 @@ export class AttendanceController {
         return res.status(403).json({ error: 'Aluno não matriculado nesta turma' });
       }
 
+      if (enrollment.is_completed) {
+        return res.status(403).json({ 
+          error: `Você já concluiu a matéria de ${classData.subject}. Não é possível registrar novas presenças para esta matéria (Modo Leitura).` 
+        });
+      }
+
       // 2.1 Verificar se o aluno já concluiu o curso desta disciplina (Curso Concluído = Somente Leitura)
       if (classData.course_name) {
         const userCourse = await prisma.userCourse.findUnique({

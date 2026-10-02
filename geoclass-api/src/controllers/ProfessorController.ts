@@ -356,4 +356,34 @@ export class ProfessorController {
       return res.status(500).json({ error: 'Erro ao resetar vínculo de dispositivo.' });
     }
   }
+
+  async getDatasComChamada(req: AuthRequest, res: Response) {
+    const classId = req.params.id;
+
+    try {
+      const presencas = await prisma.attendance.findMany({
+        where: {
+          class_id: classId,
+          status: 'PRESENTE'
+        },
+        select: {
+          date: true
+        },
+        distinct: ['date']
+      });
+
+      const dates = presencas.map(p => {
+        const d = p.date instanceof Date ? p.date : new Date(p.date);
+        const year = d.getUTCFullYear();
+        const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(d.getUTCDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      });
+
+      return res.json(dates);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar datas com chamada' });
+    }
+  }
 }

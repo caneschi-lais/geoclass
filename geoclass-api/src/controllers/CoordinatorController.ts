@@ -142,7 +142,8 @@ export class CoordinatorController {
           subject: enr.class.subject,
           room_name: enr.class.room_name,
           total_classes: totalAulas,
-          absencePercentage
+          absencePercentage,
+          is_completed: enr.is_completed || false
         };
       }));
 
@@ -426,7 +427,8 @@ export class CoordinatorController {
 
   // 10. Alternar status ativo/inativo do aluno (Toggle Active / Trancamento)
   async toggleUserActiveStatus(req: AuthRequest, res: Response) {
-    const { userId, active } = req.body;
+    const userId = req.body.userId || req.body.studentId;
+    const active = req.body.active;
 
     if (!userId || active === undefined) {
       return res.status(400).json({ error: 'ID do usuário e novo status (active) são obrigatórios' });
@@ -464,7 +466,9 @@ export class CoordinatorController {
 
   // 11. Alternar status de conclusão de um curso do aluno (Concluído / Em Andamento)
   async toggleCourseCompletion(req: AuthRequest, res: Response) {
-    const { userId, course_name, is_completed } = req.body;
+    const userId = req.body.userId || req.body.studentId;
+    const course_name = req.body.course_name || req.body.courseName;
+    const is_completed = req.body.is_completed !== undefined ? req.body.is_completed : req.body.isCompleted;
 
     if (!userId || !course_name || is_completed === undefined) {
       return res.status(400).json({ error: 'userId, course_name e is_completed são obrigatórios' });
@@ -644,6 +648,126 @@ export class CoordinatorController {
     } catch (error) {
       console.error('Erro batchAdvanceSemester', error);
       return res.status(500).json({ error: 'Erro ao realizar a virada de semestre' });
+    }
+  }
+
+  // Cadastrar nova matéria/turma
+  async createClass(req: AuthRequest, res: Response) {
+    const { 
+      subject, 
+      course_name, 
+      schedule_time, 
+      week_days, 
+      semester, 
+      room_name, 
+      latitude, 
+      longitude, 
+      radius_meters, 
+      total_classes, 
+      professor_id 
+    } = req.body;
+
+    if (!subject || !schedule_time || !professor_id) {
+      return res.status(400).json({ error: 'Nome da matéria, horário e professor são obrigatórios' });
+    }
+
+    try {
+      const professor = await prisma.user.findFirst({
+        where: { id: professor_id, role: 'PROFESSOR' }
+      });
+      if (!professor) {
+        return res.status(404).json({ error: 'Professor selecionado não foi encontrado' });
+      }
+
+      let lat = latitude ? parseFloat(String(latitude)) : -20.7588;
+      let lon = longitude ? parseFloat(String(longitude)) : -42.8795;
+
+      if (room_name) {
+        const targetRoom = await prisma.room.findUnique({ where: { name: room_name } });
+        if (targetRoom) {
+          lat = targetRoom.latitude;
+          lon = targetRoom.longitude;
+        }
+      }
+
+      const newClass = await prisma.class.create({
+        data: {
+          subject,
+          course_name: course_name || "Análise e Desenvolvimento de Sistemas",
+          schedule_time,
+          week_days: week_days || "segunda",
+          semester: semester || "2026.1",
+          room_name: room_name || "Sala Padrão",
+          latitude: lat,
+          longitude: lon,
+          radius_meters: radius_meters ? parseInt(String(radius_meters), 10) : 50,
+          total_classes: total_classes ? parseInt(String(total_classes), 10) : 40,
+          professor_id,
+          active: true
+        }
+      });
+
+      return res.status(201).json({
+        message: 'Matéria cadastrada com sucesso!',
+        class: newClass
+      });
+    } catch (error) {
+      console.error('Erro createClass', error);
+      return res.status(500).json({ error: 'Erro ao cadastrar a matéria' });
+    }
+  }
+
+  // Obter todas as salas cadastradas
+  async getAllRooms(req: AuthRequest, res: Response) {
+    try {
+      const rooms = await prisma.room.findMany({
+        orderBy: { name: 'asc' }
+      });
+      return res.json(rooms);
+    } catch (error) {
+      console.error('Erro getAllRooms', error);
+      return res.status(500).json({ error: 'Erro ao buscar salas' });
+    }
+  }
+
+  // Alternar status de conclusão de uma matéria/disciplina para um aluno
+  async toggleSubjectCompletion(req: AuthRequest, res: Response) {
+    const student_id = req.body.studentId || req.body.student_id;
+    const class_id = req.body.classId || req.body.class_id;
+    const is_completed = req.body.is_completed !== undefined ? req.body.is_completed : req.body.isCompleted;
+
+    if (!student_id || !class_id || is_completed === undefined) {
+      return res.status(400).json({ error: 'studentId, classId e is_completed são obrigatórios' });
+    }
+
+    try {
+      const enrollment = await prisma.enrollment.findFirst({
+        where: {
+          student_id: String(student_id),
+          class_id: String(class_id)
+        }
+      });
+
+      if (!enrollment) {
+        return res.status(404).json({ error: 'Matrícula do aluno nesta disciplina não foi encontrada.' });
+      }
+
+      const updated = await prisma.enrollment.update({
+        where: { id: enrollment.id },
+        data: {
+          is_completed: Boolean(is_completed)
+        }
+      });
+
+      const statusText = updated.is_completed ? 'CONCLUÍDA' : 'EM ANDAMENTO';
+
+      return res.json({
+        message: `Status da matéria atualizado para ${statusText}!`,
+        enrollment: updated
+      });
+    } catch (error) {
+      console.error('Erro toggleSubjectCompletion', error);
+      return res.status(500).json({ error: 'Erro ao alterar status de conclusão da matéria' });
     }
   }
 }

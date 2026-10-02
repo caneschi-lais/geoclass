@@ -68,10 +68,12 @@ model Enrollment {
   id String @id @default(uuid())
 
   student_id String
-  student    User   @relation(fields: [student_id], references: [id])
+  student    User   @relation(fields: [student_id], references: [id], onDelete: Cascade)
 
   class_id String
-  class    Class  @relation(fields: [class_id], references: [id])
+  class    Class  @relation(fields: [class_id], references: [id], onDelete: Cascade)
+
+  is_completed Boolean @default(false) // Indica se o aluno concluiu esta matéria específica
 
   @@unique([student_id, class_id])
 }

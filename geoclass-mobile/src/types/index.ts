@@ -24,6 +24,8 @@ export interface DashboardStat {
   subject: string;
   attendancePercentage: number;
   status: 'Aprovado' | 'Reprovado' | 'Em Risco';
+  attendedClasses?: number;
+  totalClasses?: number;
 }
 
 export interface AttendanceLog {

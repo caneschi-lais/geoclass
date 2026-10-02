@@ -27,7 +27,7 @@ export class AuthController {
         return res.status(401).json({ error: 'Credenciais inválidas' });
       }
 
-      if (!user.active) {
+      if (user.active === false) {
         return res.status(403).json({ error: 'Sua conta está inativa ou com o curso trancado. Entre em contato com a coordenação.' });
       }
 
@@ -43,16 +43,16 @@ export class AuthController {
           name: user.name,
           email: user.email,
           role: user.role,
-          courses: user.courses,
-          userCourses: user.userCourses,
-          student_semester: user.student_semester,
-          active: user.active,
+          courses: user.courses || [],
+          userCourses: user.userCourses || [],
+          student_semester: user.student_semester || null,
+          active: user.active ?? true,
           privacy_terms_accepted_at: user.privacy_terms_accepted_at
         },
         token
       });
     } catch (error) {
-      console.error(error);
+      console.error('Erro no login:', error);
       return res.status(500).json({ error: 'Erro interno no servidor' });
     }
   }

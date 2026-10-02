@@ -26,8 +26,13 @@ export default function DashboardStatCard({ item }: Props) {
     <View className="bg-white dark:bg-slate-800 rounded-xl p-5 mb-4 shadow-sm border border-gray-100 dark:border-slate-700 flex-row justify-between items-center">
       <View className="flex-1 pr-4">
         <Text className="text-lg font-bold text-gray-800 dark:text-slate-100 mb-2">{item.subject}</Text>
-        <View className={`self-start px-3 py-1 rounded-full border ${getStatusColor(item.status)}`}>
-          <Text className="text-xs font-bold">{item.status}</Text>
+        <View className="flex-row items-center gap-2 flex-wrap">
+          <View className={`self-start px-3 py-1 rounded-full border ${getStatusColor(item.status)}`}>
+            <Text className="text-xs font-bold">{item.status}</Text>
+          </View>
+          <Text className="text-xs font-semibold text-gray-500 dark:text-slate-400">
+            {item.attendedClasses ?? 0}/{item.totalClasses ?? 40} aulas
+          </Text>
         </View>
       </View>
       

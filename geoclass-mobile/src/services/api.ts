@@ -1,9 +1,12 @@
 import axios from 'axios';
 import { getToken } from './authStorage';
 
-// URL de Produção no Render
+// Determinar a URL da API (Local durante testes em localhost ou Render em produção)
+const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const API_BASE_URL = isLocalhost ? 'http://localhost:3000/api' : 'https://geoclass-backend.onrender.com/api';
+
 const api = axios.create({
-  baseURL: 'https://geoclass-backend.onrender.com/api',
+  baseURL: API_BASE_URL,
   timeout: 30000, // 30 segundos (recomendado para acomodar o "spin down" do plano gratuito do Render)
 });
 

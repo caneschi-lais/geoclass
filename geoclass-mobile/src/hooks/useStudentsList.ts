@@ -69,15 +69,20 @@ export function useStudentsList(semesterId: string) {
   const toggleUserStatus = async (studentId: string, currentActive: boolean) => {
     try {
       const newStatus = !currentActive;
-      await api.put('/coordenador/aluno/status', { studentId, active: newStatus });
+      await api.put('/coordenador/aluno/status', {
+        userId: studentId,
+        studentId,
+        active: newStatus
+      });
       setStudents(prev =>
         prev.map(s => (s.id === studentId ? { ...s, active: newStatus } : s))
       );
       setFilteredStudents(prev =>
         prev.map(s => (s.id === studentId ? { ...s, active: newStatus } : s))
       );
-    } catch (error) {
-      Alert.alert('Erro', 'Não foi possível alterar o status do aluno.');
+    } catch (error: any) {
+      console.log('Error toggling user status', error);
+      Alert.alert('Erro', error.response?.data?.error || 'Não foi possível alterar o status do aluno.');
     }
   };
 
@@ -85,9 +90,12 @@ export function useStudentsList(semesterId: string) {
     try {
       const newCompleted = !currentIsCompleted;
       await api.put('/coordenador/aluno/curso-status', {
+        userId: studentId,
         studentId,
+        course_name: courseName,
         courseName,
-        isCompleted: newCompleted,
+        is_completed: newCompleted,
+        isCompleted: newCompleted
       });
 
       const updateCourses = (sList: StudentData[]) =>
@@ -103,8 +111,9 @@ export function useStudentsList(semesterId: string) {
 
       setStudents(prev => updateCourses(prev));
       setFilteredStudents(prev => updateCourses(prev));
-    } catch (error) {
-      Alert.alert('Erro', 'Não foi possível alterar a conclusão do curso.');
+    } catch (error: any) {
+      console.log('Error toggling course completion', error);
+      Alert.alert('Erro', error.response?.data?.error || 'Não foi possível alterar a conclusão do curso.');
     }
   };
 

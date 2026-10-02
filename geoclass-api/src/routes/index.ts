@@ -34,6 +34,7 @@ router.get('/aluno/historico', studentController.getHistorico);
 // --- Rotas do Professor ---
 router.get('/professor/turmas', professorController.getTurmas);
 router.get('/professor/turma/:id/presencas', professorController.getPresencasTurma);
+router.get('/professor/turma/:id/datas-chamada', professorController.getDatasComChamada);
 router.get('/professor/turma/:id/alunos', professorController.getEnrolledStudents);
 router.post('/professor/turma/:id/chamada-manual', professorController.registerManualAttendance);
 router.post('/professor/turma/:id/trocar-sala', professorController.changeRoomTemporarily);
@@ -47,11 +48,14 @@ router.get('/coordenador/semestre/:id/turmas', coordinatorController.getClassesB
 router.get('/coordenador/aluno/:id/materias', coordinatorController.getStudentSubjects);
 router.get('/coordenador/relatorio', coordinatorController.getReportData);
 router.post('/coordenador/sala', coordinatorController.createRoom);
+router.post('/coordenador/materia', coordinatorController.createClass);
+router.get('/coordenador/salas', coordinatorController.getAllRooms);
 router.get('/coordenador/professores', coordinatorController.getProfessors);
 router.get('/coordenador/alunos', coordinatorController.getAllStudents);
 router.post('/coordenador/matricular', coordinatorController.enrollStudent);
 router.put('/coordenador/aluno/status', coordinatorController.toggleUserActiveStatus);
 router.put('/coordenador/aluno/curso-status', coordinatorController.toggleCourseCompletion);
+router.put('/coordenador/aluno/materia-status', coordinatorController.toggleSubjectCompletion);
 router.get('/coordenador/alunos-em-risco', coordinatorController.getStudentsAtRisk);
 router.get('/coordenador/semestre-atual', coordinatorController.getCurrentSemesterInfo);
 router.post('/coordenador/virada-semestre', coordinatorController.batchAdvanceSemester);
