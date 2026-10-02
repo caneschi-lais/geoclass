@@ -17,6 +17,36 @@ Para testar as diferentes interfaces e permissões do sistema no aplicativo móv
 
 ---
 
+## 📱 Instalação & Download do Aplicativo Mobile (Android & iOS)
+
+Para testar o aplicativo **GeoClass** diretamente em seu dispositivo móvel sem precisar compilar o código localmente, siga as instruções abaixo conforme o sistema operacional do seu celular:
+
+### 🤖 Android (Instalação Direta via APK)
+
+1. **Baixar o arquivo APK:**
+   - Acesse o link oficial de build na nuvem do Expo para baixar o arquivo `.apk`:
+   - 🔗 [Download APK Android (Build Expo)](https://expo.dev/accounts/caneschi-lais/projects/mobile/builds/3215e76d-c877-4c24-96b5-b1398491d0c8)
+2. **Instalar no Dispositivo:**
+   - Abra o arquivo baixado no seu celular Android.
+   - Caso a mensagem de segurança apareça, autorize a **instalação de fontes desconhecidas** no navegador ou gerenciador de arquivos.
+   - Conclua a instalação e abra o aplicativo **GeoClass**.
+
+---
+
+### 🍎 iOS / iPhone (Acesso via Expo Go & Cloud Update)
+
+No iOS, o acesso aos testes é disponibilizado instantaneamente via **Expo Go** e **EAS Update**:
+
+1. **Baixar o Expo Go (Apenas na 1ª vez):**
+   - Abra a **App Store** no seu iPhone e baixe o aplicativo gratuito **Expo Go**.
+2. **Abrir o Projeto no Celular:**
+   - **Pelo Link Directo (Safari):** Acesse o link do projeto pelo iPhone:
+     🔗 [Acessar Projeto GeoClass no Expo Go](https://expo.dev/accounts/caneschi-lais/projects/mobile/updates/046571b2-d417-46fc-8d79-ee4468c43798)
+     *(Ao tocar no link, o navegador Safari abrirá e redirecionará automaticamente para o app Expo Go)*.
+   - **Pelo QR Code:** Abra a página do link acima em um computador ou outro dispositivo, abra a **câmera padrão do iPhone** e aponte para o **QR Code** exibido na página do Expo.
+
+---
+
 ## 🚀 Como Executar o Projeto
 
 O projeto é dividido em dois componentes principais: o backend (**API REST**) e o frontend (**App Mobile**).
