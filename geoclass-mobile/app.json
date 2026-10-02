@@ -47,6 +47,12 @@
         "projectId": "54378c0a-edbf-4031-b27c-707d9801df69"
       }
     },
+    "updates": {
+      "url": "https://u.expo.dev/54378c0a-edbf-4031-b27c-707d9801df69"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "owner": "caneschi-lais"
   }
 }
