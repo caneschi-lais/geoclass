@@ -1,9 +1,11 @@
 import axios from 'axios';
 import { getToken } from './authStorage';
 
-// Determinar a URL da API (Local durante testes em localhost ou Render em produção)
-const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-const API_BASE_URL = isLocalhost ? 'http://localhost:3000/api' : 'https://geoclass-backend.onrender.com/api';
+// Determinar a URL da API (Local em desenvolvimento ou Render em produção)
+// No React Native, 'window.location' é undefined e causa crash no startup.
+const API_BASE_URL = __DEV__
+  ? 'http://10.0.2.2:3000/api' // URL padrão do emulador Android para localhost (ou configure o IP da sua máquina)
+  : 'https://geoclass-backend.onrender.com/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
