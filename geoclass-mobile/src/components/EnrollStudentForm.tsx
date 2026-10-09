@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Alert, Modal, FlatList, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, Modal, FlatList, ActivityIndicator, TextInput, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import api from '../services/api';
 
@@ -27,6 +27,14 @@ interface EnrollStudentFormProps {
   onSuccess: () => void;
 }
 
+const showAlert = (title: string, message: string) => {
+  if (Platform.OS === 'web') {
+    window.alert(`${title}: ${message}`);
+  } else {
+    Alert.alert(title, message);
+  }
+};
+
 export default function EnrollStudentForm({ isOpen, onToggle, classes, onSuccess }: EnrollStudentFormProps) {
   const [students, setStudents] = useState<Student[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
@@ -53,7 +61,7 @@ export default function EnrollStudentForm({ isOpen, onToggle, classes, onSuccess
       setStudents(response.data);
     } catch (error) {
       console.error('Erro ao carregar alunos:', error);
-      Alert.alert('Erro', 'Não foi possível carregar a lista de alunos.');
+      showAlert('Erro', 'Não foi possível carregar a lista de alunos.');
     } finally {
       setLoadingStudents(false);
     }
@@ -61,7 +69,7 @@ export default function EnrollStudentForm({ isOpen, onToggle, classes, onSuccess
 
   const handleEnroll = async () => {
     if (!selectedStudent || !selectedClass) {
-      Alert.alert('Aviso', 'Selecione um aluno e uma matéria.');
+      showAlert('Aviso', 'Selecione um aluno e uma matéria.');
       return;
     }
 
@@ -71,13 +79,14 @@ export default function EnrollStudentForm({ isOpen, onToggle, classes, onSuccess
         student_id: selectedStudent.id,
         class_id: selectedClass.id
       });
-      Alert.alert('Sucesso', `Aluno ${selectedStudent.name} matriculado em ${selectedClass.subject} com sucesso!`);
+      showAlert('Sucesso', `Aluno ${selectedStudent.name} matriculado em ${selectedClass.subject} com sucesso!`);
       setSelectedStudent(null);
       setSelectedClass(null);
       onToggle();
       onSuccess();
     } catch (error: any) {
-      Alert.alert('Erro', error.response?.data?.error || 'Erro ao matricular aluno.');
+      console.error('Erro ao matricular aluno:', error);
+      showAlert('Erro', error.response?.data?.error || 'Erro ao matricular aluno no banco de dados.');
     } finally {
       setEnrolling(false);
     }

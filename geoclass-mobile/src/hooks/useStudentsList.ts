@@ -11,6 +11,7 @@ export interface StudentData {
   absencePercentage: number;
   active?: boolean;
   courses?: string[];
+  subjects?: string[];
   userCourses?: { course_name: string; semester?: string; is_completed?: boolean }[];
 }
 
@@ -119,35 +120,45 @@ export function useStudentsList(semesterId: string) {
 
   const handleSearch = (text: string) => {
     setSearchQuery(text);
+    const query = text.toLowerCase().trim();
+
     if (activeTab === 'students') {
-      if (text.trim() === '') {
+      if (query === '') {
         setFilteredStudents(students);
       } else {
-        const filtered = students.filter(
-          s => s.ra.toLowerCase().includes(text.toLowerCase()) ||
-            s.name.toLowerCase().includes(text.toLowerCase())
-        );
+        const filtered = students.filter(s => {
+          const matchName = s.name.toLowerCase().includes(query);
+          const matchRa = s.ra.toLowerCase().includes(query);
+          const matchCourses = s.courses?.some(c => c.toLowerCase().includes(query)) ||
+            s.userCourses?.some(uc => uc.course_name.toLowerCase().includes(query));
+          const matchSubjects = s.subjects?.some(sub => sub.toLowerCase().includes(query));
+
+          return matchName || matchRa || matchCourses || matchSubjects;
+        });
         setFilteredStudents(filtered);
       }
     } else if (activeTab === 'risk') {
-      if (text.trim() === '') {
+      if (query === '') {
         setFilteredRiskStudents(riskStudents);
       } else {
         const filtered = riskStudents.filter(
-          s => (s.ra && s.ra.toLowerCase().includes(text.toLowerCase())) ||
-            (s.studentName && s.studentName.toLowerCase().includes(text.toLowerCase())) ||
-            (s.name && s.name.toLowerCase().includes(text.toLowerCase())) ||
-            (s.subject && s.subject.toLowerCase().includes(text.toLowerCase()))
+          s => (s.ra && s.ra.toLowerCase().includes(query)) ||
+            (s.studentName && s.studentName.toLowerCase().includes(query)) ||
+            (s.name && s.name.toLowerCase().includes(query)) ||
+            (s.subject && s.subject.toLowerCase().includes(query)) ||
+            (s.course_name && s.course_name.toLowerCase().includes(query))
         );
         setFilteredRiskStudents(filtered);
       }
     } else {
-      if (text.trim() === '') {
+      if (query === '') {
         setFilteredClasses(classes);
       } else {
         const filtered = classes.filter(
-          c => c.subject.toLowerCase().includes(text.toLowerCase()) ||
-            c.professor.name.toLowerCase().includes(text.toLowerCase())
+          c => c.subject.toLowerCase().includes(query) ||
+            (c.course_name && c.course_name.toLowerCase().includes(query)) ||
+            c.professor.name.toLowerCase().includes(query) ||
+            (c.room_name && c.room_name.toLowerCase().includes(query))
         );
         setFilteredClasses(filtered);
       }

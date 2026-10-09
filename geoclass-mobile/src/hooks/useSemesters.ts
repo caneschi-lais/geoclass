@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import api from '../services/api';
 import { ExportService } from '../services/ExportService';
 
@@ -62,34 +62,32 @@ export function useSemesters() {
     }
   };
 
+  const executeViradaSemestreApi = async () => {
+    setExecutingVirada(true);
+    try {
+      const res = await api.post('/coordenador/virada-semestre');
+      const msg = `${res.data.message}\n\nAlunos atualizados: ${res.data.updatedStudentsCount}\nNovos concluintes: ${res.data.completedStudentsCount}`;
+      if (Platform.OS === 'web') {
+        window.alert(`Sucesso!\n\n${msg}`);
+      } else {
+        Alert.alert('Sucesso!', msg);
+      }
+      loadSemesters();
+      loadCurrentSemester();
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.error || 'Erro ao realizar virada de semestre.';
+      if (Platform.OS === 'web') {
+        window.alert(`Erro: ${errorMsg}`);
+      } else {
+        Alert.alert('Erro', errorMsg);
+      }
+    } finally {
+      setExecutingVirada(false);
+    }
+  };
+
   const handleViradaSemestre = () => {
-    Alert.alert(
-      'Virada de Semestre',
-      `Confirma a virada de semestre letivo (${currentSemester || 'Novo Semestre'})?\n\nTodos os alunos ativos avançarão 1 semestre automaticamente (ex: 3º -> 4º) e os concluintes serão atualizados.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Confirmar Virada',
-          style: 'destructive',
-          onPress: async () => {
-            setExecutingVirada(true);
-            try {
-              const res = await api.post('/coordenador/virada-semestre');
-              Alert.alert(
-                'Sucesso!',
-                `${res.data.message}\n\nAlunos atualizados: ${res.data.updatedStudentsCount}\nNovos concluintes: ${res.data.completedStudentsCount}`
-              );
-              loadSemesters();
-              loadCurrentSemester();
-            } catch (err: any) {
-              Alert.alert('Erro', err.response?.data?.error || 'Erro ao realizar virada de semestre.');
-            } finally {
-              setExecutingVirada(false);
-            }
-          }
-        }
-      ]
-    );
+    executeViradaSemestreApi();
   };
 
   const handleExport = async (format: 'pdf' | 'excel', includeDetails: boolean) => {

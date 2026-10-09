@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, Modal, FlatList } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert, Modal, FlatList, ActivityIndicator, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import api from '../services/api';
 
 interface Professor {
@@ -16,11 +17,20 @@ interface CreateRoomFormProps {
   onSuccess: () => void;
 }
 
+const showAlert = (title: string, message: string) => {
+  if (Platform.OS === 'web') {
+    window.alert(`${title}: ${message}`);
+  } else {
+    Alert.alert(title, message);
+  }
+};
+
 export default function CreateRoomForm({ isOpen, onToggle, professors, onSuccess }: CreateRoomFormProps) {
   const [roomName, setRoomName] = useState('');
   const [roomLat, setRoomLat] = useState('');
   const [roomLon, setRoomLon] = useState('');
   const [creatingRoom, setCreatingRoom] = useState(false);
+  const [gettingLocation, setGettingLocation] = useState(false);
 
   // Estados opcionais de Atribuição de Classe
   const [assignClass, setAssignClass] = useState(false);
@@ -29,29 +39,62 @@ export default function CreateRoomForm({ isOpen, onToggle, professors, onSuccess
   const [selectedProf, setSelectedProf] = useState<Professor | null>(null);
   const [profModalVisible, setProfModalVisible] = useState(false);
 
+  const handleGetLocation = async () => {
+    setGettingLocation(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        showAlert(
+          'Permissão Negada',
+          'É necessária a permissão de localização para capturar as coordenadas atuais da sala.'
+        );
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      setRoomLat(location.coords.latitude.toString());
+      setRoomLon(location.coords.longitude.toString());
+    } catch (error) {
+      console.log('Erro ao capturar localização:', error);
+      showAlert('Erro GPS', 'Não foi possível capturar a localização atual. Verifique se o GPS está ativo.');
+    } finally {
+      setGettingLocation(false);
+    }
+  };
+
   const handleCreateRoom = async () => {
-    if (!roomName || !roomLat || !roomLon) {
-      Alert.alert('Aviso', 'Preencha todos os campos da sala.');
+    const trimmedName = roomName.trim();
+    const parsedLat = parseFloat(roomLat.trim().replace(',', '.'));
+    const parsedLon = parseFloat(roomLon.trim().replace(',', '.'));
+
+    if (!trimmedName || isNaN(parsedLat) || isNaN(parsedLon)) {
+      showAlert('Aviso', 'Preencha o nome da sala e coordenadas (latitude e longitude) válidas.');
       return;
     }
+
     if (assignClass) {
-      if (!subjectName || !scheduleTime || !selectedProf) {
-        Alert.alert('Aviso', 'Preencha todos os campos para atribuir a turma.');
+      if (!subjectName.trim() || !scheduleTime.trim() || !selectedProf) {
+        showAlert('Aviso', 'Preencha todos os campos para atribuir a turma.');
         return;
       }
     }
+
     setCreatingRoom(true);
     try {
-      await api.post('/coordenador/sala', {
-        name: roomName,
-        latitude: parseFloat(roomLat),
-        longitude: parseFloat(roomLon),
+      const response = await api.post('/coordenador/sala', {
+        name: trimmedName,
+        latitude: parsedLat,
+        longitude: parsedLon,
         assignClass,
-        subject: subjectName,
-        schedule_time: scheduleTime,
+        subject: subjectName.trim(),
+        schedule_time: scheduleTime.trim(),
         professor_id: selectedProf?.id
       });
-      Alert.alert('Sucesso', 'Sala cadastrada ' + (assignClass ? 'e vinculada à turma ' : '') + 'com sucesso!');
+
+      showAlert('Sucesso', response.data?.message || 'Sala salva com sucesso!');
       setRoomName('');
       setRoomLat('');
       setRoomLon('');
@@ -62,7 +105,12 @@ export default function CreateRoomForm({ isOpen, onToggle, professors, onSuccess
       onToggle();
       onSuccess();
     } catch (error: any) {
-      Alert.alert('Erro', error.response?.data?.error || 'Erro ao cadastrar sala.');
+      console.error('Erro ao salvar sala:', error);
+      const errorMessage = error.response?.data?.error 
+        || (error.message?.includes('Network Error') || error.code === 'ECONNABORTED'
+            ? 'Não foi possível se conectar ao servidor da API. Verifique a conexão.' 
+            : error.message || 'Erro ao cadastrar sala no banco de dados.');
+      showAlert('Erro', errorMessage);
     } finally {
       setCreatingRoom(false);
     }
@@ -155,13 +203,32 @@ export default function CreateRoomForm({ isOpen, onToggle, professors, onSuccess
             </View>
           )}
 
-          <TouchableOpacity
-            className={`py-3 rounded-lg items-center ${creatingRoom ? 'bg-sky-400' : 'bg-sky-500'}`}
-            onPress={handleCreateRoom}
-            disabled={creatingRoom}
-          >
-            <Text className="text-white font-bold">{creatingRoom ? 'Salvando...' : 'Salvar Sala'}</Text>
-          </TouchableOpacity>
+          <View className="flex-row gap-2 mt-1">
+            <TouchableOpacity
+              className={`flex-1 py-3 px-2 rounded-lg flex-row items-center justify-center bg-emerald-600 ${gettingLocation || creatingRoom ? 'opacity-70' : ''}`}
+              onPress={handleGetLocation}
+              disabled={gettingLocation || creatingRoom}
+            >
+              {gettingLocation ? (
+                <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 6 }} />
+              ) : (
+                <Feather name="map-pin" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+              )}
+              <Text className="text-white font-bold text-sm">
+                {gettingLocation ? 'Buscando...' : 'Buscar GPS'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              className={`flex-1 py-3 px-2 rounded-lg items-center justify-center ${creatingRoom ? 'bg-sky-400' : 'bg-sky-500'}`}
+              onPress={handleCreateRoom}
+              disabled={creatingRoom || gettingLocation}
+            >
+              <Text className="text-white font-bold text-sm">
+                {creatingRoom ? 'Salvando...' : 'Salvar Sala'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 

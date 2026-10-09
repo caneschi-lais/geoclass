@@ -1,8 +1,33 @@
 import { useState, useEffect } from 'react';
+import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import api from '../services/api';
 
-const OFFLINE_QUEUE_KEY = '@geoclass_offline_attendance_queue';
+const OFFLINE_QUEUE_KEY = 'geoclass_offline_attendance_queue';
+
+async function getStoredQueue(): Promise<string | null> {
+  try {
+    if (Platform.OS === 'web') {
+      return localStorage.getItem(OFFLINE_QUEUE_KEY);
+    }
+    return await SecureStore.getItemAsync(OFFLINE_QUEUE_KEY);
+  } catch (error) {
+    console.log('Error reading queue from storage', error);
+    return null;
+  }
+}
+
+async function setStoredQueue(value: string): Promise<void> {
+  try {
+    if (Platform.OS === 'web') {
+      localStorage.setItem(OFFLINE_QUEUE_KEY, value);
+    } else {
+      await SecureStore.setItemAsync(OFFLINE_QUEUE_KEY, value);
+    }
+  } catch (error) {
+    console.log('Error writing queue to storage', error);
+  }
+}
 
 export interface OfflineAttendanceItem {
   classId: string;
@@ -24,7 +49,7 @@ export function useOfflineQueue() {
 
   const loadQueue = async () => {
     try {
-      const stored = await SecureStore.getItemAsync(OFFLINE_QUEUE_KEY);
+      const stored = await getStoredQueue();
       if (stored) {
         setQueue(JSON.parse(stored));
       }
@@ -35,7 +60,7 @@ export function useOfflineQueue() {
 
   const saveQueue = async (newQueue: OfflineAttendanceItem[]) => {
     try {
-      await SecureStore.setItemAsync(OFFLINE_QUEUE_KEY, JSON.stringify(newQueue));
+      await setStoredQueue(JSON.stringify(newQueue));
       setQueue(newQueue);
     } catch (error) {
       console.log('Error saving offline queue', error);
@@ -43,7 +68,7 @@ export function useOfflineQueue() {
   };
 
   const enqueueOfflineAttendance = async (item: OfflineAttendanceItem) => {
-    const stored = await SecureStore.getItemAsync(OFFLINE_QUEUE_KEY);
+    const stored = await getStoredQueue();
     const currentQueue: OfflineAttendanceItem[] = stored ? JSON.parse(stored) : [];
     
     // Evita duplicados na fila offline para a mesma aula
@@ -57,7 +82,7 @@ export function useOfflineQueue() {
   const syncQueue = async () => {
     if (isSyncing) return;
     
-    const stored = await SecureStore.getItemAsync(OFFLINE_QUEUE_KEY);
+    const stored = await getStoredQueue();
     const currentQueue: OfflineAttendanceItem[] = stored ? JSON.parse(stored) : [];
     
     if (currentQueue.length === 0) return;

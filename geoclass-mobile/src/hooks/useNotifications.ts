@@ -18,8 +18,10 @@ export function useNotifications() {
       if (isMounted.current) {
         setNotifications(response.data);
       }
-    } catch (error) {
-      console.error('Erro ao buscar notificações:', error);
+    } catch (error: any) {
+      if (!silent) {
+        console.log('Erro ao buscar notificações:', error?.message || error);
+      }
     } finally {
       if (isMounted.current) setLoading(false);
     }

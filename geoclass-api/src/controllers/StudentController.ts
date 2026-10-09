@@ -151,12 +151,14 @@ export class StudentController {
       });
 
       const historico = attendances.map(a => {
-        const [year, month, day] = a.date.toISOString().split('T')[0].split('-');
+        const localDateStr = a.check_in_time.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+        const localTimeStr = a.check_in_time.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
+
         return {
           id: a.id,
           subject: a.class.subject,
-          date: `${day}/${month}/${year}`,
-          time: a.check_in_time.toISOString().split('T')[1].substring(0, 5)
+          date: localDateStr,
+          time: localTimeStr
         };
       });
 

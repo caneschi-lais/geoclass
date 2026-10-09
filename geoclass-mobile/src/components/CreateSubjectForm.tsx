@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, Modal, FlatList } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert, Modal, FlatList, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import api from '../services/api';
 
@@ -23,6 +23,14 @@ interface CreateSubjectFormProps {
   onSuccess: () => void;
   currentSemester?: string;
 }
+
+const showAlert = (title: string, message: string) => {
+  if (Platform.OS === 'web') {
+    window.alert(`${title}: ${message}`);
+  } else {
+    Alert.alert(title, message);
+  }
+};
 
 export default function CreateSubjectForm({
   isOpen,
@@ -65,15 +73,15 @@ export default function CreateSubjectForm({
 
   const handleCreateSubject = async () => {
     if (!subjectName.trim()) {
-      Alert.alert('Aviso', 'Preencha o nome da matéria.');
+      showAlert('Aviso', 'Preencha o nome da matéria.');
       return;
     }
     if (!scheduleTime.trim()) {
-      Alert.alert('Aviso', 'Preencha o horário da aula (Ex: 08:00).');
+      showAlert('Aviso', 'Preencha o horário da aula (Ex: 08:00).');
       return;
     }
     if (!selectedProf) {
-      Alert.alert('Aviso', 'Selecione o professor responsável.');
+      showAlert('Aviso', 'Selecione o professor responsável.');
       return;
     }
 
@@ -92,7 +100,7 @@ export default function CreateSubjectForm({
         professor_id: selectedProf.id
       });
 
-      Alert.alert('Sucesso', `Matéria "${subjectName}" cadastrada com sucesso!`);
+      showAlert('Sucesso', `Matéria "${subjectName.trim()}" cadastrada com sucesso!`);
       setSubjectName('');
       setScheduleTime('');
       setSelectedProf(null);
@@ -101,7 +109,8 @@ export default function CreateSubjectForm({
       onToggle();
       onSuccess();
     } catch (error: any) {
-      Alert.alert('Erro', error.response?.data?.error || 'Erro ao cadastrar a matéria.');
+      console.error('Erro ao cadastrar matéria:', error);
+      showAlert('Erro', error.response?.data?.error || 'Erro ao cadastrar a matéria no banco de dados.');
     } finally {
       setSubmitting(false);
     }

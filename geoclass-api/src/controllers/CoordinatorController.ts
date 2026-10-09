@@ -72,6 +72,7 @@ export class CoordinatorController {
           }
         },
         include: {
+          userCourses: true,
           enrollments: {
             where: { class: { semester, active: true } },
             include: { class: true }
@@ -92,10 +93,20 @@ export class CoordinatorController {
         const totalFaltas = totalExpectedClasses - totalAttendances;
         const absencePercentage = totalExpectedClasses === 0 ? 0 : Math.round((totalFaltas / totalExpectedClasses) * 100);
 
+        const subjects = Array.from(new Set(student.enrollments.map(enr => enr.class.subject)));
+        const classCourses = student.enrollments.map(enr => enr.class.course_name).filter(Boolean) as string[];
+        const userCourseNames = student.userCourses?.map(uc => uc.course_name) || [];
+        const userCoursesArray = student.courses || [];
+        const courses = Array.from(new Set([...userCourseNames, ...userCoursesArray, ...classCourses]));
+
         return {
           id: student.id,
           name: student.name,
           ra: student.ra || 'N/A',
+          courses: courses.length > 0 ? courses : ['Análise e Desenvolvimento de Sistemas'],
+          subjects,
+          userCourses: student.userCourses || [],
+          active: student.active !== false,
           absencePercentage
         };
       });
@@ -237,23 +248,48 @@ export class CoordinatorController {
     }
   }
 
-  // 5. Cadastrar nova sala
+  // 5. Cadastrar ou Atualizar sala
   async createRoom(req: AuthRequest, res: Response) {
     const { name, latitude, longitude, assignClass, subject, schedule_time, professor_id } = req.body;
 
-    if (!name || latitude === undefined || longitude === undefined) {
+    const trimmedName = String(name || '').trim();
+
+    if (!trimmedName || latitude === undefined || longitude === undefined) {
       return res.status(400).json({ error: 'Nome, latitude e longitude são obrigatórios' });
+    }
+
+    const parsedLat = parseFloat(String(latitude).replace(',', '.'));
+    const parsedLon = parseFloat(String(longitude).replace(',', '.'));
+
+    if (isNaN(parsedLat) || isNaN(parsedLon)) {
+      return res.status(400).json({ error: 'Coordenadas de latitude e longitude são inválidas.' });
     }
 
     try {
       const existingRoom = await prisma.room.findUnique({
-        where: { name }
+        where: { name: trimmedName }
       });
 
+      let room;
       if (existingRoom) {
-        return res.status(400).json({ error: 'Já existe uma sala com esse nome' });
+        room = await prisma.room.update({
+          where: { id: existingRoom.id },
+          data: {
+            latitude: parsedLat,
+            longitude: parsedLon
+          }
+        });
+      } else {
+        room = await prisma.room.create({
+          data: {
+            name: trimmedName,
+            latitude: parsedLat,
+            longitude: parsedLon
+          }
+        });
       }
 
+      let createdClass = null;
       if (assignClass) {
         if (!subject || !schedule_time || !professor_id) {
           return res.status(400).json({ error: 'Matéria, horário e professor são obrigatórios para vincular à turma' });
@@ -264,26 +300,15 @@ export class CoordinatorController {
         if (!professor) {
           return res.status(404).json({ error: 'Professor selecionado não foi encontrado' });
         }
-      }
 
-      const room = await prisma.room.create({
-        data: {
-          name,
-          latitude: parseFloat(String(latitude)),
-          longitude: parseFloat(String(longitude))
-        }
-      });
-
-      let createdClass = null;
-      if (assignClass) {
         createdClass = await prisma.class.create({
           data: {
-            subject,
-            schedule_time,
+            subject: String(subject).trim(),
+            schedule_time: String(schedule_time).trim(),
             professor_id,
-            latitude: parseFloat(String(latitude)),
-            longitude: parseFloat(String(longitude)),
-            room_name: name,
+            latitude: parsedLat,
+            longitude: parsedLon,
+            room_name: trimmedName,
             radius_meters: 50,
             semester: '2026.1',
             total_classes: 40
@@ -292,13 +317,13 @@ export class CoordinatorController {
       }
 
       return res.status(201).json({ 
-        message: 'Sala cadastrada com sucesso!', 
+        message: existingRoom ? 'Sala atualizada com sucesso!' : 'Sala cadastrada com sucesso!', 
         room,
         class: createdClass 
       });
-    } catch (error) {
-      console.error('Erro createRoom', error);
-      return res.status(500).json({ error: 'Erro ao cadastrar a sala' });
+    } catch (error: any) {
+      console.error('Erro createRoom:', error);
+      return res.status(500).json({ error: error.message || 'Erro ao salvar a sala no banco de dados' });
     }
   }
 
@@ -679,14 +704,25 @@ export class CoordinatorController {
         return res.status(404).json({ error: 'Professor selecionado não foi encontrado' });
       }
 
-      let lat = latitude ? parseFloat(String(latitude)) : -20.7588;
-      let lon = longitude ? parseFloat(String(longitude)) : -42.8795;
+      let lat = latitude ? parseFloat(String(latitude).replace(',', '.')) : -20.7588;
+      let lon = longitude ? parseFloat(String(longitude).replace(',', '.')) : -42.8795;
 
-      if (room_name) {
-        const targetRoom = await prisma.room.findUnique({ where: { name: room_name } });
+      const roomNameClean = room_name ? String(room_name).trim() : "Sala Padrão";
+
+      if (roomNameClean) {
+        let targetRoom = await prisma.room.findUnique({ where: { name: roomNameClean } });
         if (targetRoom) {
           lat = targetRoom.latitude;
           lon = targetRoom.longitude;
+        } else {
+          // Cria a sala no banco se ainda não existir
+          targetRoom = await prisma.room.create({
+            data: {
+              name: roomNameClean,
+              latitude: lat,
+              longitude: lon
+            }
+          });
         }
       }
 

@@ -7,6 +7,8 @@ import ScreenHeader from '../../components/ScreenHeader';
 import LoadingOverlay from '../../components/LoadingOverlay';
 import EmptyState from '../../components/EmptyState';
 import ExportModal from '../../components/ExportModal';
+import ConfirmationModal from '../../components/ConfirmationModal';
+import HoldButton from '../../components/HoldButton';
 
 type SubjectData = {
   classId: string;
@@ -29,6 +31,19 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [exporting, setExporting] = useState(false);
 
+  const [confirmModal, setConfirmModal] = useState<{
+    visible: boolean;
+    classId: string;
+    subjectName: string;
+    isCompleted: boolean;
+  }>({
+    visible: false,
+    classId: '',
+    subjectName: '',
+    isCompleted: false,
+  });
+  const [actionLoading, setActionLoading] = useState(false);
+
   useEffect(() => {
     loadSubjects();
   }, [studentId, semesterId]);
@@ -44,17 +59,28 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
     }
   };
 
-  const toggleSubjectCompletion = async (classId: string, currentCompleted: boolean) => {
+  const handleOpenConfirmModal = (item: SubjectData) => {
+    setConfirmModal({
+      visible: true,
+      classId: item.classId,
+      subjectName: item.subject,
+      isCompleted: !!item.is_completed,
+    });
+  };
+
+  const handleConfirmToggleSubject = async () => {
+    if (!confirmModal.classId) return;
+    setActionLoading(true);
     try {
-      const newStatus = !currentCompleted;
+      const newStatus = !confirmModal.isCompleted;
       const response = await api.put('/coordenador/aluno/materia-status', {
         studentId,
-        classId,
+        classId: confirmModal.classId,
         is_completed: newStatus
       });
 
       setSubjects(prev =>
-        prev.map(s => s.classId === classId ? { ...s, is_completed: newStatus } : s)
+        prev.map(s => s.classId === confirmModal.classId ? { ...s, is_completed: newStatus } : s)
       );
 
       const msg = response.data?.message || 'Status da matéria atualizado!';
@@ -71,6 +97,19 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
       } else {
         Alert.alert('Erro', errMsg);
       }
+    } finally {
+      setActionLoading(false);
+      setConfirmModal(prev => ({ ...prev, visible: false }));
+    }
+  };
+
+  const showHoldHint = (isCompleted: boolean) => {
+    const action = isCompleted ? 'reabrir a matéria' : 'concluir a matéria';
+    const msg = `Mantenha o botão pressionado por 1 segundo para ${action}.`;
+    if (Platform.OS === 'web') {
+      window.alert(msg);
+    } else {
+      Alert.alert('Instrução', msg);
     }
   };
 
@@ -147,9 +186,9 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
         />
       </View>
 
-      {/* Ação do Coordenador: Alternar Conclusão da Matéria */}
+      {/* Ação do Coordenador: Alternar Conclusão da Matéria (Exige segurar 1s) */}
       <View className="mt-4 pt-3 border-t border-gray-100 dark:border-slate-700 flex-row justify-between items-center">
-        <View className="flex-row items-center gap-1.5">
+        <View className="flex-row items-center gap-1.5 flex-1 pr-2">
           <Feather
             name={item.is_completed ? "check-circle" : "clock"}
             size={16}
@@ -160,9 +199,10 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
           </Text>
         </View>
 
-        <TouchableOpacity
-          onPress={() => toggleSubjectCompletion(item.classId, !!item.is_completed)}
-          className={`px-3 py-1.5 rounded-lg flex-row items-center gap-1 border ${
+        <HoldButton
+          onHoldSuccess={() => handleOpenConfirmModal(item)}
+          hintActionText={item.is_completed ? 'reabrir a matéria' : 'concluir a matéria'}
+          className={`px-3 py-2 rounded-lg flex-row items-center gap-1 border shadow-xs ${
             item.is_completed
               ? 'bg-gray-100 border-gray-300 dark:bg-slate-700 dark:border-slate-600'
               : 'bg-amber-500 border-amber-600 active:bg-amber-600'
@@ -170,9 +210,9 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
         >
           <Feather name={item.is_completed ? "rotate-ccw" : "check"} size={14} color={item.is_completed ? "#475569" : "#ffffff"} />
           <Text className={`text-xs font-bold ${item.is_completed ? 'text-slate-700 dark:text-slate-200' : 'text-white'}`}>
-            {item.is_completed ? 'Reabrir Matéria' : 'Marcar Concluída'}
+            {item.is_completed ? 'Reabrir (Segure 1s)' : 'Marcar Concluída (Segure 1s)'}
           </Text>
-        </TouchableOpacity>
+        </HoldButton>
       </View>
     </View>
   );
@@ -214,6 +254,21 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
         onExport={(format) => handleExport(format)}
         showDetailsOption={false}
         title="Exportar Matérias"
+      />
+
+      <ConfirmationModal
+        visible={confirmModal.visible}
+        title={confirmModal.isCompleted ? 'Reabrir Matéria' : 'Concluir Matéria'}
+        message={
+          confirmModal.isCompleted
+            ? `Tem certeza que deseja reabrir a matéria "${confirmModal.subjectName}" para o aluno ${studentName}? Ele voltará a poder registrar presenças.`
+            : `Tem certeza que deseja marcar a matéria "${confirmModal.subjectName}" como CONCLUÍDA para o aluno ${studentName}? A matéria entrará em Modo Leitura.`
+        }
+        confirmText={confirmModal.isCompleted ? 'Reabrir Matéria' : 'Marcar Concluída'}
+        confirmVariant={confirmModal.isCompleted ? 'warning' : 'success'}
+        onConfirm={handleConfirmToggleSubject}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, visible: false }))}
+        loading={actionLoading}
       />
     </View>
   );

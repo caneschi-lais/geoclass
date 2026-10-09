@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { useColorScheme } from 'nativewind';
 
@@ -12,7 +13,7 @@ interface ThemeContextData {
 
 const ThemeContext = createContext<ThemeContextData>({} as ThemeContextData);
 
-const THEME_STORAGE_KEY = '@geoclass_theme';
+const THEME_STORAGE_KEY = 'geoclass_theme';
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { colorScheme, setColorScheme } = useColorScheme();
@@ -23,7 +24,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Load saved theme on startup
     const loadTheme = async () => {
       try {
-        const savedTheme = await SecureStore.getItemAsync(THEME_STORAGE_KEY);
+        const savedTheme = Platform.OS === 'web'
+          ? localStorage.getItem(THEME_STORAGE_KEY)
+          : await SecureStore.getItemAsync(THEME_STORAGE_KEY);
+
         if (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system') {
           setThemeState(savedTheme);
           setColorScheme(savedTheme);
@@ -42,7 +46,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       setThemeState(newTheme);
       setColorScheme(newTheme);
-      await SecureStore.setItemAsync(THEME_STORAGE_KEY, newTheme);
+
+      if (Platform.OS === 'web') {
+        localStorage.setItem(THEME_STORAGE_KEY, newTheme);
+      } else {
+        await SecureStore.setItemAsync(THEME_STORAGE_KEY, newTheme);
+      }
     } catch (error) {
       console.error('Failed to save theme to storage', error);
     }

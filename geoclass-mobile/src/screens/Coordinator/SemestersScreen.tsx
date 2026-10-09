@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { deleteToken } from '../../services/authStorage';
@@ -9,6 +9,8 @@ import EmptyState from '../../components/EmptyState';
 import ExportModal from '../../components/ExportModal';
 import CreateRoomForm from '../../components/CreateRoomForm';
 import CreateSubjectForm from '../../components/CreateSubjectForm';
+import ConfirmationModal from '../../components/ConfirmationModal';
+import HoldButton from '../../components/HoldButton';
 
 type SemesterData = {
   id: string;
@@ -37,7 +39,8 @@ export default function SemestersScreen({ navigation }: Props) {
     handleExport
   } = useSemesters();
 
-  const [isSubjectAccordionOpen, setIsSubjectAccordionOpen] = React.useState(false);
+  const [isSubjectAccordionOpen, setIsSubjectAccordionOpen] = useState(false);
+  const [viradaModalVisible, setViradaModalVisible] = useState(false);
 
   const handleLogout = async () => {
     await deleteToken();
@@ -75,79 +78,83 @@ export default function SemestersScreen({ navigation }: Props) {
       {exporting && <LoadingOverlay message="Gerando relatório..." />}
       {executingVirada && <LoadingOverlay message="Processando virada de semestre..." />}
 
-      <ScreenHeader
-        title="Gestão Acadêmica"
-        rightButton={{
-          icon: 'log-out',
-          onPress: handleLogout,
-          variant: 'white'
-        }}
-      />
-
-      {/* Card do Semestre Atual Vigente e Ação de Virada */}
-      <View className="bg-sky-50 dark:bg-sky-950/30 border border-sky-100 dark:border-sky-900/50 p-4 rounded-xl mb-4 shadow-sm">
-        <View className="flex-row justify-between items-center mb-2">
-          <View className="flex-row items-center">
-            <View className="bg-sky-500 p-1.5 rounded-lg mr-2">
-              <Feather name="clock" size={16} color="#ffffff" />
-            </View>
-            <Text className="text-sky-900 dark:text-sky-200 font-bold text-sm">
-              Semestre Vigente: <Text className="font-extrabold text-sky-600 dark:text-sky-400">{currentSemester || 'Carregando...'}</Text>
-            </Text>
-          </View>
-        </View>
-
-        <Text className="text-gray-600 dark:text-slate-400 text-xs mb-3">
-          Detectado automaticamente pela data atual do servidor.
-        </Text>
-
-        <TouchableOpacity
-          className="bg-sky-500 active:bg-sky-600 py-2.5 px-4 rounded-lg flex-row items-center justify-center shadow-sm"
-          onPress={handleViradaSemestre}
-        >
-          <Feather name="rotate-cw" size={16} color="#ffffff" />
-          <Text className="text-white font-bold text-xs ml-2">Executar Virada de Semestre</Text>
-        </TouchableOpacity>
-      </View>
-
-      <CreateRoomForm
-        isOpen={isAccordionOpen}
-        onToggle={() => {
-          setIsAccordionOpen(!isAccordionOpen);
-          if (!isAccordionOpen) setIsSubjectAccordionOpen(false);
-        }}
-        professors={professors}
-        onSuccess={loadSemesters}
-      />
-
-      <CreateSubjectForm
-        isOpen={isSubjectAccordionOpen}
-        onToggle={() => {
-          setIsSubjectAccordionOpen(!isSubjectAccordionOpen);
-          if (!isSubjectAccordionOpen) setIsAccordionOpen(false);
-        }}
-        professors={professors}
-        onSuccess={loadSemesters}
-        currentSemester={currentSemester}
-      />
-
-      <View className="flex-row justify-between items-center mb-4">
-        <Text className="text-xl font-bold text-gray-800 dark:text-slate-100">Semestres Ativos</Text>
-        <TouchableOpacity
-          className="flex-row items-center bg-gray-200 px-3 py-2 rounded-lg"
-          onPress={() => setExportModalVisible(true)}
-        >
-          <Feather name="download" size={16} color="#475569" />
-          <Text className="text-slate-600 font-bold ml-2">Exportar</Text>
-        </TouchableOpacity>
-      </View>
-
       <FlatList
         data={semesters}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        contentContainerStyle={{ paddingBottom: 20 }}
+        contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <View className="mb-2">
+            <ScreenHeader
+              title="Gestão Acadêmica"
+              rightButton={{
+                icon: 'log-out',
+                onPress: handleLogout,
+                variant: 'white'
+              }}
+            />
+
+            {/* Card do Semestre Atual Vigente e Ação de Virada (Segurar por 1s) */}
+            <View className="bg-sky-50 dark:bg-sky-950/30 border border-sky-100 dark:border-sky-900/50 p-4 rounded-xl mb-4 shadow-sm">
+              <View className="flex-row justify-between items-center mb-2">
+                <View className="flex-row items-center">
+                  <View className="bg-sky-500 p-1.5 rounded-lg mr-2">
+                    <Feather name="clock" size={16} color="#ffffff" />
+                  </View>
+                  <Text className="text-sky-900 dark:text-sky-200 font-bold text-sm">
+                    Semestre Vigente: <Text className="font-extrabold text-sky-600 dark:text-sky-400">{currentSemester || 'Carregando...'}</Text>
+                  </Text>
+                </View>
+              </View>
+
+              <Text className="text-gray-600 dark:text-slate-400 text-xs mb-3">
+                Detectado automaticamente pela data atual do servidor.
+              </Text>
+
+              <HoldButton
+                onHoldSuccess={() => setViradaModalVisible(true)}
+                hintActionText="executar a virada de semestre"
+                className="bg-sky-500 active:bg-sky-600 py-2.5 px-4 rounded-lg flex-row items-center justify-center shadow-sm"
+              >
+                <Feather name="rotate-cw" size={16} color="#ffffff" />
+                <Text className="text-white font-bold text-xs ml-2">Executar Virada de Semestre (Segure 1s)</Text>
+              </HoldButton>
+            </View>
+
+            <CreateRoomForm
+              isOpen={isAccordionOpen}
+              onToggle={() => {
+                setIsAccordionOpen(!isAccordionOpen);
+                if (!isAccordionOpen) setIsSubjectAccordionOpen(false);
+              }}
+              professors={professors}
+              onSuccess={loadSemesters}
+            />
+
+            <CreateSubjectForm
+              isOpen={isSubjectAccordionOpen}
+              onToggle={() => {
+                setIsSubjectAccordionOpen(!isSubjectAccordionOpen);
+                if (!isSubjectAccordionOpen) setIsAccordionOpen(false);
+              }}
+              professors={professors}
+              onSuccess={loadSemesters}
+              currentSemester={currentSemester}
+            />
+
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-xl font-bold text-gray-800 dark:text-slate-100">Semestres Ativos</Text>
+              <TouchableOpacity
+                className="flex-row items-center bg-gray-200 px-3 py-2 rounded-lg"
+                onPress={() => setExportModalVisible(true)}
+              >
+                <Feather name="download" size={16} color="#475569" />
+                <Text className="text-slate-600 font-bold ml-2">Exportar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        }
         ListEmptyComponent={<EmptyState message="Nenhum semestre encontrado." />}
       />
 
@@ -156,6 +163,20 @@ export default function SemestersScreen({ navigation }: Props) {
         onClose={() => setExportModalVisible(false)}
         onExport={handleExport}
         title="Exportar Visão Geral"
+      />
+
+      <ConfirmationModal
+        visible={viradaModalVisible}
+        title="Virada de Semestre"
+        message={`Confirma a virada do semestre letivo (${currentSemester || 'Novo Semestre'})?\n\nTodos os alunos ativos avançarão 1 semestre automaticamente e os concluintes serão atualizados no sistema.`}
+        confirmText="Confirmar Virada"
+        confirmVariant="warning"
+        onConfirm={() => {
+          setViradaModalVisible(false);
+          handleViradaSemestre();
+        }}
+        onCancel={() => setViradaModalVisible(false)}
+        loading={executingVirada}
       />
     </View>
   );
