@@ -177,6 +177,10 @@ export class ClassCancellationController {
     }
   }
 
+  async listPendingAbsenceRequests(req: AuthRequest, res: Response) {
+    return this.listPendingRequests(req, res);
+  }
+
   // 3. Coordenador aprova a falta do professor
   async approveAbsence(req: AuthRequest, res: Response) {
     const { id } = req.params;

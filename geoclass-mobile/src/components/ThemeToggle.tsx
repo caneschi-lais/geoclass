@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { TouchableOpacity, Animated } from 'react-native';
+import { TouchableOpacity, Animated, Platform } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -12,7 +12,7 @@ export const ThemeToggle: React.FC = () => {
     Animated.timing(rotateAnim, {
       toValue: isDark ? 1 : 0,
       duration: 300,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   }, [isDark]);
 

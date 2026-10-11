@@ -35,10 +35,11 @@ export default function SplashScreen({ navigation }: Props) {
   }, [navigation]);
 
   return (
-    <View className="flex-1 justify-center items-center bg-white dark:bg-slate-800">
+    <View className="flex-1 justify-center items-center bg-white dark:bg-slate-900">
       <Image 
         source={require('../../assets/images/logo.jpg')} 
-        className="w-48 h-48 mb-8"
+        style={{ width: 120, height: 120 }}
+        className="mb-8 rounded-3xl"
         resizeMode="contain"
       />
       <ActivityIndicator size="large" color="#0ea5e9" />

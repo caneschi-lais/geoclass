@@ -134,6 +134,7 @@ export default function SemestersScreen({ navigation }: Props) {
               }}
               professors={professors}
               onSuccess={loadSemesters}
+              currentSemester={currentSemester}
             />
 
             <CreateSubjectForm

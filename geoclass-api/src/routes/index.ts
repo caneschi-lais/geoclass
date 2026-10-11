@@ -70,7 +70,7 @@ router.post('/coordenador/virada-semestre', coordinatorController.batchAdvanceSe
 router.get('/coordenador/calendario', coordinatorController.getAcademicCalendar);
 router.post('/coordenador/calendario', coordinatorController.createAcademicCalendarEntry);
 router.delete('/coordenador/calendario/:id', coordinatorController.deleteAcademicCalendarEntry);
-router.get('/coordenador/solicitacoes-falta', cancellationController.listPendingAbsenceRequests);
+router.get('/coordenador/solicitacoes-falta', (req, res) => cancellationController.listPendingRequests(req, res));
 router.put('/coordenador/solicitacoes-falta/:id/aprovar', cancellationController.approveAbsence);
 router.put('/coordenador/solicitacoes-falta/:id/rejeitar', cancellationController.rejectAbsence);
 router.put('/coordenador/solicitacoes-falta/:id/pedir-atestado', cancellationController.requestCertificate);

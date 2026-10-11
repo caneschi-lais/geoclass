@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, Modal, FlatList, ActivityIndicator, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -15,6 +15,7 @@ interface CreateRoomFormProps {
   onToggle: () => void;
   professors: Professor[];
   onSuccess: () => void;
+  currentSemester?: string;
 }
 
 const showAlert = (title: string, message: string) => {
@@ -25,7 +26,13 @@ const showAlert = (title: string, message: string) => {
   }
 };
 
-export default function CreateRoomForm({ isOpen, onToggle, professors, onSuccess }: CreateRoomFormProps) {
+export default function CreateRoomForm({
+  isOpen,
+  onToggle,
+  professors,
+  onSuccess,
+  currentSemester = '2026.2'
+}: CreateRoomFormProps) {
   const [roomName, setRoomName] = useState('');
   const [roomLat, setRoomLat] = useState('');
   const [roomLon, setRoomLon] = useState('');
@@ -36,8 +43,16 @@ export default function CreateRoomForm({ isOpen, onToggle, professors, onSuccess
   const [assignClass, setAssignClass] = useState(false);
   const [subjectName, setSubjectName] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
+  const [weekDays, setWeekDays] = useState('segunda');
+  const [semesterStr, setSemesterStr] = useState(currentSemester);
   const [selectedProf, setSelectedProf] = useState<Professor | null>(null);
   const [profModalVisible, setProfModalVisible] = useState(false);
+
+  useEffect(() => {
+    if (currentSemester) {
+      setSemesterStr(currentSemester);
+    }
+  }, [currentSemester]);
 
   const handleGetLocation = async () => {
     setGettingLocation(true);
@@ -91,7 +106,9 @@ export default function CreateRoomForm({ isOpen, onToggle, professors, onSuccess
         assignClass,
         subject: subjectName.trim(),
         schedule_time: scheduleTime.trim(),
-        professor_id: selectedProf?.id
+        week_days: weekDays.trim() || 'segunda',
+        professor_id: selectedProf?.id,
+        semester: semesterStr.trim() || currentSemester
       });
 
       showAlert('Sucesso', response.data?.message || 'Sala salva com sucesso!');
@@ -100,6 +117,7 @@ export default function CreateRoomForm({ isOpen, onToggle, professors, onSuccess
       setRoomLon('');
       setSubjectName('');
       setScheduleTime('');
+      setWeekDays('segunda');
       setSelectedProf(null);
       setAssignClass(false);
       onToggle();
@@ -182,12 +200,33 @@ export default function CreateRoomForm({ isOpen, onToggle, professors, onSuccess
                 onChangeText={setSubjectName}
               />
 
-              <Text className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Horário (Ex: 08:00)</Text>
+              <View className="flex-row justify-between mb-3">
+                <View className="flex-1 mr-2">
+                  <Text className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Horário (Ex: 08:00)</Text>
+                  <TextInput
+                    className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-3 text-gray-800 dark:text-slate-100"
+                    placeholder="Ex: 08:00"
+                    value={scheduleTime}
+                    onChangeText={setScheduleTime}
+                  />
+                </View>
+                <View className="flex-1 ml-2">
+                  <Text className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Semestre Letivo</Text>
+                  <TextInput
+                    className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-3 text-gray-800 dark:text-slate-100"
+                    placeholder="Ex: 2026.2"
+                    value={semesterStr}
+                    onChangeText={setSemesterStr}
+                  />
+                </View>
+              </View>
+
+              <Text className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Dias da Semana (Ex: segunda,quarta)</Text>
               <TextInput
                 className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-3 mb-3 text-gray-800 dark:text-slate-100"
-                placeholder="Ex: 08:00"
-                value={scheduleTime}
-                onChangeText={setScheduleTime}
+                placeholder="Ex: segunda,quarta ou terça"
+                value={weekDays}
+                onChangeText={setWeekDays}
               />
 
               <Text className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Professor Responsável</Text>
@@ -240,7 +279,10 @@ export default function CreateRoomForm({ isOpen, onToggle, professors, onSuccess
         onRequestClose={() => setProfModalVisible(false)}
       >
         <View className="flex-1 justify-end bg-black/50">
-          <View className="bg-white dark:bg-slate-800 rounded-t-3xl p-6 max-h-[60%]">
+          <View 
+            className="bg-white dark:bg-slate-800 rounded-t-3xl p-6"
+            style={{ height: '70%', maxHeight: '80%' }}
+          >
             <View className="flex-row justify-between items-center mb-4">
               <Text className="text-xl font-bold text-gray-800 dark:text-slate-100">Selecionar Professor</Text>
               <TouchableOpacity onPress={() => setProfModalVisible(false)}>
@@ -251,6 +293,10 @@ export default function CreateRoomForm({ isOpen, onToggle, professors, onSuccess
             <FlatList
               data={professors}
               keyExtractor={(item) => item.id}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled={true}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   className="py-4 border-b border-gray-100 dark:border-slate-700 flex-row justify-between items-center"

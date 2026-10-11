@@ -235,6 +235,7 @@ export function useStudentsList(semesterId: string) {
     exporting,
     activeTab,
     classes: filteredClasses,
+    allClasses: classes,
     handleSearch,
     handleTabSwitch,
     handleExport,

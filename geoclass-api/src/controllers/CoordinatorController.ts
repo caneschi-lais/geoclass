@@ -250,7 +250,7 @@ export class CoordinatorController {
 
   // 5. Cadastrar ou Atualizar sala
   async createRoom(req: AuthRequest, res: Response) {
-    const { name, latitude, longitude, assignClass, subject, schedule_time, professor_id } = req.body;
+    const { name, latitude, longitude, assignClass, subject, schedule_time, professor_id, semester, course_name, week_days } = req.body;
 
     const trimmedName = String(name || '').trim();
 
@@ -301,17 +301,22 @@ export class CoordinatorController {
           return res.status(404).json({ error: 'Professor selecionado não foi encontrado' });
         }
 
+        const classSemester = semester ? String(semester).trim() : getCurrentAcademicSemester();
+
         createdClass = await prisma.class.create({
           data: {
             subject: String(subject).trim(),
+            course_name: course_name ? String(course_name).trim() : "Análise e Desenvolvimento de Sistemas",
             schedule_time: String(schedule_time).trim(),
+            week_days: week_days ? String(week_days).trim() : "segunda",
             professor_id,
             latitude: parsedLat,
             longitude: parsedLon,
             room_name: trimmedName,
             radius_meters: 50,
-            semester: '2026.1',
-            total_classes: 40
+            semester: classSemester,
+            total_classes: 40,
+            active: true
           }
         });
       }
@@ -352,12 +357,22 @@ export class CoordinatorController {
 
     try {
       const classes = await prisma.class.findMany({
-        where: { semester, active: true },
+        where: {
+          OR: [
+            { semester, active: true },
+            ...(semester === '2026.2' ? [{ semester: '2026.1', active: true }] : [])
+          ]
+        },
         include: {
           professor: {
             select: {
               name: true,
               email: true
+            }
+          },
+          enrollments: {
+            select: {
+              student_id: true
             }
           }
         },
@@ -384,6 +399,11 @@ export class CoordinatorController {
           courses: true,
           student_semester: true,
           active: true,
+          enrollments: {
+            select: {
+              class_id: true
+            }
+          }
         },
         orderBy: { name: 'asc' }
       });
@@ -732,7 +752,7 @@ export class CoordinatorController {
           course_name: course_name || "Análise e Desenvolvimento de Sistemas",
           schedule_time,
           week_days: week_days || "segunda",
-          semester: semester || "2026.1",
+          semester: semester ? String(semester).trim() : getCurrentAcademicSemester(),
           room_name: room_name || "Sala Padrão",
           latitude: lat,
           longitude: lon,

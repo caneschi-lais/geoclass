@@ -37,7 +37,7 @@ export default function CreateSubjectForm({
   onToggle,
   professors,
   onSuccess,
-  currentSemester = '2026.1'
+  currentSemester = '2026.2'
 }: CreateSubjectFormProps) {
   const [subjectName, setSubjectName] = useState('');
   const [courseName, setCourseName] = useState('Análise e Desenvolvimento de Sistemas');
@@ -55,6 +55,12 @@ export default function CreateSubjectForm({
   const [roomModalVisible, setRoomModalVisible] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (currentSemester) {
+      setSemesterStr(currentSemester);
+    }
+  }, [currentSemester]);
 
   useEffect(() => {
     if (isOpen) {
@@ -234,7 +240,10 @@ export default function CreateSubjectForm({
         onRequestClose={() => setProfModalVisible(false)}
       >
         <View className="flex-1 justify-end bg-black/50">
-          <View className="bg-white dark:bg-slate-800 rounded-t-3xl p-6 max-h-[60%]">
+          <View 
+            className="bg-white dark:bg-slate-800 rounded-t-3xl p-6"
+            style={{ height: '70%', maxHeight: '80%' }}
+          >
             <View className="flex-row justify-between items-center mb-4">
               <Text className="text-xl font-bold text-gray-800 dark:text-slate-100">Selecionar Professor</Text>
               <TouchableOpacity onPress={() => setProfModalVisible(false)}>
@@ -245,6 +254,10 @@ export default function CreateSubjectForm({
             <FlatList
               data={professors}
               keyExtractor={(item) => item.id}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled={true}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   className="py-4 border-b border-gray-100 dark:border-slate-700 flex-row justify-between items-center"
@@ -280,7 +293,10 @@ export default function CreateSubjectForm({
         onRequestClose={() => setRoomModalVisible(false)}
       >
         <View className="flex-1 justify-end bg-black/50">
-          <View className="bg-white dark:bg-slate-800 rounded-t-3xl p-6 max-h-[70%]">
+          <View 
+            className="bg-white dark:bg-slate-800 rounded-t-3xl p-6"
+            style={{ height: '75%', maxHeight: '85%' }}
+          >
             <View className="flex-row justify-between items-center mb-4">
               <Text className="text-xl font-bold text-gray-800 dark:text-slate-100">Selecionar Sala</Text>
               <TouchableOpacity onPress={() => setRoomModalVisible(false)}>
@@ -291,6 +307,10 @@ export default function CreateSubjectForm({
             <FlatList
               data={rooms}
               keyExtractor={(item) => item.id}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled={true}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   className="py-4 border-b border-gray-100 dark:border-slate-700 flex-row justify-between items-center"
