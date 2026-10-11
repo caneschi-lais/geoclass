@@ -43,7 +43,7 @@ export class ProfessorController {
 
   async getPresencasTurma(req: AuthRequest, res: Response) {
     const classId = req.params.id;
-    const { date } = req.query as { date?: string };
+    const { date, status } = req.query as { date?: string; status?: string };
 
     let targetDate: Date;
     if (date && typeof date === 'string') {
@@ -62,25 +62,38 @@ export class ProfessorController {
     targetDate.setHours(0, 0, 0, 0);
 
     try {
+      const whereClause: any = {
+        class_id: classId,
+        date: targetDate,
+      };
+
+      if (status && ['PRESENTE', 'FALTA', 'ATRASADO', 'PRESENCA_PARCIAL'].includes(status.toUpperCase())) {
+        whereClause.status = status.toUpperCase();
+      }
+
       const attendances = await prisma.attendance.findMany({
-        where: {
-          class_id: classId,
-          date: targetDate,
-          status: 'PRESENTE'
-        },
+        where: whereClause,
         include: {
-          student: true
+          student: {
+            include: { userCourses: true }
+          }
+        },
+        orderBy: {
+          check_in_time: 'asc'
         }
       });
 
-      const presentes = attendances.map(a => ({
+      const records = attendances.map(a => ({
         id: a.student.id,
         name: a.student.name,
         ra: a.student.ra || 'N/A',
-        time: a.check_in_time.toISOString().split('T')[1].substring(0, 5)
+        time: a.check_in_time.toISOString().split('T')[1].substring(0, 5),
+        status: a.status,
+        student_semester: a.student.student_semester || undefined,
+        courses: a.student.courses
       }));
 
-      return res.json(presentes);
+      return res.json(records);
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao buscar presenças da turma' });
@@ -236,14 +249,23 @@ export class ProfessorController {
   // Registrar chamada manual (EAD)
   async registerManualAttendance(req: AuthRequest, res: Response) {
     const classId = req.params.id;
-    const { attendances } = req.body; // array de { studentId, isPresent }
+    const { attendances, date } = req.body; // array de { studentId, isPresent } e opcional date "YYYY-MM-DD"
 
     if (!attendances || !Array.isArray(attendances)) {
       return res.status(400).json({ error: 'Dados de chamada inválidos' });
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    let targetDate = new Date();
+    if (date) {
+      const parts = String(date).split('-');
+      if (parts.length === 3) {
+        targetDate = new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 0, 0, 0, 0));
+      } else {
+        targetDate.setHours(0, 0, 0, 0);
+      }
+    } else {
+      targetDate.setHours(0, 0, 0, 0);
+    }
 
     try {
       const classInfo = await prisma.class.findUnique({
@@ -251,15 +273,15 @@ export class ProfessorController {
         select: { subject: true }
       });
 
-      const formattedDate = today.toLocaleDateString('pt-BR');
+      const formattedDate = targetDate.toLocaleDateString('pt-BR');
 
-      // Registrar tudo de uma vez usando loop (Prisma UPSERT não suporta transação em lote direto com data dinâmica fácil)
+      // Registrar ou atualizar as presenças de cada aluno na data especificada
       for (const record of attendances) {
         const existing = await prisma.attendance.findFirst({
           where: {
             student_id: record.studentId,
             class_id: classId,
-            date: today
+            date: targetDate
           }
         });
 
@@ -268,7 +290,6 @@ export class ProfessorController {
             where: { id: existing.id },
             data: {
               status: record.isPresent ? 'PRESENTE' : 'FALTA',
-              is_remote: true,
               manual_attendance: true
             }
           });
@@ -277,11 +298,10 @@ export class ProfessorController {
             data: {
               student_id: record.studentId,
               class_id: classId,
-              date: today,
+              date: targetDate,
               slot_time: 'MANUAL',
               check_in_time: new Date(),
               status: record.isPresent ? 'PRESENTE' : 'FALTA',
-              is_remote: true,
               manual_attendance: true
             }
           });
@@ -364,7 +384,6 @@ export class ProfessorController {
       const presencas = await prisma.attendance.findMany({
         where: {
           class_id: classId,
-          status: 'PRESENTE'
         },
         select: {
           date: true

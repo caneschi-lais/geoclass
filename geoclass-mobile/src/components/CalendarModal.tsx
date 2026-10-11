@@ -8,9 +8,17 @@ interface CalendarModalProps {
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
   attendanceDates?: string[];
+  replacementDates?: string[];
 }
 
-export default function CalendarModal({ visible, onClose, selectedDate, onSelectDate, attendanceDates = [] }: CalendarModalProps) {
+export default function CalendarModal({
+  visible,
+  onClose,
+  selectedDate,
+  onSelectDate,
+  attendanceDates = [],
+  replacementDates = []
+}: CalendarModalProps) {
   const [currentYear, setCurrentYear] = useState<number>(selectedDate.getFullYear());
   const [currentMonth, setCurrentMonth] = useState<number>(selectedDate.getMonth());
 
@@ -118,6 +126,7 @@ export default function CalendarModal({ visible, onClose, selectedDate, onSelect
                 const isSelected = isSameDay(selectedDate, item);
                 const isTodayDate = isToday(item);
                 const dateKey = formatDateKey(item);
+                const isReplacement = replacementDates.includes(dateKey);
                 const hasAttendance = attendanceDates.includes(dateKey);
 
                 let bgStyle = 'bg-transparent';
@@ -126,6 +135,9 @@ export default function CalendarModal({ visible, onClose, selectedDate, onSelect
                 if (isSelected) {
                   bgStyle = 'bg-sky-500 shadow-sm';
                   textStyle = 'text-white';
+                } else if (isReplacement) {
+                  bgStyle = 'bg-amber-100 dark:bg-amber-900/40 border border-amber-400 dark:border-amber-600';
+                  textStyle = 'text-amber-800 dark:text-amber-300 font-extrabold';
                 } else if (hasAttendance) {
                   bgStyle = 'bg-emerald-100 dark:bg-emerald-900/40 border border-emerald-300 dark:border-emerald-700/60';
                   textStyle = 'text-emerald-700 dark:text-emerald-400 font-bold';
@@ -154,10 +166,14 @@ export default function CalendarModal({ visible, onClose, selectedDate, onSelect
           </View>
 
           {/* Legenda sutil */}
-          <View className="flex-row items-center justify-center gap-4 my-2">
+          <View className="flex-row items-center justify-center flex-wrap gap-3 my-2">
             <View className="flex-row items-center gap-1.5">
               <View className="w-2.5 h-2.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 border border-emerald-400" />
-              <Text className="text-[11px] text-gray-500 dark:text-slate-400 font-medium">Houve chamada</Text>
+              <Text className="text-[11px] text-gray-500 dark:text-slate-400 font-medium">Chamada</Text>
+            </View>
+            <View className="flex-row items-center gap-1.5">
+              <View className="w-2.5 h-2.5 rounded-full bg-amber-100 dark:bg-amber-900/60 border border-amber-400" />
+              <Text className="text-[11px] text-amber-700 dark:text-amber-400 font-bold">Reposição</Text>
             </View>
             <View className="flex-row items-center gap-1.5">
               <View className="w-2.5 h-2.5 rounded-full bg-sky-500" />

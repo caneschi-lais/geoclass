@@ -12,7 +12,6 @@ Para testar as diferentes interfaces e permissões do sistema no aplicativo móv
 | :----------------| :------------------| :---------| :----------------------------------------|
 | **Aluno**       | `aluno@teste.com` | `123456` | RA: `123456789` (João Silva)            |
 | **Professor**   | `prof@teste.com`  | `123456` | Professor Carlos                        |
-| **Professor**   | `profa@teste.com` | `123456` | Professora Ana                          |
 | **Coordenador** | `coord@teste.com` | `123456` | Acesso administrativo completo (Márcia) |
 
 ---
@@ -134,7 +133,7 @@ O GeoClass foi planejado a partir de uma modelagem de Engenharia de Requisitos s
 * **RF02 (Termos de Privacidade LGPD):** Coleta e registro do consentimento expresso (`privacy_terms_accepted_at`) sobre uso de localização e hardware.
 * **RF03 (Consulta de Aulas do Dia):** Exibição apenas das disciplinas agendadas para a data corrente com locais e horários.
 * **RF04 (Validação de Ponto por GPS):** Captura de coordenadas GPS de alta precisão e validação do raio de Geofencing (Haversine) no servidor.
-* **RF05 (Janela de Horário Estrita):** Validação de horário de aula permitindo check-in dentro do limite máximo de tolerância de 15 minutos.
+* **RF05 (Janela de Horário Estrita & Registro de Faltas):** Validação de horário permitindo check-in dentro do limite de 15 minutos; caso a tolerância expire sem presença, o sistema registra automaticamente a ausência (`status: FALTA`) no banco de dados.
 * **RF06 (Bloqueio Antifraude / Device Binding):** Captura da assinatura de hardware (`Device ID`) para impedir registro de múltiplos RAs no mesmo aparelho no dia.
 * **RF07 (Presença Offline Criptografada):** Validação de raio local sem internet e enfileiramento com assinatura digital SHA-256 enviada automaticamente ao reconectar.
 * **RF08 (Realocação Temporária de Sala):** Permite ao professor editar a sala no dia da aula, realizando dupla checagem de conflitos e notificando os alunos.
@@ -144,7 +143,8 @@ O GeoClass foi planejado a partir de uma modelagem de Engenharia de Requisitos s
 * **RF12 (Dashboard de Evasão e Alunos em Risco):** Painel do Coordenador calculando taxas de ausência por semestre e listando alunos em risco (`< 75%`).
 * **RF13 (Matrícula de Alunos em Disciplinas):** Vinculação de alunos a disciplinas ativas garantindo integridade referencial.
 * **RF14 (Cadastro de Infraestrutura):** Cadastro de salas e laboratórios mapeando suas coordenadas geográficas de centróide.
-* **RF15 (Relatórios Gerenciais):** Exportação de planilhas consolidadas (`.XLSX`) e documentos analíticos em `.PDF` com gráficos interativos.: reorganize documentation structure by moving markdown files into a dedicated diagrams directory and creating new documentation files.)
+* **RF15 (Relatórios Gerenciais):** Exportação de planilhas consolidadas (`.XLSX`) e documentos analíticos em `.PDF` com gráficos interativos.
+* **RF16 (Calendário Acadêmico & Dias Não Letivos):** Gestão e leitura dinâmica de feriados, recessos escolares, semanas pedagógicas e exames finais, suspendendo chamadas e geração de faltas automáticas em dias não letivos.
 
 ---
 
@@ -169,6 +169,7 @@ O GeoClass utiliza uma arquitetura clássica em camadas com separação clara de
 
 ```mermaid
 flowchart TD
+    %% Estilização Personalizada
     classDef external fill:#ef4444,stroke:#dc2626,stroke-width:2px,color:#fff,font-weight:bold
     classDef client fill:#f59e0b,stroke:#b45309,stroke-width:2px,color:#fff,font-weight:bold
     classDef frontend fill:#3b82f6,stroke:#1d4ed8,stroke-width:2px,color:#fff,font-weight:bold
@@ -182,31 +183,34 @@ flowchart TD
 
     subgraph Clients ["Dispositivos Clientes"]
         direction LR
-        Mobile["📱 App Mobile Aluno/Prof"]:::client
-        Web["💻 Navegador Web Admin"]:::client
+        Mobile["📱 App Mobile Aluno/Prof/Coord"]:::client
+        Web["💻 Navegador Web Admin / Coord"]:::client
     end
 
     subgraph Frontend ["Frontend Services - React Native/Expo"]
         direction TB
-        UI["Interface de Telas"]:::frontend
+        UI["Interface de Telas & Badges"]:::frontend
         Device["Módulo Device ID Binding"]:::frontend
         GPS["Módulo de Geolocalização"]:::frontend
         OfflineQ["Fila Offline & Assinatura SHA-256"]:::frontend
+        ReadOnlyGuard["Guard Modo Leitura (Curso Concluído)"]:::frontend
     end
 
     subgraph Backend ["Cloud Web Service - Render.com (Node.js/Express)"]
         direction TB
-        Auth["Auth Service - JWT"]:::backend
-        GeoEngine["Motor Geofencing - Haversine"]:::backend
-        StudentAPI["API do Aluno"]:::backend
+        Auth["Auth Service - JWT & Account Status"]:::backend
+        GeoEngine["Motor Geofencing - Haversine & Multi-Slot"]:::backend
+        StudentAPI["API do Aluno & Status de Curso"]:::backend
         ProfAPI["API do Professor"]:::backend
-        CoordAPI["API do Coordenador"]:::backend
-        NotifAPI["API de Notificações"]:::backend
+        CoordAPI["API do Coordenador & Batch Virada"]:::backend
+        NotifAPI["API de Notificações & Alerta de Risco (<75%)"]:::backend
+        SemUtil["Utilitário de Semestre Automático (YYYY.1/2)"]:::backend
     end
 
     subgraph Background ["Jobs Agendados - node-cron"]
         CronLGPD["LgpdWiperJob - 03:00 AM"]:::job
         CronNotif["NotificationJob - Minutual"]:::job
+        RiskJob["RiskCheckerJob - Notificação Auto <75%"]:::job
     end
 
     subgraph Persistence ["Cloud Database - Neon.tech"]
@@ -226,17 +230,19 @@ flowchart TD
     UI --> Device
     UI --> GPS
     UI --> OfflineQ
+    UI --> ReadOnlyGuard
 
     %% Comunicação Frontend -> Render API
     UI -->|Login/Token JWT| Auth
-    GPS -->|Coordenadas + Device ID| StudentAPI
+    GPS -->|Coordenadas + Device ID + Slot| StudentAPI
     OfflineQ -->|Sync Pacotes Assinados| StudentAPI
     UI -->|Gestão de Chamada & Salas| ProfAPI
-    UI -->|Dashboard & Relatórios| CoordAPI
+    UI -->|Dashboard, Risco & Virada| CoordAPI
     UI -->|Avisos & Notificações| NotifAPI
 
     %% Fluxos Internos do Backend
-    StudentAPI -->|Valida Distância & Janela 15m| GeoEngine
+    StudentAPI -->|Valida Distância, Horários Multi-Slot & IsCompleted| GeoEngine
+    CoordAPI -->|Calcula YYYY.1/2 & Incrementa Semestres| SemUtil
     Auth --> ORM
     StudentAPI --> ORM
     ProfAPI --> ORM
@@ -249,6 +255,7 @@ flowchart TD
     %% Jobs Background
     CronLGPD -.->|Expurgo Diário >6 meses| DB
     CronNotif -.->|Varredura de Aulas| DB
+    RiskJob -.->|Monitora Frequência <75%| DB
 ```
 
 ---

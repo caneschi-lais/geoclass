@@ -13,7 +13,7 @@ export default function ClassCard({ aula, onConfirm, isLoading }: ClassCardProps
   const progress = useRef(new Animated.Value(0)).current;
 
   const handlePressIn = () => {
-    if (isLoading || aula.alreadyCheckedIn) return;
+    if (isLoading || aula.alreadyCheckedIn || aula.isAbsent) return;
 
     // Inicia a animação de preenchimento
     Animated.timing(progress, {
@@ -28,7 +28,7 @@ export default function ClassCard({ aula, onConfirm, isLoading }: ClassCardProps
   };
 
   const handlePressOut = () => {
-    if (isLoading || aula.alreadyCheckedIn) return;
+    if (isLoading || aula.alreadyCheckedIn || aula.isAbsent) return;
 
     // Se o usuário soltar antes de completar, reseta a barra rapidamente
     Animated.timing(progress, {
@@ -61,6 +61,11 @@ export default function ClassCard({ aula, onConfirm, isLoading }: ClassCardProps
         <View className="mt-2 py-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 rounded-lg flex-row justify-center items-center">
           <Feather name="check-circle" size={18} color="#10b981" />
           <Text className="text-emerald-700 dark:text-emerald-400 font-bold ml-2 text-sm">Presença Confirmada</Text>
+        </View>
+      ) : aula.isAbsent ? (
+        <View className="mt-2 py-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-lg flex-row justify-center items-center">
+          <Feather name="x-circle" size={18} color="#ef4444" />
+          <Text className="text-red-700 dark:text-red-400 font-bold ml-2 text-sm">Ausência Registrada (Falta)</Text>
         </View>
       ) : aula.isCourseCompleted ? (
         <View className="mt-2 py-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-lg flex-row justify-center items-center">

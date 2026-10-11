@@ -70,10 +70,10 @@ export default function ManualAttendanceScreen({ navigation, route }: Props) {
       await api.post(`/professor/turma/${classId}/chamada-manual`, { attendances: payload });
 
       if (Platform.OS === 'web') {
-        window.alert('Chamada remota salva com sucesso!');
+        window.alert('Presença manual salva com sucesso!');
         navigation.goBack();
       } else {
-        Alert.alert('Sucesso', 'Chamada remota salva com sucesso!', [
+        Alert.alert('Sucesso', 'Presença manual salva com sucesso!', [
           { text: 'OK', onPress: () => navigation.goBack() }
         ]);
       }
@@ -120,10 +120,10 @@ export default function ManualAttendanceScreen({ navigation, route }: Props) {
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-slate-900 pt-14 px-4">
-      {saving && <LoadingOverlay message="Salvando chamada..." />}
+      {saving && <LoadingOverlay message="Salvando presença manual..." />}
 
       <ScreenHeader
-        title="Chamada EAD"
+        title="Presença Manual"
         subtitle={subjectName}
         showBackButton={true}
         onBackPress={() => navigation.goBack()}

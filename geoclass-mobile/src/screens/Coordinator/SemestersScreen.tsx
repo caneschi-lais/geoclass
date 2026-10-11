@@ -11,6 +11,8 @@ import CreateRoomForm from '../../components/CreateRoomForm';
 import CreateSubjectForm from '../../components/CreateSubjectForm';
 import ConfirmationModal from '../../components/ConfirmationModal';
 import HoldButton from '../../components/HoldButton';
+import AcademicCalendarModal from '../../components/AcademicCalendarModal';
+import CoordinatorAbsenceRequestsModal from '../../components/CoordinatorAbsenceRequestsModal';
 
 type SemesterData = {
   id: string;
@@ -41,6 +43,8 @@ export default function SemestersScreen({ navigation }: Props) {
 
   const [isSubjectAccordionOpen, setIsSubjectAccordionOpen] = useState(false);
   const [viradaModalVisible, setViradaModalVisible] = useState(false);
+  const [calendarModalVisible, setCalendarModalVisible] = useState(false);
+  const [absenceRequestsModalVisible, setAbsenceRequestsModalVisible] = useState(false);
 
   const handleLogout = async () => {
     await deleteToken();
@@ -145,17 +149,46 @@ export default function SemestersScreen({ navigation }: Props) {
 
             <View className="flex-row justify-between items-center mb-4">
               <Text className="text-xl font-bold text-gray-800 dark:text-slate-100">Semestres Ativos</Text>
-              <TouchableOpacity
-                className="flex-row items-center bg-gray-200 px-3 py-2 rounded-lg"
-                onPress={() => setExportModalVisible(true)}
-              >
-                <Feather name="download" size={16} color="#475569" />
-                <Text className="text-slate-600 font-bold ml-2">Exportar</Text>
-              </TouchableOpacity>
+              <View className="flex-row flex-wrap gap-2">
+                <TouchableOpacity
+                  className="flex-row items-center bg-amber-100 dark:bg-amber-950/40 px-2.5 py-2 rounded-lg border border-amber-300 dark:border-amber-800/50"
+                  onPress={() => setAbsenceRequestsModalVisible(true)}
+                >
+                  <Feather name="alert-triangle" size={15} color="#d97706" />
+                  <Text className="text-amber-800 dark:text-amber-300 font-bold ml-1 text-xs">Faltas & Aulas</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  className="flex-row items-center bg-sky-100 dark:bg-sky-950/40 px-2.5 py-2 rounded-lg border border-sky-200 dark:border-sky-900/40"
+                  onPress={() => setCalendarModalVisible(true)}
+                >
+                  <Feather name="calendar" size={15} color="#0ea5e9" />
+                  <Text className="text-sky-700 dark:text-sky-300 font-bold ml-1 text-xs">Calendário</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  className="flex-row items-center bg-gray-200 dark:bg-slate-700 px-2.5 py-2 rounded-lg"
+                  onPress={() => setExportModalVisible(true)}
+                >
+                  <Feather name="download" size={15} color="#475569" />
+                  <Text className="text-slate-600 dark:text-slate-300 font-bold ml-1 text-xs">Exportar</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         }
         ListEmptyComponent={<EmptyState message="Nenhum semestre encontrado." />}
+      />
+
+      <CoordinatorAbsenceRequestsModal
+        visible={absenceRequestsModalVisible}
+        onClose={() => setAbsenceRequestsModalVisible(false)}
+        onSuccess={loadSemesters}
+      />
+
+      <AcademicCalendarModal
+        visible={calendarModalVisible}
+        onClose={() => setCalendarModalVisible(false)}
       />
 
       <ExportModal

@@ -11,9 +11,11 @@ export function useClassAttendance(classId: string) {
   const [calendarVisible, setCalendarVisible] = useState(false);
 
   const [attendanceDates, setAttendanceDates] = useState<string[]>([]);
+  const [replacementDates, setReplacementDates] = useState<string[]>([]);
 
   useEffect(() => {
     loadAttendanceDates();
+    loadReplacementDates();
   }, [classId]);
 
   const loadAttendanceDates = async () => {
@@ -22,6 +24,15 @@ export function useClassAttendance(classId: string) {
       setAttendanceDates(response.data);
     } catch (error) {
       console.log('Error loading attendance dates', error);
+    }
+  };
+
+  const loadReplacementDates = async () => {
+    try {
+      const response = await api.get(`/professor/turma/${classId}/datas-reposicao`);
+      setReplacementDates(response.data);
+    } catch (error) {
+      console.log('Error loading replacement dates', error);
     }
   };
 
@@ -83,8 +94,10 @@ export function useClassAttendance(classId: string) {
     calendarVisible,
     setCalendarVisible,
     attendanceDates,
+    replacementDates,
     loadAttendance,
     loadAttendanceDates,
+    loadReplacementDates,
     formatDateDisplay,
     isToday
   };

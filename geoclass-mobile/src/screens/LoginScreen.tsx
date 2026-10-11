@@ -1,5 +1,18 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, Image } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
+} from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import api from '../services/api';
 import { saveToken, saveRole } from '../services/authStorage';
@@ -52,62 +65,74 @@ export default function LoginScreen({ navigation }: Props) {
   };
 
   return (
-    <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900 p-6">
-      <View className="absolute top-14 right-6">
-        <ThemeToggle />
-      </View>
+    <KeyboardAvoidingView
+      className="flex-1 bg-gray-50 dark:bg-slate-900"
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View className="absolute top-14 right-6">
+            <ThemeToggle />
+          </View>
 
-      <View className="items-center justify-center mb-4">
-        <View className="items-center justify-center mb-6">
-          <Image className='rounded-2xl'
-            source={isDark ? require('../../assets/images/dark-logo.png') : require('../../assets/images/logo.jpg')}
-            style={{ width: 110, height: 110 }}
-            resizeMode="contain"
-          />
-        </View>
-      </View>
+          <View className="items-center justify-center mb-4 mt-8">
+            <View className="items-center justify-center mb-6">
+              <Image
+                className="rounded-2xl"
+                source={isDark ? require('../../assets/images/dark-logo.png') : require('../../assets/images/logo.jpg')}
+                style={{ width: 110, height: 110 }}
+                resizeMode="contain"
+              />
+            </View>
+          </View>
 
-      <View className="flex-row items-center justify-center mb-8">
-        <Text className="text-3xl font-extrabold text-[#0096c7]">Geo</Text>
-        <Text className="text-3xl font-extrabold text-[#00b489]">Class</Text>
-      </View>
+          <View className="flex-row items-center justify-center mb-8">
+            <Text className="text-3xl font-extrabold text-[#0096c7]">Geo</Text>
+            <Text className="text-3xl font-extrabold text-[#00b489]">Class</Text>
+          </View>
 
-      <View className="w-full max-w-sm mb-4">
-        <Text className="text-gray-600 dark:text-slate-300 mb-2 font-medium">E-mail</Text>
-        <TextInput
-          className="w-full bg-white dark:bg-slate-800 rounded-lg p-4 text-gray-800 dark:text-slate-100 border border-gray-200 dark:border-slate-700"
-          placeholder="Digite seu e-mail"
-          placeholderTextColor="#94a3b8"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          value={email}
-          onChangeText={setEmail}
-        />
-      </View>
+          <View className="w-full max-w-sm mb-4">
+            <Text className="text-gray-600 dark:text-slate-300 mb-2 font-medium">E-mail</Text>
+            <TextInput
+              className="w-full bg-white dark:bg-slate-800 rounded-lg p-4 text-gray-800 dark:text-slate-100 border border-gray-200 dark:border-slate-700"
+              placeholder="Digite seu e-mail"
+              placeholderTextColor="#94a3b8"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              value={email}
+              onChangeText={setEmail}
+            />
+          </View>
 
-      <View className="w-full max-w-sm mb-8">
-        <Text className="text-gray-600 dark:text-slate-300 mb-2 font-medium">Senha</Text>
-        <TextInput
-          className="w-full bg-white dark:bg-slate-800 rounded-lg p-4 text-gray-800 dark:text-slate-100 border border-gray-200 dark:border-slate-700"
-          placeholder="Digite sua senha"
-          placeholderTextColor="#94a3b8"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
-      </View>
+          <View className="w-full max-w-sm mb-8">
+            <Text className="text-gray-600 dark:text-slate-300 mb-2 font-medium">Senha</Text>
+            <TextInput
+              className="w-full bg-white dark:bg-slate-800 rounded-lg p-4 text-gray-800 dark:text-slate-100 border border-gray-200 dark:border-slate-700"
+              placeholder="Digite sua senha"
+              placeholderTextColor="#94a3b8"
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+            />
+          </View>
 
-      <TouchableOpacity
-        className={`w-full max-w-sm rounded-lg p-4 items-center ${loading ? 'bg-sky-400' : 'bg-sky-500'}`}
-        onPress={handleLogin}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#ffffff" />
-        ) : (
-          <Text className="text-white font-bold text-lg">Entrar</Text>
-        )}
-      </TouchableOpacity>
-    </View>
+          <TouchableOpacity
+            className={`w-full max-w-sm rounded-lg p-4 items-center ${loading ? 'bg-sky-400' : 'bg-sky-500'}`}
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text className="text-white font-bold text-lg">Entrar</Text>
+            )}
+          </TouchableOpacity>
+        </ScrollView>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }

@@ -120,6 +120,33 @@ Armazena avisos de presença confirmada, trocas de sala e alertas acadêmicos.
 
 ---
 
+### 8. Tabela: `AcademicCalendar` (Dias Não Letivos / Feriados)
+Armazena os dias em que não haverá aula por motivo de feriado, emenda, recesso escolar, SPAP ou período de exames finais.
+
+| Atributo | Tipo PostgreSQL | Nulo? | Chave | Descrição / Regra de Negócio |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | `UUID` | Não | **PK** | Identificador único do evento (`uuid()`). |
+| `date` | `DATE` | Não | **Unique** | Data do dia não letivo (`@db.Date`). |
+| `description` | `VARCHAR` | Não | - | Descrição do evento (ex: "Feriado de Tiradentes", "Carnaval", "18ª SPAP"). |
+| `type` | `VARCHAR` | Não | - | Categoria do dia: `FERIADO`, `RECESSO`, `SPAP`, `EXAME`, `NAO_LETIVO`. Default: `NAO_LETIVO`. |
+| `created_at` | `TIMESTAMP` | Não | - | Timestamp de registro no sistema (`now()`). |
+
+---
+
+### 9. Tabela: `AcademicSemester` (Períodos Oficiais dos Semestres)
+Armazena as datas de início e término das aulas de cada semestre letivo para validação de dias letivos válidos.
+
+| Atributo | Tipo PostgreSQL | Nulo? | Chave | Descrição / Regra de Negócio |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | `UUID` | Não | **PK** | Identificador único do semestre (`uuid()`). |
+| `name` | `VARCHAR` | Não | **Unique** | Nome identificador do semestre (ex: "2026.1", "2026.2"). |
+| `start_date` | `DATE` | Não | - | Data de início oficial das aulas do semestre (`@db.Date`). |
+| `end_date` | `DATE` | Não | - | Data de término oficial das aulas do semestre (`@db.Date`). |
+| `active` | `BOOLEAN` | Não | - | Indica se o semestre está em vigência acadêmica (`true`/`false`). Default: `true`. |
+| `created_at` | `TIMESTAMP` | Não | - | Timestamp de criação (`now()`). |
+
+---
+
 ## 🔠 Tipos Enumerados (Enums)
 
 ### Enum: `Role`

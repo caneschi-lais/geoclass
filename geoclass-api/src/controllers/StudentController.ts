@@ -1,6 +1,8 @@
 import { Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middlewares/authMiddleware';
+import { processExpiredAttendanceSlots } from '../jobs/AbsenceProcessor';
+import { isAcademicInstructionalDay } from '../services/CalendarService';
 
 const prisma = new PrismaClient();
 
@@ -13,6 +15,17 @@ export class StudentController {
     }
 
     try {
+      const now = new Date();
+
+      // 0. Se hoje não for dia letivo (feriado, recesso, etc.), nenhuma aula é exibida
+      const calendarCheck = await isAcademicInstructionalDay(now);
+      if (!calendarCheck.isInstructional) {
+        return res.json([]);
+      }
+
+      // Garantir que slots expirados tenham faltas devidamente registradas
+      await processExpiredAttendanceSlots(now);
+
       const todayStr = new Date().toISOString().split('T')[0];
 
       const enrollments = await prisma.enrollment.findMany({
@@ -50,9 +63,12 @@ export class StudentController {
             student_id: studentId,
             class_id: c.id,
             date: today,
-            status: 'PRESENTE'
-          }
+          },
+          orderBy: { check_in_time: 'desc' }
         });
+
+        const alreadyCheckedIn = attendanceExists?.status === 'PRESENTE' || attendanceExists?.status === 'ATRASADO';
+        const isAbsent = attendanceExists?.status === 'FALTA';
         
         const enrollment = await prisma.enrollment.findUnique({
           where: {
@@ -84,7 +100,9 @@ export class StudentController {
           latitude: tempLoc ? tempLoc.latitude : c.latitude,
           longitude: tempLoc ? tempLoc.longitude : c.longitude,
           radiusMeters: c.radius_meters,
-          alreadyCheckedIn: attendanceExists !== null,
+          alreadyCheckedIn,
+          isAbsent,
+          attendanceStatus: attendanceExists?.status || null,
           isCourseCompleted
         };
       }));
@@ -112,7 +130,7 @@ export class StudentController {
           where: {
             student_id: studentId,
             class_id: e.class.id,
-            status: 'PRESENTE'
+            status: { in: ['PRESENTE', 'PRESENCA_PARCIAL'] } as any
           }
         });
 
@@ -158,7 +176,8 @@ export class StudentController {
           id: a.id,
           subject: a.class.subject,
           date: localDateStr,
-          time: localTimeStr
+          time: localTimeStr,
+          status: a.status
         };
       });
 

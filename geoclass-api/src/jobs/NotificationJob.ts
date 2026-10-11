@@ -1,4 +1,6 @@
 import { PrismaClient } from '@prisma/client';
+import { processExpiredAttendanceSlots, isClassScheduledToday } from './AbsenceProcessor';
+import { isAcademicInstructionalDay } from '../services/CalendarService';
 
 const prisma = new PrismaClient();
 
@@ -24,6 +26,16 @@ export async function notificationJob() {
   console.log(`[NOTIFICATION JOB] Iniciando execução às ${currentTimeStr}`);
 
   try {
+    // 0. Processar fechamento de faltas para horários cuja tolerância de 15 minutos já expirou hoje
+    await processExpiredAttendanceSlots(now);
+
+    // 0.1 Se hoje não for dia letivo, não dispara notificações de início ou fechamento de aula
+    const calendarCheck = await isAcademicInstructionalDay(now);
+    if (!calendarCheck.isInstructional) {
+      console.log(`[NOTIFICATION JOB] Hoje não é dia letivo: ${calendarCheck.reason}. Lembretes de aula suspensos.`);
+      return;
+    }
+
     // Buscar todas as turmas ativas
     const activeClasses = await prisma.class.findMany({
       where: { active: true },
@@ -38,18 +50,96 @@ export async function notificationJob() {
     });
 
     for (const cls of activeClasses) {
-      // 1. Aluno (Lembrete de Aula)
-      // Se o horário de início da aula coincide com a hora atual
-      if (cls.schedule_time === currentTimeStr) {
-        console.log(`[NOTIFICATION JOB] Enviando lembretes de início de aula para: ${cls.subject}`);
-        for (const enrollment of cls.enrollments) {
-          const student = enrollment.student;
+      // Verificar se a aula está prevista para hoje
+      if (!isClassScheduledToday(cls.week_days, now)) {
+        continue;
+      }
 
-          // Evitar notificação duplicada hoje
-          const title = `Lembrete de Aula: ${cls.subject}`;
+      // Verificar se a aula possui cancelamento aprovado para hoje
+      let cancellationToday = null;
+      try {
+        if ((prisma as any).classCancellation) {
+          cancellationToday = await (prisma as any).classCancellation.findFirst({
+            where: {
+              status: 'APROVADO',
+              date: todayDate,
+              OR: [
+                { class_id: cls.id },
+                { scope: 'INSTITUICAO' },
+                ...(cls.course_name ? [{ scope: 'CURSO', course_name: cls.course_name }] : []),
+              ],
+            },
+          });
+        }
+      } catch (err) {
+        // Modelo ClassCancellation pode ainda não estar gerado pelo prisma generate
+      }
+
+      if (cancellationToday) {
+        continue;
+      }
+
+      const slots = cls.schedule_time.split(',').map((s) => s.trim());
+
+      // 1. Aluno (Lembrete de Início de Aula)
+      for (const slotStr of slots) {
+        if (slotStr === currentTimeStr) {
+          console.log(`[NOTIFICATION JOB] Enviando lembretes de início de aula para: ${cls.subject} (${slotStr})`);
+          for (const enrollment of cls.enrollments) {
+            const student = enrollment.student;
+
+            const title = `Lembrete de Aula: ${cls.subject}`;
+            const alreadyNotified = await prisma.notification.findFirst({
+              where: {
+                user_id: student.id,
+                title,
+                created_at: {
+                  gte: todayDate,
+                },
+              },
+            });
+
+            if (!alreadyNotified) {
+              await prisma.notification.create({
+                data: {
+                  user_id: student.id,
+                  title,
+                  body: `Sua aula de ${cls.subject} começou às ${slotStr}. Registre sua presença nos próximos 15 minutos para não receber falta!`,
+                },
+              });
+            }
+          }
+        }
+
+        // 2. Professor (Fechamento de Chamada - 15min após início do slot)
+        const professorTriggerTime = add15Minutes(slotStr);
+        if (professorTriggerTime === currentTimeStr) {
+          console.log(`[NOTIFICATION JOB] Enviando relatório de chamada para professor de: ${cls.subject} (${slotStr})`);
+
+          const checkedInCount = await prisma.attendance.count({
+            where: {
+              class_id: cls.id,
+              date: todayDate,
+              slot_time: slotStr,
+              status: { in: ['PRESENTE', 'ATRASADO'] },
+            },
+          });
+
+          const absentCount = await prisma.attendance.count({
+            where: {
+              class_id: cls.id,
+              date: todayDate,
+              slot_time: slotStr,
+              status: 'FALTA',
+            },
+          });
+
+          const totalStudents = cls.enrollments.length;
+          const title = `Fechamento de Chamada: ${cls.subject} (${slotStr})`;
+
           const alreadyNotified = await prisma.notification.findFirst({
             where: {
-              user_id: student.id,
+              user_id: cls.professor_id,
               title,
               created_at: {
                 gte: todayDate,
@@ -60,50 +150,12 @@ export async function notificationJob() {
           if (!alreadyNotified) {
             await prisma.notification.create({
               data: {
-                user_id: student.id,
+                user_id: cls.professor_id,
                 title,
-                body: `Sua aula de ${cls.subject} começou às ${cls.schedule_time}. Não se esqueça de registrar sua presença nos próximos 15 minutos!`,
+                body: `A tolerância de 15 minutos para o horário das ${slotStr} de ${cls.subject} encerrou. Resultado: ${checkedInCount} presentes, ${absentCount} faltas registradas (${totalStudents} matriculados).`,
               },
             });
           }
-        }
-      }
-
-      // 2. Professor (Fechamento de Chamada - 15min após início)
-      const professorTriggerTime = add15Minutes(cls.schedule_time);
-      if (professorTriggerTime === currentTimeStr) {
-        console.log(`[NOTIFICATION JOB] Enviando relatório de chamada para professor de: ${cls.subject}`);
-        
-        // Contar quantos alunos marcaram presença hoje nesta turma
-        const checkedInCount = await prisma.attendance.count({
-          where: {
-            class_id: cls.id,
-            date: todayDate,
-            status: { in: ['PRESENTE', 'ATRASADO'] },
-          },
-        });
-
-        const totalStudents = cls.enrollments.length;
-        const title = `Fechamento de Chamada: ${cls.subject}`;
-
-        const alreadyNotified = await prisma.notification.findFirst({
-          where: {
-            user_id: cls.professor_id,
-            title,
-            created_at: {
-              gte: todayDate,
-            },
-          },
-        });
-
-        if (!alreadyNotified) {
-          await prisma.notification.create({
-            data: {
-              user_id: cls.professor_id,
-              title,
-              body: `A tolerância de 15 minutos para a aula de ${cls.subject} encerrou. Total de presentes hoje: ${checkedInCount}/${totalStudents} alunos.`,
-            },
-          });
         }
       }
     }
@@ -271,7 +323,5 @@ export async function notificationJob() {
     }
   } catch (error) {
     console.error('[NOTIFICATION JOB] Erro ao executar job de notificações:', error);
-  } finally {
-    await prisma.$disconnect();
   }
 }

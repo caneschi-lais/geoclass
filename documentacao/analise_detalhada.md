@@ -107,8 +107,8 @@ Em estrito alinhamento com a **Lei Geral de Proteção de Dados (LGPD)**, o GeoC
 ## 📬 5. Rotinas Automatizadas (Jobs)
 
 Além do expurgo LGPD, o backend roda um job de **processamento de notificações** a cada minuto (`NotificationJob`):
-* **Lembrete aos alunos**: Se uma turma inicia no horário corrente, notifica os alunos matriculados para realizarem a chamada.
-* **Fechamento ao professor**: 15 minutos após o início da aula, calcula o total de alunos presentes e notifica o professor com o sumário.
+* **Lembrete aos alunos**: Se uma turma inicia no horário corrente, notifica os alunos matriculados para realizarem a chamada nos próximos 15 minutos.
+* **Fechamento e Registro Automático de Faltas (`AbsenceProcessor`)**: 15 minutos após o início do horário de aula (slot), varre os alunos matriculados que não bateram ponto e cria automaticamente o registro de ausência (`status: FALTA`) no banco de dados (`Attendance`), notificando o aluno e gerando o sumário com presentes e faltosos para o professor.
 * **Evasão**: 
   - Notifica o aluno se sua taxa de faltas em alguma disciplina passar de 20%.
   - Notifica os coordenadores se a média geral de faltas de um aluno superar 25%.

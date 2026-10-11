@@ -24,6 +24,7 @@ model User {
   enrollments   Enrollment[]
   attendances   Attendance[]
   notifications Notification[]
+  cancellations ClassCancellation[] @relation("ProfessorCancellations")
 
   created_at DateTime @default(now())
 }
@@ -62,6 +63,7 @@ model Class {
 
   created_at    DateTime                 @default(now())
   temporaryLocs TemporaryClassLocation[]
+  cancellations ClassCancellation[]
 }
 
 model Enrollment {
@@ -114,6 +116,7 @@ enum Status {
   PRESENTE
   ATRASADO
   FALTA
+  PRESENCA_PARCIAL
 }
 
 model Room {
@@ -144,4 +147,43 @@ model Notification {
   body       String
   read       Boolean  @default(false)
   created_at DateTime @default(now())
+}
+
+model AcademicCalendar {
+  id          String   @id @default(uuid())
+  date        DateTime @db.Date @unique
+  description String
+  type        String   @default("NAO_LETIVO") // "FERIADO", "RECESSO", "NAO_LETIVO", "EXAME", "SPAP"
+  created_at  DateTime @default(now())
+}
+
+model AcademicSemester {
+  id         String   @id @default(uuid())
+  name       String   @unique // Ex: "2026.1", "2026.2"
+  start_date DateTime @db.Date // Início das aulas (ex: 2026-02-09)
+  end_date   DateTime @db.Date // Término das aulas (ex: 2026-06-27)
+  active     Boolean  @default(true)
+  created_at DateTime @default(now())
+}
+
+model ClassCancellation {
+  id                    String    @id @default(uuid())
+  class_id              String?
+  class                 Class?    @relation(fields: [class_id], references: [id], onDelete: Cascade)
+  course_name           String?   // Para cancelamentos por curso
+  professor_id          String?
+  professor             User?     @relation("ProfessorCancellations", fields: [professor_id], references: [id])
+  date                  DateTime  @db.Date
+  reason_type           String    // "SAUDE", "PESSOAL", "ACADEMICO", "TRANSPORTE", "MANUTENCAO", "FERIADO_EXTRA", "OUTROS"
+  description           String?
+  certificate_url       String?
+  status                String    @default("PENDENTE") // "PENDENTE", "APROVADO", "REJEITADO"
+  scope                 String    @default("TURMA")    // "TURMA", "CURSO", "INSTITUICAO"
+  created_by_role       Role      @default(PROFESSOR)
+  replacement_date      DateTime? @db.Date
+  replacement_completed Boolean   @default(false)
+  created_at            DateTime  @default(now())
+
+  @@index([date])
+  @@index([class_id, date])
 }

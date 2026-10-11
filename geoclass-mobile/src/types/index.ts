@@ -16,6 +16,8 @@ export interface ClassData {
   room?: string;
   enrolledCount?: number;
   alreadyCheckedIn?: boolean;
+  isAbsent?: boolean;
+  attendanceStatus?: 'PRESENTE' | 'FALTA' | 'ATRASADO' | 'PRESENCA_PARCIAL' | null;
   isCourseCompleted?: boolean;
 }
 
@@ -33,6 +35,7 @@ export interface AttendanceLog {
   date: string;
   time: string;
   subject: string;
+  status?: 'PRESENTE' | 'FALTA' | 'ATRASADO' | 'PRESENCA_PARCIAL';
 }
 
 export type UserRole = 'ALUNO' | 'PROFESSOR' | 'COORDENADOR';
@@ -43,6 +46,7 @@ export interface StudentAttendance {
   ra: string;
   email?: string;
   time?: string; // Hora que bateu o ponto
+  status?: 'PRESENTE' | 'FALTA' | 'ATRASADO' | 'PRESENCA_PARCIAL';
   student_semester?: string;
   courses?: string[];
   userCourses?: UserCourseInfo[];

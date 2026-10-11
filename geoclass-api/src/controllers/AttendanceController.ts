@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middlewares/authMiddleware';
+import { isAcademicInstructionalDay } from '../services/CalendarService';
 import crypto from 'crypto';
 
 const prisma = new PrismaClient();
@@ -32,6 +33,19 @@ export class AttendanceController {
     }
 
     try {
+      // Determinar o momento do registro de presença
+      const checkInTime = timestamp ? new Date(timestamp) : new Date();
+      const checkInDate = new Date(checkInTime);
+      checkInDate.setHours(0, 0, 0, 0);
+
+      // 0. Validação de Calendário Acadêmico (Feriados, Recessos, etc.)
+      const calendarCheck = await isAcademicInstructionalDay(checkInTime);
+      if (!calendarCheck.isInstructional) {
+        return res.status(403).json({
+          error: `Hoje não é um dia letivo: ${calendarCheck.reason}. Registros de presença suspensos.`,
+        });
+      }
+
       // 1. Buscar informações da sala de aula
       const classData = await prisma.class.findUnique({
         where: { id: classId }
@@ -51,14 +65,11 @@ export class AttendanceController {
         }
       }
 
-      // Determinar o momento do registro de presença
-      const checkInTime = timestamp ? new Date(timestamp) : new Date();
-      const checkInDate = new Date(checkInTime);
-      checkInDate.setHours(0, 0, 0, 0);
-
       // 1.5 Validação de Janela de Horário Estrita por Slots (Suporta múltiplos horários separados por vírgula)
       const slots = classData.schedule_time.split(',').map((s) => s.trim());
       let activeSlot: string | null = null;
+      let expiredSlot: string | null = null;
+      let expiredEndTime: Date | null = null;
 
       for (const slotStr of slots) {
         const [schedHours, schedMinutes] = slotStr.split(':').map(Number);
@@ -73,10 +84,52 @@ export class AttendanceController {
         if (checkInTime >= startTime && checkInTime <= endTime) {
           activeSlot = slotStr;
           break;
+        } else if (checkInTime > endTime) {
+          expiredSlot = slotStr;
+          expiredEndTime = endTime;
         }
       }
 
       if (!activeSlot) {
+        // Se já passou do horário de tolerância de 15 minutos, registra a ausência (falta) no banco
+        if (expiredSlot) {
+          const existingExpiredAttendance = await prisma.attendance.findFirst({
+            where: {
+              student_id: studentId,
+              class_id: classId,
+              date: checkInDate,
+              slot_time: expiredSlot,
+            },
+          });
+
+          if (!existingExpiredAttendance) {
+            await prisma.attendance.create({
+              data: {
+                student_id: studentId,
+                class_id: classId,
+                date: checkInDate,
+                slot_time: expiredSlot,
+                check_in_time: expiredEndTime || checkInTime,
+                status: 'FALTA',
+                manual_attendance: false,
+                is_remote: false,
+              },
+            });
+
+            await prisma.notification.create({
+              data: {
+                user_id: studentId,
+                title: `Falta Registrada: ${classData.subject}`,
+                body: `O limite de tolerância de 15 minutos para a chamada das ${expiredSlot} encerrou e sua ausência foi registrada.`,
+              },
+            });
+          }
+
+          return res.status(403).json({ 
+            error: `A tolerância de 15 minutos para o horário das ${expiredSlot} expirou. Sua ausência (falta) foi registrada no sistema.` 
+          });
+        }
+
         return res.status(403).json({ 
           error: `Não há chamada aberta neste momento. Horários da disciplina: ${classData.schedule_time}. Cada chamada fica aberta por 15min a partir do horário.` 
         });
@@ -93,6 +146,9 @@ export class AttendanceController {
       });
 
       if (existingSlotAttendance) {
+        if (existingSlotAttendance.status === 'FALTA') {
+          return res.status(400).json({ error: `Você já possui falta registrada para o horário das ${activeSlot} hoje.` });
+        }
         return res.status(400).json({ error: `Você já registrou presença para o horário das ${activeSlot} hoje.` });
       }
 

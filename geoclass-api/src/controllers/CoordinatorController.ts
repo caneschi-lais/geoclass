@@ -806,5 +806,96 @@ export class CoordinatorController {
       return res.status(500).json({ error: 'Erro ao alterar status de conclusão da matéria' });
     }
   }
+
+  // --- Rotas de Gestão do Calendário Acadêmico ---
+  async getAcademicCalendar(req: AuthRequest, res: Response) {
+    try {
+      const events = await prisma.academicCalendar.findMany({
+        orderBy: { date: 'asc' },
+      });
+
+      const semesters = await prisma.academicSemester.findMany({
+        orderBy: { start_date: 'asc' },
+      });
+
+      return res.json({
+        events: events.map((e) => ({
+          id: e.id,
+          date: e.date.toISOString().split('T')[0],
+          description: e.description,
+          type: e.type,
+        })),
+        semesters: semesters.map((s) => ({
+          id: s.id,
+          name: s.name,
+          startDate: s.start_date.toISOString().split('T')[0],
+          endDate: s.end_date.toISOString().split('T')[0],
+          active: s.active,
+        })),
+      });
+    } catch (error) {
+      console.error('Erro getAcademicCalendar', error);
+      return res.status(500).json({ error: 'Erro ao buscar calendário acadêmico' });
+    }
+  }
+
+  async createAcademicCalendarEntry(req: AuthRequest, res: Response) {
+    const { date, description, type } = req.body;
+
+    if (!date || !description) {
+      return res.status(400).json({ error: 'Data e descrição são obrigatórias' });
+    }
+
+    try {
+      const parts = String(date).split('-');
+      if (parts.length !== 3) {
+        return res.status(400).json({ error: 'Data deve estar no formato YYYY-MM-DD' });
+      }
+
+      const targetDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      targetDate.setHours(0, 0, 0, 0);
+
+      const entry = await prisma.academicCalendar.upsert({
+        where: { date: targetDate },
+        update: {
+          description,
+          type: type || 'NAO_LETIVO',
+        },
+        create: {
+          date: targetDate,
+          description,
+          type: type || 'NAO_LETIVO',
+        },
+      });
+
+      return res.status(201).json({
+        message: 'Dia não-letivo registrado no calendário acadêmico!',
+        entry: {
+          id: entry.id,
+          date: entry.date.toISOString().split('T')[0],
+          description: entry.description,
+          type: entry.type,
+        },
+      });
+    } catch (error) {
+      console.error('Erro createAcademicCalendarEntry', error);
+      return res.status(500).json({ error: 'Erro ao salvar evento no calendário' });
+    }
+  }
+
+  async deleteAcademicCalendarEntry(req: AuthRequest, res: Response) {
+    const { id } = req.params;
+
+    try {
+      await prisma.academicCalendar.delete({
+        where: { id },
+      });
+
+      return res.json({ message: 'Dia não-letivo removido do calendário com sucesso!' });
+    } catch (error) {
+      console.error('Erro deleteAcademicCalendarEntry', error);
+      return res.status(500).json({ error: 'Erro ao remover evento do calendário' });
+    }
+  }
 }
 
