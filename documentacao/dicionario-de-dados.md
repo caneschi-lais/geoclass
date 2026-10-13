@@ -147,14 +147,37 @@ Armazena as datas de início e término das aulas de cada semestre letivo para v
 
 ---
 
+### 10. Tabela: `ClassCancellation` (Cancelamentos, Ausências e Reposições)
+Armazena solicitações de falta de professores e suspensões institucionais de aula com suporte a atestado médico e vinculação de data de reposição.
+
+| Atributo | Tipo PostgreSQL | Nulo? | Chave | Descrição / Regra de Negócio |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | `UUID` | Não | **PK** | Identificador único do registro (`uuid()`). |
+| `class_id` | `UUID` | Sim | **FK** | Referência à turma (`Class.id`), nulo para suspensões gerais. |
+| `course_name` | `VARCHAR` | Sim | - | Nome do curso para suspensões filtradas por curso. |
+| `professor_id` | `UUID` | Sim | **FK** | Referência ao professor (`User.id`) solicitante ou responsável. |
+| `date` | `DATE` | Não | - | Data exata da ausência ou do cancelamento da aula (`@db.Date`). |
+| `reason_type` | `VARCHAR` | Não | - | Motivo: `SAUDE`, `PESSOAL`, `ACADEMICO`, `TRANSPORTE`, `MANUTENCAO`, `FERIADO_EXTRA`, `OUTROS`. |
+| `description` | `TEXT` | Sim | - | Detalhamento da justificativa ou comunicação institucional. |
+| `certificate_url`| `VARCHAR` | Sim | - | Caminho/URL do arquivo de atestado médico anexado. |
+| `status` | `VARCHAR` | Não | - | Status da solicitação: `PENDENTE`, `APROVADO`, `REJEITADO`. Default: `PENDENTE`. |
+| `scope` | `VARCHAR` | Não | - | Escopo da suspensão: `TURMA`, `CURSO`, `INSTITUICAO`. Default: `TURMA`. |
+| `created_by_role`| `Role` (Enum) | Não | - | Perfil de quem registrou: `PROFESSOR` ou `COORDENADOR`. |
+| `replacement_date`| `DATE` | Sim | - | Data agendada para reposição da aula (`@db.Date`). |
+| `replacement_completed`| `BOOLEAN` | Não | - | Flag indicando se a chamada de reposição foi concluída (default: `false`). |
+| `created_at` | `TIMESTAMP` | Não | - | Data/hora do lançamento no sistema (`now()`). |
+
+---
+
 ## 🔠 Tipos Enumerados (Enums)
 
 ### Enum: `Role`
 - `ALUNO`: Permissão de acesso ao app mobile de chamadas e histórico.
-- `PROFESSOR`: Permissão de acompanhamento de turmas, chamada manual e troca de sala.
-- `COORDENADOR`: Permissão administrativa total, dashboards, relatórios e infraestrutura.
+- `PROFESSOR`: Permissão de acompanhamento de turmas, chamada manual, troca de sala, aviso de faltas e atestados.
+- `COORDENADOR`: Permissão administrativa total, dashboards, relatórios, infraestrutura e cancelamentos institucionais.
 
 ### Enum: `Status`
-- `PRESENTE`: Registro de presença confirmado.
+- `PRESENTE`: Registro de presença confirmado via GPS ou chamada manual.
 - `ATRASADO`: Registro com atraso (reservado para regras institucionais).
 - `FALTA`: Ausência registrada manualmente ou falta computada.
+- `PRESENCA_PARCIAL`: Presença temporária/provisória atribuída aos alunos matriculados quando há suspensão institucional ou falta aprovada do docente, resguardando o histórico até a realização da chamada de reposição.

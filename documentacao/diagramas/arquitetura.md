@@ -33,6 +33,7 @@ flowchart TD
         GPS["Módulo de Geolocalização"]:::frontend
         OfflineQ["Fila Offline & Assinatura SHA-256"]:::frontend
         ReadOnlyGuard["Guard Modo Leitura (Curso Concluído)"]:::frontend
+        AbsenceModule["Módulo de Faltas, Atestados & Reposições"]:::frontend
     end
 
     subgraph Backend ["Cloud Web Service - Render.com (Node.js/Express)"]
@@ -42,6 +43,7 @@ flowchart TD
         StudentAPI["API do Aluno & Status de Curso"]:::backend
         ProfAPI["API do Professor"]:::backend
         CoordAPI["API do Coordenador & Batch Virada"]:::backend
+        CancellationAPI["API de Cancelamentos, Atestados & Reposições"]:::backend
         NotifAPI["API de Notificações & Alerta de Risco (<75%)"]:::backend
         SemUtil["Utilitário de Semestre Automático (YYYY.1/2)"]:::backend
     end
@@ -70,6 +72,7 @@ flowchart TD
     UI --> GPS
     UI --> OfflineQ
     UI --> ReadOnlyGuard
+    UI --> AbsenceModule
 
     %% Comunicação Frontend -> Render API
     UI -->|Login/Token JWT| Auth
@@ -77,15 +80,18 @@ flowchart TD
     OfflineQ -->|Sync Pacotes Assinados| StudentAPI
     UI -->|Gestão de Chamada & Salas| ProfAPI
     UI -->|Dashboard, Risco & Virada| CoordAPI
+    AbsenceModule -->|Avisos, Atestados, Suspensões & Reposições| CancellationAPI
     UI -->|Avisos & Notificações| NotifAPI
 
     %% Fluxos Internos do Backend
     StudentAPI -->|Valida Distância, Horários Multi-Slot & IsCompleted| GeoEngine
     CoordAPI -->|Calcula YYYY.1/2 & Incrementa Semestres| SemUtil
+    CancellationAPI -->|Dispara Alertas de Cancelamento/Reposição| NotifAPI
     Auth --> ORM
     StudentAPI --> ORM
     ProfAPI --> ORM
     CoordAPI --> ORM
+    CancellationAPI --> ORM
     NotifAPI --> ORM
 
     %% Camada de Persistência em Nuvem

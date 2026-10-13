@@ -316,6 +316,107 @@ sequenceDiagram
 
 ---
 
+### 2.5 Solicitação de Falta & Anexo de Atestado Médico pelo Professor
+O professor comunica ausência antecipada ou imprevista pelo botão "Avisar Falta", seleciona o motivo e pode anexar atestado imediatamente ou posteriormente pela aba "Atestados / Minhas Faltas".
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Professor
+    participant App as Aplicativo Mobile (Expo)
+    participant API as Backend API (Render.com)
+    participant DB as Banco PostgreSQL (Neon.tech)
+    actor Coordenador
+
+    Professor->>App: Clica em "Avisar Falta" na tela da turma
+    App->>Professor: Exibe formulário (Data, Motivo, Justificativa, Data Reposição, Atestado)
+    Professor->>App: Preenche os dados e anexa foto/PDF do atestado (opcional)
+    Professor->>App: Clica em "Enviar Solicitação de Falta"
+    App->>API: POST /api/professor/aviso-falta {classId, date, reason_type, description, certificate_base64}
+    API->>DB: Salva arquivo em disco/uploads (se enviado)
+    API->>DB: Insere registro em ClassCancellation (status=PENDENTE)
+    API->>DB: Cria notificações em lote para todos os Coordenadores ativos
+    DB-->>API: Registro criado
+    API-->>App: Sucesso 201: "Solicitação de ausência enviada!"
+    App-->>Professor: Exibe confirmação
+
+    opt Envio Posterior de Atestado Médico
+        Professor->>App: Acessa "Atestados / Minhas Faltas" na tela Minhas Turmas
+        App->>API: GET /api/professor/minhas-ausencias
+        API->>DB: Busca histórico de ausências do docente
+        DB-->>API: Retorna solicitações
+        App-->>Professor: Exibe lista com status de atestado
+        Professor->>App: Clica em "Anexar Atestado (PDF ou Foto)"
+        App->>API: POST /api/professor/cancelamento/:id/atestado {certificate_base64}
+        API->>DB: Atualiza certificate_url em ClassCancellation
+        API->>DB: Cria notificação para Coordenadores ("Atestado Enviado: Prof...")
+        DB-->>API: Concluído
+        API-->>App: Sucesso 200: "Atestado médico anexado!"
+        App-->>Professor: Atualiza card com botão "Visualizar Atestado"
+    end
+```
+
+---
+
+### 2.6 Agendamento de Aula de Reposição & Notificação Automática
+Permite ao professor (ou coordenador) definir ou alterar a data de reposição para qualquer ausência aprovada, vinculando-a à aula sem aula e notificando automaticamente todos os alunos e docentes.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Professor
+    participant App as Aplicativo Mobile
+    participant API as Backend API (Render.com)
+    participant DB as Banco PostgreSQL (Neon.tech)
+    actor Alunos as Alunos Matriculados
+
+    Professor->>App: Acessa "Atestados" ou "Reposições" e clica em "Agendar / Alterar Data"
+    App-->>Professor: Abre Modal de Agendamento com atalhos (+1d, +7d, +14d) e data
+    Professor->>App: Define nova data (AAAA-MM-DD) e clica em "Confirmar & Notificar"
+    App->>API: PUT /api/professor/reposicao/:id/agendar {replacement_date}
+    API->>DB: Busca cancelamento e alunos matriculados na turma
+    API->>DB: UPDATE ClassCancellation SET replacement_date = repDate
+    loop Para cada aluno matriculado na turma
+        API->>DB: INSERT INTO Notification (user_id, title="Reposição Agendada: [Matéria]", body="Referente ao dia...")
+    end
+    DB-->>API: Atualizado com sucesso
+    API-->>App: Sucesso 200: "Data de reposição agendada!"
+    App-->>Professor: Atualiza card e exibe feedback de sucesso
+    note right of Alunos: Alunos recebem notificação push<br/>no aplicativo instantaneamente!
+```
+
+---
+
+### 2.7 Chamada de Aula de Reposição & Conversão de Presença Parcial
+Na data da reposição, o docente realiza a chamada das reposições pendentes. Conforme a regra de negócio, todos os alunos vêm marcados como presentes por padrão.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Professor
+    participant App as Aplicativo Mobile
+    participant API as Backend API (Render.com)
+    participant DB as Banco PostgreSQL (Neon.tech)
+
+    Professor->>App: Clica no botão "Reposições / Chamadas" na tela Minhas Turmas
+    App->>API: GET /api/professor/reposicoes-pendentes
+    API->>DB: Busca registros com status=APROVADO e replacement_completed=false
+    DB-->>API: Retorna turmas e alunos matriculados
+    API-->>App: Renderiza lista (Todos os alunos vêm pré-marcados como presentes)
+
+    Professor->>App: Desmarca eventuais alunos que faltaram à reposição
+    Professor->>App: Clica em "Concluir Chamada de Reposição"
+    App->>API: POST /api/professor/reposicao/:id/finalizar {attended_student_ids}
+    API->>DB: Converte presenças parciais dos presentes para confirmadas
+    API->>DB: Lança falta para quem não compareceu à reposição
+    API->>DB: UPDATE ClassCancellation SET replacement_completed = true
+    DB-->>API: Transação finalizada
+    API-->>App: Sucesso 200: "Chamada de reposição concluída!"
+    App-->>Professor: Exibe modal de confirmação e atualiza pendências
+```
+
+---
+
 ## 3. Fluxos do Coordenador
 
 Mapeia a gestão administrativa da instituição: análise de semestres letivos, identificação de alunos em risco de evasão, cadastro de infraestrutura de salas, matriculação de alunos e exportação de relatórios.
@@ -600,6 +701,85 @@ sequenceDiagram
     DB-->>API: Registro atualizado
     API-->>Web: Retorna status ("Curso Concluído - Modo Leitura")
     Web-->>Coordenador: Exibe tag com ícone de cadeado e status Concluído
+```
+
+---
+
+### 3.7 Suspensão Direta de Aulas pela Coordenação (Institucional, Curso ou Turma)
+O coordenador suspende aulas administrativamente (por manutenção, recesso ou imprevisto institucional), atribuindo presença parcial automática e notificando todos os alunos e professores afetados.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Coordenador
+    participant Web as Painel Coordenador / App
+    participant API as Backend API (Render.com)
+    participant DB as Banco PostgreSQL (Neon.tech)
+    actor Alunos as Alunos Matriculados
+    actor Professores as Professores
+
+    Coordenador->>Web: Acessa "Solicitações & Cancelamentos" -> Aba "Suspender Aula"
+    Web-->>Coordenador: Exibe formulário com Escopo (Toda Instituição / Por Curso / Por Turma)
+    Coordenador->>Web: Seleciona o escopo, matéria/curso, data sem aula e motivo
+    Coordenador->>Web: Clica em "Confirmar Suspensão & Notificar"
+    Web->>API: POST /api/coordenador/cancelar-aulas {scope, date, reason_type, class_id, course_name, replacement_date}
+
+    rect rgb(241, 245, 249)
+        note right of API: Processamento em Lote Institucional
+        API->>DB: Identifica turmas afetadas pelo escopo e dia da semana
+        API->>DB: Cria registro(s) em ClassCancellation (status=APROVADO)
+        loop Para cada turma afetada
+            loop Para cada aluno matriculado
+                API->>DB: UPSERT Attendance (status='PRESENCA_PARCIAL')
+                API->>DB: INSERT INTO Notification (user_id=aluno, title="Aula Suspensa: [Matéria]")
+            end
+            API->>DB: INSERT INTO Notification (user_id=professor, title="Aula Suspensa: [Matéria]")
+        end
+    end
+
+    DB-->>API: Transação concluída
+    API-->>Web: Sucesso 200: "Suspensão registrada e alunos/professores notificados!"
+    Web-->>Coordenador: Exibe confirmação com contador de turmas suspensas
+    note over Alunos, Professores: Notificação push imediata avisando da suspensão<br/>e resguardando presença parcial até reposição
+```
+
+---
+
+### 3.8 Análise de Solicitações de Falta & Solicitação de Atestado Médico
+Painel de aprovação das ausências docentes com cobrança formal de atestado médico.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Coordenador
+    participant Web as Painel Coordenador / App
+    participant API as Backend API (Render.com)
+    participant DB as Banco PostgreSQL (Neon.tech)
+    actor Professor
+
+    Coordenador->>Web: Acessa aba "Solicitações de Falta"
+    Web->>API: GET /api/coordenador/solicitacoes-falta
+    API->>DB: Busca pedidos pendentes (ClassCancellation status=PENDENTE)
+    DB-->>API: Retorna lista com justificativas e links de atestado
+    API-->>Web: Exibe cards de solicitações
+
+    alt Falta por Motivo de Saúde sem Atestado
+        Coordenador->>Web: Clica em "Solicitar Atestado ao Professor"
+        Web->>API: PUT /api/coordenador/solicitacoes-falta/:id/pedir-atestado
+        API->>DB: INSERT INTO Notification (user_id=professor, title="Solicitação de Atestado Médico")
+        DB-->>API: Notificação criada
+        API-->>Web: Sucesso 200: "Notificação enviada ao professor!"
+        note right of Professor: Professor recebe aviso com instrução para anexar o arquivo
+    else Solicitação com Atestado Válido
+        Coordenador->>Web: Clica em "Aprovar Falta"
+        Web->>API: PUT /api/coordenador/solicitacoes-falta/:id/aprovar
+        API->>DB: UPDATE ClassCancellation SET status = 'APROVADO'
+        API->>DB: Gera presença parcial (PRESENCA_PARCIAL) para todos os alunos da matéria
+        API->>DB: Dispara notificações para todos os alunos da turma
+        DB-->>API: Solicitação aprovada
+        API-->>Web: Sucesso 200: "Falta aprovada e alunos notificados!"
+        Web-->>Coordenador: Remove pedido da lista de pendências
+    end
 ```
 
 ---

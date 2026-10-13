@@ -15,13 +15,16 @@ config:
 ---
 flowchart LR
     Aluno["Aluno"] --- Login(["Autenticar no App"]) & AceitarLGPD(["Aceitar Termos de Privacidade LGPD"]) & ViewTurmas(["Consultar Aulas do Dia & Modo Leitura"]) & RegistrarPonto(["Marcar Presença via GPS / Multi-Slot"]) & ViewHistorico(["Consultar Histórico Acadêmico"]) & ViewNotif(["Visualizar Notificações & Alertas de Risco"])
-    Prof["Professor"] --- Login & ViewTurmas & ViewAlunosTurma(["Consultar Alunos da Turma & Semestre"]) & RealocarSala(["Realocar Sala Temporariamente"]) & ChamadaManual(["Realizar Chamada Manual / EAD"]) & ResetDevice(["Resetar Device Binding de Aluno"])
-    Coord["Coordenador"] --- Login & CadastrarSala(["Cadastrar Sala/Infraestrutura"]) & MatricularAluno(["Matricular Aluno em Disciplina"]) & ViewDashboardRisk(["Monitorar Evasão e Alunos em Risco (<75%)"]) & GerarRelatorio(["Exportar Relatórios PDF/XLSX"]) & ToggleStatus(["Alternar Status Ativo/Trancamento"]) & ToggleConclusao(["Gerenciar Conclusão de Curso"]) & ViradaSemestre(["Executar Virada de Semestre em Lote"])
+    Prof["Professor"] --- Login & ViewTurmas & ViewAlunosTurma(["Consultar Alunos da Turma & Semestre"]) & RealocarSala(["Realocar Sala Temporariamente"]) & ChamadaManual(["Realizar Chamada Manual / EAD"]) & ResetDevice(["Resetar Device Binding de Aluno"]) & AvisarFalta(["Avisar Falta / Solicitar Ausência"]) & AnexarAtestado(["Anexar Atestado Médico"]) & AgendarReposicao(["Agendar Data de Reposição"]) & ChamadaReposicao(["Realizar Chamada de Reposição"])
+    Coord["Coordenador"] --- Login & CadastrarSala(["Cadastrar Sala/Infraestrutura"]) & MatricularAluno(["Matricular Aluno em Disciplina"]) & ViewDashboardRisk(["Monitorar Evasão e Alunos em Risco (<75%)"]) & GerarRelatorio(["Exportar Relatórios PDF/XLSX"]) & ToggleStatus(["Alternar Status Ativo/Trancamento"]) & ToggleConclusao(["Gerenciar Conclusão de Curso"]) & ViradaSemestre(["Executar Virada de Semestre em Lote"]) & SuspenderAula(["Suspender Aula Direta"]) & GerenciarFaltas(["Aprovar/Recusar Falta & Solicitar Atestado"]) & AgendarReposicaoCoord(["Agendar / Alterar Reposição"])
     Sistema["Sistema (Job / Nuvem)"] --- Expurgo(["Expurgar Geodados e Device ID - LGPD"]) & KeepAlive(["Manter API Ativa via Keep-Alive"]) & NotifJob(["Processar Notificações Automáticas"]) & RiskNotification(["Disparar Alerta Auto de Risco (<75%)"]) & DetectSemestre(["Detectar Semestre Atual Automático YYYY.1/2"])
     RegistrarPonto -. &lt;&gt; .-> ValidarAntiFraude(["Validar Geofencing, Janela 15m, Device ID & Slot"])
     RegistrarOffline(["Registrar Presença Offline SHA-256"]) -. &lt;&gt; .-> RegistrarPonto
     RealocarSala -. &lt;&gt; .-> NotifJob
     ViradaSemestre -. &lt;&gt; .-> DetectSemestre
+    SuspenderAula -. &lt;&gt; .-> NotifJob
+    AgendarReposicao -. &lt;&gt; .-> NotifJob
+    AvisarFalta -. &lt;&gt; .-> NotifJob
 
      Aluno:::actor
      Login:::usecase
@@ -35,6 +38,10 @@ flowchart LR
      RealocarSala:::usecase
      ChamadaManual:::usecase
      ResetDevice:::usecase
+     AvisarFalta:::usecase
+     AnexarAtestado:::usecase
+     AgendarReposicao:::usecase
+     ChamadaReposicao:::usecase
      Coord:::actor
      CadastrarSala:::usecase
      MatricularAluno:::usecase
@@ -43,6 +50,9 @@ flowchart LR
      ToggleStatus:::usecase
      ToggleConclusao:::usecase
      ViradaSemestre:::usecase
+     SuspenderAula:::usecase
+     GerenciarFaltas:::usecase
+     AgendarReposicaoCoord:::usecase
      Sistema:::systemActor
      Expurgo:::usecase
      KeepAlive:::usecase
@@ -139,4 +149,28 @@ flowchart LR
 ### CDU-24: Detectar Semestre Letivo Atual Automático (YYYY.1 / YYYY.2)
 * **Ator Principal:** Sistema (Backend API)
 * **Descrição:** Algoritmo que identifica automaticamente o semestre vigente com base no mês do calendário (Jan-Jun = `YYYY.1`, Jul-Dez = `YYYY.2`).
+
+### CDU-25: Avisar Falta e Solicitar Ausência
+* **Ator Principal:** Professor
+* **Descrição:** Permite ao professor comunicar ausência antecipada ou imprevista para determinada disciplina e data, selecionando o motivo (Saúde, Pessoal, Transporte, Acadêmico ou Outros) e opcionalmente sugerindo data de reposição e anexando atestado médico. Dispara notificação push instantânea para todos os coordenadores da instituição.
+
+### CDU-26: Anexar e Gerenciar Atestados Médicos
+* **Ator Principal:** Professor
+* **Descrição:** Permite ao docente acessar a tela dedicada "Minhas Ausências & Atestados" e realizar o upload de atestado médico (PDF ou Imagem base64) para faltas previamente solicitadas, inclusive em resposta a cobranças enviadas pela coordenação. Notifica os coordenadores da entrega do documento.
+
+### CDU-27: Suspender Aula Direta por Escopo (Institucional, Curso ou Turma)
+* **Ator Principal:** Coordenador
+* **Descrição:** Permite ao coordenador suspender aulas de forma direta em 3 níveis de granularidade: Toda a Instituição, Por Curso ou Por Turma específica. Ao confirmar, o sistema grava o cancelamento aprovado, lança automaticamente o status de `PRESENCA_PARCIAL` na tabela `Attendance` para todos os alunos matriculados e emite notificações push para alunos e professores afetados.
+
+### CDU-28: Gerenciar Solicitações de Falta e Cobrança de Atestado
+* **Ator Principal:** Coordenador
+* **Descrição:** Painel de análise das solicitações de falta dos docentes. Permite visualizar detalhes e atestados médicos anexados, solicitar atestado formalmente via notificação ao professor em casos de saúde, recusar ou aprovar a solicitação com geração de presença parcial e aviso aos discentes.
+
+### CDU-29: Agendar e Relacionar Aula de Reposição com Notificação
+* **Atores:** Professor, Coordenador
+* **Descrição:** Permite vincular ou alterar uma data de reposição (`replacement_date`) para qualquer falta ou aula suspensa que tenha ficado sem agendamento prévio. O sistema conecta a reposição exatamente ao dia sem aula original e notifica automaticamente todos os alunos matriculados na matéria e o professor responsável.
+
+### CDU-30: Realizar Chamada de Reposição de Aula
+* **Ator Principal:** Professor
+* **Descrição:** Permite ao professor abrir o modal de "Reposições / Chamadas", selecionar a aula reposta com todos os alunos matriculados pré-selecionados por padrão (conforme requisito), desmarcar eventuais faltosos e concluir a chamada, convertendo as presenças parciais para presença final da reposição.
 
