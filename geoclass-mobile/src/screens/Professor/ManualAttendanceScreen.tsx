@@ -145,7 +145,7 @@ export default function ManualAttendanceScreen({ navigation, route }: Props) {
 
       <View className="absolute bottom-6 left-4 right-4">
         <TouchableOpacity
-          className="bg-sky-500 py-4 rounded-xl items-center shadow-md"
+          className="bg-sky-500 py-4 rounded-xl items-center shadow-sm"
           onPress={handleSave}
           disabled={saving}
         >

@@ -83,6 +83,8 @@ export default function CalendarModal({
     setCurrentYear(nextYear);
   };
 
+  if (!visible) return null;
+
   return (
     <Modal
       visible={visible}
@@ -90,8 +92,25 @@ export default function CalendarModal({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View className="flex-1 justify-center items-center bg-black/50 p-6">
-        <View className="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-sm shadow-xl border border-gray-150 dark:border-slate-700">
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          padding: 24,
+        }}
+      >
+        <View
+          style={{
+            elevation: 6,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 3 },
+            shadowOpacity: 0.15,
+            shadowRadius: 10,
+          }}
+          className="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-sm border border-gray-200 dark:border-slate-700"
+        >
           
           <View className="flex-row justify-between items-center mb-4">
             <TouchableOpacity onPress={() => changeMonth(-1)} className="p-1">
@@ -181,7 +200,7 @@ export default function CalendarModal({
             </View>
           </View>
 
-          <View className="flex-row justify-between mt-2 border-t border-gray-150 dark:border-slate-700/80 pt-4">
+          <View className="flex-row justify-between mt-2 border-t border-gray-200 dark:border-slate-700/80 pt-4">
             <TouchableOpacity
               onPress={() => {
                 onSelectDate(new Date());

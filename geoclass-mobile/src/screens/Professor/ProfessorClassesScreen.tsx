@@ -13,6 +13,7 @@ import ChangeRoomModal from '../../components/ChangeRoomModal';
 import HoldButton from '../../components/HoldButton';
 import ProfessorAbsenceModal from '../../components/ProfessorAbsenceModal';
 import ReplacementAttendanceModal from '../../components/ReplacementAttendanceModal';
+import ProfessorAbsenceHistoryModal from '../../components/ProfessorAbsenceHistoryModal';
 
 type Props = {
   navigation: NativeStackNavigationProp<ProfessorStackParamList, 'Classes'>;
@@ -29,6 +30,8 @@ export default function ProfessorClassesScreen({ navigation }: Props) {
   const [absenceModalVisible, setAbsenceModalVisible] = useState(false);
   const [selectedAbsenceClass, setSelectedAbsenceClass] = useState<{ id: string; subject: string }>({ id: '', subject: '' });
   const [replacementModalVisible, setReplacementModalVisible] = useState(false);
+  const [absenceHistoryVisible, setAbsenceHistoryVisible] = useState(false);
+  const [pendingCertificatesCount, setPendingCertificatesCount] = useState(0);
 
   useEffect(() => {
     loadClasses();
@@ -38,6 +41,13 @@ export default function ProfessorClassesScreen({ navigation }: Props) {
     try {
       const response = await api.get('/professor/turmas');
       setClasses(response.data);
+
+      try {
+        const absRes = await api.get('/professor/minhas-ausencias');
+        const list = absRes.data || [];
+        const pendingCount = list.filter((a: any) => !a.certificate_url && a.reason_type === 'SAUDE').length;
+        setPendingCertificatesCount(pendingCount);
+      } catch (e) {}
     } catch (error) {
       console.log('Error loading classes', error);
     } finally {
@@ -86,10 +96,8 @@ export default function ProfessorClassesScreen({ navigation }: Props) {
           <Text className="text-sky-600 font-bold ml-1 text-xs">Presença Manual</Text>
         </TouchableOpacity>
 
-        <HoldButton
-          holdTimeMs={1000}
-          hintActionText="abrir o formulário de ausência"
-          onHoldSuccess={() => {
+        <TouchableOpacity
+          onPress={() => {
             setSelectedAbsenceClass({ id: item.id, subject: item.subject });
             setAbsenceModalVisible(true);
           }}
@@ -97,7 +105,7 @@ export default function ProfessorClassesScreen({ navigation }: Props) {
         >
           <Feather name="alert-circle" size={14} color="#ef4444" />
           <Text className="text-red-600 dark:text-red-400 font-bold ml-1 text-xs">Avisar Falta</Text>
-        </HoldButton>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -116,21 +124,46 @@ export default function ProfessorClassesScreen({ navigation }: Props) {
         }}
       />
 
-      <TouchableOpacity
-        onPress={() => setReplacementModalVisible(true)}
-        className="flex-row items-center justify-between bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800/60 p-3 rounded-xl mb-4 shadow-sm"
-      >
-        <View className="flex-row items-center">
-          <View className="bg-amber-100 dark:bg-amber-900/50 p-2 rounded-lg mr-3">
-            <Feather name="check-square" size={18} color="#d97706" />
+      <View className="flex-row gap-2 mb-4">
+        {/* Reposições de Aula */}
+        <TouchableOpacity
+          onPress={() => setReplacementModalVisible(true)}
+          className="flex-1 flex-row items-center justify-between bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800/60 p-3 rounded-xl shadow-sm"
+        >
+          <View className="flex-row items-center flex-1 pr-1">
+            <View className="bg-amber-100 dark:bg-amber-900/50 p-2 rounded-lg mr-2">
+              <Feather name="check-square" size={16} color="#d97706" />
+            </View>
+            <View className="flex-1">
+              <Text numberOfLines={1} className="text-xs font-bold uppercase text-amber-800 dark:text-amber-400">Reposições</Text>
+              <Text numberOfLines={1} className="text-[10px] text-amber-700 dark:text-amber-500 font-medium">Chamadas</Text>
+            </View>
           </View>
-          <View>
-            <Text className="text-xs font-bold uppercase text-amber-800 dark:text-amber-400">Reposições de Aula</Text>
-            <Text className="text-[11px] text-amber-700 dark:text-amber-500 font-medium">Realizar chamada da reposição (Checkboxes)</Text>
+          <Feather name="chevron-right" size={14} color="#d97706" />
+        </TouchableOpacity>
+
+        {/* Minhas Ausências & Atestados */}
+        <TouchableOpacity
+          onPress={() => setAbsenceHistoryVisible(true)}
+          className="flex-1 flex-row items-center justify-between bg-sky-50 dark:bg-sky-950/30 border border-sky-300 dark:border-sky-800/60 p-3 rounded-xl shadow-sm relative"
+        >
+          {pendingCertificatesCount > 0 && (
+            <View className="absolute -top-1.5 -right-1.5 bg-red-500 rounded-full px-1.5 py-0.5 border-2 border-white dark:border-slate-800 z-10">
+              <Text className="text-white text-[9px] font-extrabold">{pendingCertificatesCount}</Text>
+            </View>
+          )}
+          <View className="flex-row items-center flex-1 pr-1">
+            <View className="bg-sky-100 dark:bg-sky-900/50 p-2 rounded-lg mr-2">
+              <Feather name="file-text" size={16} color="#0ea5e9" />
+            </View>
+            <View className="flex-1">
+              <Text numberOfLines={1} className="text-xs font-bold uppercase text-sky-800 dark:text-sky-300">Atestados</Text>
+              <Text numberOfLines={1} className="text-[10px] text-sky-700 dark:text-sky-400 font-medium">Minhas Faltas</Text>
+            </View>
           </View>
-        </View>
-        <Feather name="chevron-right" size={18} color="#d97706" />
-      </TouchableOpacity>
+          <Feather name="chevron-right" size={14} color="#0ea5e9" />
+        </TouchableOpacity>
+      </View>
 
       <FlatList
         data={classes}
@@ -159,6 +192,12 @@ export default function ProfessorClassesScreen({ navigation }: Props) {
       <ReplacementAttendanceModal
         visible={replacementModalVisible}
         onClose={() => setReplacementModalVisible(false)}
+        onSuccess={() => loadClasses()}
+      />
+
+      <ProfessorAbsenceHistoryModal
+        visible={absenceHistoryVisible}
+        onClose={() => setAbsenceHistoryVisible(false)}
         onSuccess={() => loadClasses()}
       />
     </View>

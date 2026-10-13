@@ -43,6 +43,7 @@ router.post('/professor/turma/:id/trocar-sala', professorController.changeRoomTe
 router.get('/professor/salas-disponiveis', roomController.getAvailableRooms);
 router.post('/professor/presenca/reset-device', professorController.resetDeviceBinding);
 router.post('/professor/aviso-falta', cancellationController.reportProfessorAbsence);
+router.get('/professor/minhas-ausencias', cancellationController.getProfessorAbsences);
 router.post('/professor/cancelamento/:id/atestado', cancellationController.uploadCertificate);
 router.get('/professor/reposicoes-pendentes', cancellationController.getPendingReplacements);
 router.put('/professor/reposicao/:id/agendar', cancellationController.scheduleReplacement);
@@ -53,6 +54,7 @@ router.get('/professor/turma/:id/datas-reposicao', cancellationController.getRep
 router.get('/coordenador/semestres', coordinatorController.getSemesters);
 router.get('/coordenador/semestre/:id/alunos', coordinatorController.getStudentsBySemester);
 router.get('/coordenador/semestre/:id/turmas', coordinatorController.getClassesBySemester);
+router.get('/coordenador/turmas', coordinatorController.getAllActiveClasses);
 router.get('/coordenador/aluno/:id/materias', coordinatorController.getStudentSubjects);
 router.get('/coordenador/relatorio', coordinatorController.getReportData);
 router.post('/coordenador/sala', coordinatorController.createRoom);

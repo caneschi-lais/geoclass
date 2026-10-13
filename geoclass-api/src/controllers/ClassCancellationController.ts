@@ -29,6 +29,31 @@ function formatDateDisplay(d: Date | string): string {
   return `${day}/${month}/${year}`;
 }
 
+function isClassScheduledOnDate(weekDays?: string | null, dateInput?: Date | string): boolean {
+  if (!weekDays || weekDays.trim() === '') return true;
+
+  let dayIndex: number;
+  if (typeof dateInput === 'string') {
+    const [year, month, day] = dateInput.split('-').map(Number);
+    const d = new Date(year, month - 1, day, 12, 0, 0);
+    dayIndex = d.getDay();
+  } else if (dateInput instanceof Date) {
+    dayIndex = dateInput.getUTCDay();
+  } else {
+    dayIndex = new Date().getDay();
+  }
+
+  const daysOfWeekMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+  const dayName = daysOfWeekMap[dayIndex];
+
+  const normalizedWeekDays = weekDays
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  const days = normalizedWeekDays.split(',').map((d) => d.trim());
+  return days.some((d) => d.includes(dayName) || dayName.includes(d));
+}
+
 function saveBase64File(base64Data: string, originalFilename = 'documento.pdf'): string | null {
   try {
     const uploadsDir = path.join(__dirname, '../../uploads/atestados');
@@ -98,34 +123,42 @@ export class ClassCancellationController {
         certificateUrl = saveBase64File(certificate_base64, certificate_filename);
       }
 
-      const cancellation = await (prisma as any).classCancellation.upsert({
+      const existing = await prisma.classCancellation.findFirst({
         where: {
-          class_id_date: {
-            class_id,
-            date: targetDate,
-          },
-        },
-        update: {
-          reason_type,
-          description: description ? description.trim() : null,
-          certificate_url: certificateUrl || undefined,
-          status: 'PENDENTE',
-          replacement_date: replacementDateObj,
-        },
-        create: {
           class_id,
-          course_name: classData.course_name,
-          professor_id: professorId,
           date: targetDate,
-          reason_type,
-          description: description ? description.trim() : null,
-          certificate_url: certificateUrl,
-          status: 'PENDENTE',
-          scope: 'TURMA',
-          created_by_role: 'PROFESSOR',
-          replacement_date: replacementDateObj,
         },
       });
+
+      let cancellation;
+      if (existing) {
+        cancellation = await prisma.classCancellation.update({
+          where: { id: existing.id },
+          data: {
+            reason_type,
+            description: description ? description.trim() : null,
+            certificate_url: certificateUrl || undefined,
+            status: 'PENDENTE',
+            replacement_date: replacementDateObj,
+          },
+        });
+      } else {
+        cancellation = await prisma.classCancellation.create({
+          data: {
+            class_id,
+            course_name: classData.course_name,
+            professor_id: professorId,
+            date: targetDate,
+            reason_type,
+            description: description ? description.trim() : null,
+            certificate_url: certificateUrl,
+            status: 'PENDENTE',
+            scope: 'TURMA',
+            created_by_role: 'PROFESSOR',
+            replacement_date: replacementDateObj,
+          },
+        });
+      }
 
       // Notificar Coordenadores
       const coordinators = await prisma.user.findMany({
@@ -218,27 +251,34 @@ export class ClassCancellationController {
 
         for (const enrollment of classData.enrollments) {
           for (const slotStr of slots) {
-            await (prisma.attendance as any).upsert({
+            const existingAttendance = await prisma.attendance.findFirst({
               where: {
-                student_id_class_id_date_slot_time: {
-                  student_id: enrollment.student_id,
-                  class_id: classData.id,
-                  date: targetDate,
-                  slot_time: slotStr,
-                },
-              },
-              update: {
-                status: 'PRESENCA_PARCIAL',
-              },
-              create: {
                 student_id: enrollment.student_id,
                 class_id: classData.id,
                 date: targetDate,
                 slot_time: slotStr,
-                check_in_time: new Date(),
-                status: 'PRESENCA_PARCIAL',
               },
             });
+
+            if (existingAttendance) {
+              await prisma.attendance.update({
+                where: { id: existingAttendance.id },
+                data: {
+                  status: 'PRESENCA_PARCIAL',
+                },
+              });
+            } else {
+              await prisma.attendance.create({
+                data: {
+                  student_id: enrollment.student_id,
+                  class_id: classData.id,
+                  date: targetDate,
+                  slot_time: slotStr,
+                  check_in_time: new Date(),
+                  status: 'PRESENCA_PARCIAL',
+                },
+              });
+            }
           }
 
           // Notificar Aluno
@@ -401,6 +441,42 @@ export class ClassCancellationController {
     }
   }
 
+  // 6.1 Professor lista suas próprias solicitações de ausência e atestados
+  async getProfessorAbsences(req: AuthRequest, res: Response) {
+    const professorId = req.user?.id;
+    if (!professorId) {
+      return res.status(401).json({ error: 'Usuário não autenticado.' });
+    }
+
+    try {
+      const absences = await (prisma as any).classCancellation.findMany({
+        where: {
+          professor_id: professorId,
+        },
+        include: {
+          class: {
+            select: {
+              id: true,
+              subject: true,
+              course_name: true,
+              schedule_time: true,
+              room_name: true,
+              week_days: true,
+            },
+          },
+        },
+        orderBy: {
+          date: 'desc',
+        },
+      });
+
+      return res.json(absences);
+    } catch (error) {
+      console.error('Erro ao buscar ausências do professor:', error);
+      return res.status(500).json({ error: 'Erro ao buscar ausências.' });
+    }
+  }
+
   // 7. Cancelamento Direto pelo Coordenador (Manutenção, Feriado extra, etc.)
   async coordinatorDirectCancellation(req: AuthRequest, res: Response) {
     const {
@@ -425,15 +501,24 @@ export class ClassCancellationController {
 
       // Buscar turmas afetadas
       let affectedClasses: any[] = [];
-      if (scope === 'TURMA' && class_id) {
-        const c = await prisma.class.findUnique({
-          where: { id: class_id },
-          include: { enrollments: true, professor: true },
-        });
-        if (c) affectedClasses.push(c);
+      if (scope === 'TURMA') {
+        if (class_id) {
+          const c = await prisma.class.findUnique({
+            where: { id: class_id },
+            include: { enrollments: true, professor: true },
+          });
+          if (c) affectedClasses.push(c);
+        } else if (req.body.subject_name || req.body.subject) {
+          const subj = String(req.body.subject_name || req.body.subject).trim();
+          affectedClasses = await prisma.class.findMany({
+            where: { subject: { contains: subj, mode: 'insensitive' }, active: true },
+            include: { enrollments: true, professor: true },
+          });
+        }
       } else if (scope === 'CURSO' && course_name) {
+        const cName = String(course_name).trim();
         affectedClasses = await prisma.class.findMany({
-          where: { course_name, active: true },
+          where: { course_name: { contains: cName, mode: 'insensitive' }, active: true },
           include: { enrollments: true, professor: true },
         });
       } else {
@@ -444,65 +529,127 @@ export class ClassCancellationController {
         });
       }
 
+      // Filtrar apenas as turmas que realmente lecionam no dia da semana selecionado (quando INSTITUICAO ou CURSO)
+      if (scope === 'INSTITUICAO' || scope === 'CURSO') {
+        affectedClasses = affectedClasses.filter((cls) => isClassScheduledOnDate(cls.week_days, date));
+      }
+
       const createdCancellations = [];
 
-      for (const cls of affectedClasses) {
-        const cancellation = await (prisma as any).classCancellation.upsert({
+      // Sempre garantir que o registro geral institucional/curso exista para a data
+      if (scope === 'INSTITUICAO' || scope === 'CURSO') {
+        const existingGen = await prisma.classCancellation.findFirst({
           where: {
-            class_id_date: {
-              class_id: cls.id,
-              date: targetDate,
-            },
-          },
-          update: {
-            reason_type,
-            description: description ? description.trim() : null,
-            status: 'APROVADO',
-            scope,
-            course_name: cls.course_name,
-            replacement_date: replacementDateObj,
-            created_by_role: 'COORDENADOR',
-          },
-          create: {
-            class_id: cls.id,
-            course_name: cls.course_name,
-            professor_id: cls.professor_id,
             date: targetDate,
-            reason_type,
-            description: description ? description.trim() : null,
-            status: 'APROVADO',
             scope,
-            created_by_role: 'COORDENADOR',
-            replacement_date: replacementDateObj,
+            course_name: scope === 'CURSO' ? course_name : null,
+            class_id: null,
           },
         });
+
+        if (existingGen) {
+          await prisma.classCancellation.update({
+            where: { id: existingGen.id },
+            data: {
+              reason_type,
+              description: description ? description.trim() : null,
+              status: 'APROVADO',
+              replacement_date: replacementDateObj,
+              created_by_role: 'COORDENADOR',
+            },
+          });
+        } else {
+          await prisma.classCancellation.create({
+            data: {
+              date: targetDate,
+              reason_type,
+              description: description ? description.trim() : null,
+              status: 'APROVADO',
+              scope,
+              course_name: scope === 'CURSO' ? course_name : null,
+              class_id: null,
+              created_by_role: 'COORDENADOR',
+              replacement_date: replacementDateObj,
+            },
+          });
+        }
+      }
+
+      for (const cls of affectedClasses) {
+        const existing = await prisma.classCancellation.findFirst({
+          where: {
+            class_id: cls.id,
+            date: targetDate,
+          },
+        });
+
+        let cancellation;
+        if (existing) {
+          cancellation = await prisma.classCancellation.update({
+            where: { id: existing.id },
+            data: {
+              reason_type,
+              description: description ? description.trim() : null,
+              status: 'APROVADO',
+              scope,
+              course_name: cls.course_name,
+              replacement_date: replacementDateObj,
+              created_by_role: 'COORDENADOR',
+            },
+          });
+        } else {
+          cancellation = await prisma.classCancellation.create({
+            data: {
+              class_id: cls.id,
+              course_name: cls.course_name,
+              professor_id: cls.professor_id,
+              date: targetDate,
+              reason_type,
+              description: description ? description.trim() : null,
+              status: 'APROVADO',
+              scope,
+              created_by_role: 'COORDENADOR',
+              replacement_date: replacementDateObj,
+            },
+          });
+        }
         createdCancellations.push(cancellation);
 
         // Gerar Presença Parcial para os alunos da turma
-        const slots = cls.schedule_time.split(',').map((s: string) => s.trim());
-        for (const enrollment of cls.enrollments) {
-          for (const slotStr of slots) {
-            await (prisma.attendance as any).upsert({
+        const rawSchedule = cls.schedule_time || '08:00';
+        const slots = rawSchedule.split(',').map((s: string) => s.trim()).filter(Boolean);
+        const slotsToProcess = slots.length > 0 ? slots : ['08:00'];
+
+        for (const enrollment of (cls.enrollments || [])) {
+          for (const slotStr of slotsToProcess) {
+            const existingAttendance = await prisma.attendance.findFirst({
               where: {
-                student_id_class_id_date_slot_time: {
-                  student_id: enrollment.student_id,
-                  class_id: cls.id,
-                  date: targetDate,
-                  slot_time: slotStr,
-                },
-              },
-              update: {
-                status: 'PRESENCA_PARCIAL',
-              },
-              create: {
                 student_id: enrollment.student_id,
                 class_id: cls.id,
                 date: targetDate,
                 slot_time: slotStr,
-                check_in_time: new Date(),
-                status: 'PRESENCA_PARCIAL',
               },
             });
+
+            if (existingAttendance) {
+              await prisma.attendance.update({
+                where: { id: existingAttendance.id },
+                data: {
+                  status: 'PRESENCA_PARCIAL',
+                },
+              });
+            } else {
+              await prisma.attendance.create({
+                data: {
+                  student_id: enrollment.student_id,
+                  class_id: cls.id,
+                  date: targetDate,
+                  slot_time: slotStr,
+                  check_in_time: new Date(),
+                  status: 'PRESENCA_PARCIAL',
+                },
+              });
+            }
           }
 
           // Notificar Aluno

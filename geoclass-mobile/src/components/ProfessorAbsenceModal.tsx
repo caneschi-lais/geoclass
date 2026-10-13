@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import api from '../services/api';
+import CalendarModal from './CalendarModal';
 
 interface ProfessorAbsenceModalProps {
   visible: boolean;
@@ -19,6 +20,32 @@ interface ProfessorAbsenceModalProps {
   subjectName: string;
   onClose: () => void;
   onSuccess: () => void;
+}
+
+function parseDateStrToDate(str: string): Date {
+  if (!str) return new Date();
+  const parts = str.split('-').map(Number);
+  if (parts.length === 3) {
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+  return new Date();
+}
+
+function formatDateFriendly(dateStr: string): string {
+  if (!dateStr) return '';
+  try {
+    const parts = dateStr.split('-').map(Number);
+    if (parts.length === 3) {
+      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+      const weekDays = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      const weekDay = weekDays[d.getDay()];
+      return `${day}/${month}/${year} (${weekDay})`;
+    }
+  } catch (e) {}
+  return dateStr;
 }
 
 const REASONS = [
@@ -44,6 +71,24 @@ export default function ProfessorAbsenceModal({
   const [fileBase64, setFileBase64] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Modal de Calendário
+  const [calendarVisible, setCalendarVisible] = useState(false);
+  const [calendarTarget, setCalendarTarget] = useState<'DATE' | 'REPLACEMENT'>('DATE');
+
+  const handleSelectCalendarDate = (selectedDate: Date) => {
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(selectedDate.getDate()).padStart(2, '0');
+    const isoString = `${year}-${month}-${day}`;
+
+    if (calendarTarget === 'DATE') {
+      setDate(isoString);
+    } else {
+      setReplacementDate(isoString);
+    }
+    setCalendarVisible(false);
+  };
 
   const resetForm = () => {
     setDate(new Date().toISOString().split('T')[0]);
@@ -133,40 +178,73 @@ export default function ProfessorAbsenceModal({
     }
   };
 
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View className="flex-1 justify-center items-center bg-black/60 p-4">
-        <View className="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-md max-h-[90%] shadow-2xl border border-gray-150 dark:border-slate-700">
-          {/* Header */}
-          <View className="flex-row justify-between items-center pb-3 border-b border-gray-100 dark:border-slate-700">
-            <View className="flex-1 pr-2">
-              <Text className="text-lg font-extrabold text-gray-800 dark:text-slate-100">
-                Informar Ausência
-              </Text>
-              <Text className="text-xs text-sky-600 dark:text-sky-400 font-semibold" numberOfLines={1}>
-                {subjectName}
-              </Text>
-            </View>
-            <TouchableOpacity onPress={onClose} className="p-1 rounded-full bg-gray-100 dark:bg-slate-700">
-              <Feather name="x" size={20} color="#64748b" />
-            </TouchableOpacity>
-          </View>
+  if (!visible) return null;
 
-          <ScrollView showsVerticalScrollIndicator={false} className="mt-4">
-            {/* Data da falta */}
-            <Text className="text-xs font-bold text-gray-600 dark:text-slate-300 uppercase mb-1">
-              Data em que não lecionará (AAAA-MM-DD):
-            </Text>
-            <View className="flex-row items-center bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2.5 mb-4">
-              <Feather name="calendar" size={16} color="#0ea5e9" className="mr-2" />
-              <TextInput
-                value={date}
-                onChangeText={setDate}
-                placeholder="Ex: 2026-10-15"
-                placeholderTextColor="#94a3b8"
-                className="flex-1 text-sm font-semibold text-gray-800 dark:text-slate-100 ml-2"
-              />
+  return (
+    <>
+      <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            padding: 16,
+          }}
+        >
+          <View
+            style={{
+              elevation: 8,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 16,
+            }}
+            className="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-md max-h-[90%] border border-gray-200 dark:border-slate-700"
+          >
+            {/* Header */}
+            <View className="flex-row justify-between items-center pb-3 border-b border-gray-100 dark:border-slate-700">
+              <View className="flex-1 pr-2">
+                <Text className="text-lg font-extrabold text-gray-800 dark:text-slate-100">
+                  Informar Ausência
+                </Text>
+                <Text className="text-xs text-sky-600 dark:text-sky-400 font-semibold" numberOfLines={1}>
+                  {subjectName}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={onClose} className="p-1 rounded-full bg-gray-100 dark:bg-slate-700">
+                <Feather name="x" size={20} color="#64748b" />
+              </TouchableOpacity>
             </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} className="mt-4">
+              {/* Data da falta */}
+              <Text className="text-xs font-bold text-gray-600 dark:text-slate-300 uppercase mb-1">
+                Data em que não lecionará:
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setCalendarTarget('DATE');
+                  setCalendarVisible(true);
+                }}
+                activeOpacity={0.7}
+                className="flex-row items-center justify-between bg-white dark:bg-slate-800 border border-sky-300 dark:border-sky-700 rounded-xl px-3.5 py-3 mb-4"
+              >
+                <View className="flex-row items-center flex-1 pr-2">
+                  <View className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-950/60 items-center justify-center mr-2.5">
+                    <Feather name="calendar" size={16} color="#0ea5e9" />
+                  </View>
+                  <View>
+                    <Text className="text-xs font-bold text-gray-800 dark:text-slate-100">
+                      {formatDateFriendly(date)}
+                    </Text>
+                    <Text className="text-[10px] text-gray-400 dark:text-slate-500">
+                      Toque para alterar no calendário
+                    </Text>
+                  </View>
+                </View>
+                <Feather name="calendar" size={16} color="#0ea5e9" />
+              </TouchableOpacity>
 
             {/* Motivo da Falta */}
             <Text className="text-xs font-bold text-gray-600 dark:text-slate-300 uppercase mb-2">
@@ -237,7 +315,7 @@ export default function ProfessorAbsenceModal({
                 {fileName ? (
                   <View className="flex-row items-center justify-between bg-white dark:bg-slate-800 p-2.5 rounded-lg border border-amber-300 dark:border-amber-700">
                     <View className="flex-row items-center flex-1 mr-2">
-                      <Feather name="file-text" size={16} color="#0ea5e9" className="mr-2" />
+                      <Feather name="file-text" size={16} color="#0ea5e9" style={{ marginRight: 8 }} />
                       <Text
                         className="text-xs font-semibold text-gray-800 dark:text-slate-200 ml-1.5"
                         numberOfLines={1}
@@ -276,15 +354,38 @@ export default function ProfessorAbsenceModal({
             <Text className="text-xs font-bold text-gray-600 dark:text-slate-300 uppercase mb-1">
               Data Sugerida para Reposição (Opcional):
             </Text>
-            <View className="flex-row items-center bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2.5 mb-6">
-              <Feather name="clock" size={16} color="#64748b" className="mr-2" />
-              <TextInput
-                value={replacementDate}
-                onChangeText={setReplacementDate}
-                placeholder="Ex: 2026-10-22 (Pode definir depois)"
-                placeholderTextColor="#94a3b8"
-                className="flex-1 text-sm font-semibold text-gray-800 dark:text-slate-100 ml-2"
-              />
+            <View className="flex-row items-center mb-6">
+              <TouchableOpacity
+                onPress={() => {
+                  setCalendarTarget('REPLACEMENT');
+                  setCalendarVisible(true);
+                }}
+                activeOpacity={0.7}
+                className="flex-1 flex-row items-center justify-between bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-3"
+              >
+                <View className="flex-row items-center flex-1 pr-2">
+                  <View className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-slate-700 items-center justify-center mr-2.5">
+                    <Feather name="clock" size={16} color="#64748b" />
+                  </View>
+                  <View>
+                    <Text className={`text-xs ${replacementDate ? 'font-bold text-gray-800 dark:text-slate-100' : 'text-gray-400 dark:text-slate-400'}`}>
+                      {replacementDate ? formatDateFriendly(replacementDate) : 'Nenhuma data de reposição definida'}
+                    </Text>
+                    <Text className="text-[10px] text-gray-400 dark:text-slate-500">
+                      {replacementDate ? `Formato: ${replacementDate}` : 'Pode definir depois ou tocar para selecionar'}
+                    </Text>
+                  </View>
+                </View>
+                <Feather name="calendar" size={16} color="#64748b" />
+              </TouchableOpacity>
+              {replacementDate ? (
+                <TouchableOpacity
+                  onPress={() => setReplacementDate('')}
+                  className="ml-2 p-3 bg-gray-100 dark:bg-slate-700 rounded-xl"
+                >
+                  <Feather name="trash-2" size={16} color="#ef4444" />
+                </TouchableOpacity>
+              ) : null}
             </View>
 
             {/* Ações */}
@@ -300,13 +401,21 @@ export default function ProfessorAbsenceModal({
               <TouchableOpacity
                 onPress={handleSubmit}
                 disabled={loading}
-                className="flex-1 bg-sky-500 hover:bg-sky-600 py-3.5 rounded-xl items-center flex-row justify-center shadow-md shadow-sky-500/20"
+                activeOpacity={0.8}
+                style={{
+                  elevation: 2,
+                  shadowColor: '#0ea5e9',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 4,
+                }}
+                className="flex-1 bg-sky-500 active:bg-sky-600 py-3.5 rounded-xl items-center flex-row justify-center"
               >
                 {loading ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
                   <>
-                    <Feather name="send" size={14} color="#fff" className="mr-1.5" />
+                    <Feather name="send" size={14} color="#fff" />
                     <Text className="text-white font-bold text-xs uppercase ml-1.5">Enviar Aviso</Text>
                   </>
                 )}
@@ -316,5 +425,14 @@ export default function ProfessorAbsenceModal({
         </View>
       </View>
     </Modal>
-  );
+
+    {/* Modal de Calendário Interativo */}
+    <CalendarModal
+      visible={calendarVisible}
+      onClose={() => setCalendarVisible(false)}
+      selectedDate={parseDateStrToDate(calendarTarget === 'DATE' ? date : (replacementDate || date))}
+      onSelectDate={handleSelectCalendarDate}
+    />
+  </>
+);
 }

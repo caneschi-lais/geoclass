@@ -351,6 +351,28 @@ export class CoordinatorController {
     }
   }
 
+  // 6b. Obter todas as turmas ativas
+  async getAllActiveClasses(req: AuthRequest, res: Response) {
+    try {
+      const classes = await prisma.class.findMany({
+        where: { active: true },
+        include: {
+          professor: {
+            select: {
+              name: true,
+              email: true
+            }
+          }
+        },
+        orderBy: { subject: 'asc' }
+      });
+      return res.json(classes);
+    } catch (error) {
+      console.error('Erro getAllActiveClasses', error);
+      return res.status(500).json({ error: 'Erro ao buscar turmas ativas' });
+    }
+  }
+
   // 7. Obter todas as turmas (matérias e professores) de um semestre
   async getClassesBySemester(req: AuthRequest, res: Response) {
     const { id: semester } = req.params;

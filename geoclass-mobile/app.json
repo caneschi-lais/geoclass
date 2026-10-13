@@ -16,6 +16,7 @@
     },
     "android": {
       "package": "com.geoclass.app",
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.jpg",
         "backgroundColor": "#000000"

@@ -11,7 +11,7 @@ export default function StudentRiskCard({ item }: Props) {
   const isCritical = percentage < 75;
 
   return (
-    <View className={`bg-white dark:bg-slate-800 rounded-xl p-4 mb-3 shadow-sm border-l-4 ${isCritical ? 'border-l-red-500' : 'border-l-amber-500'} border border-y-gray-100 dark:border-y-slate-700 border-r-gray-100 dark:border-r-slate-700 flex-row justify-between items-center`}>
+    <View className={`bg-white dark:bg-slate-800 rounded-xl p-4 mb-3 shadow-sm border-l-4 ${isCritical ? 'border-l-red-500' : 'border-l-amber-500'} border border-gray-100 dark:border-slate-700 flex-row justify-between items-center`}>
       <View className="flex-1 pr-3">
         <Text className="text-base font-bold text-gray-800 dark:text-slate-100">{item.studentName || item.name}</Text>
         <Text className="text-gray-500 dark:text-slate-400 font-medium text-xs mt-0.5">RA: {item.ra}</Text>

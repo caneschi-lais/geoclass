@@ -56,7 +56,7 @@ export default function PrivacyScreen({ navigation, route }: Props) {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
         <View className="bg-white dark:bg-slate-800 rounded-xl p-5 mb-4 shadow-sm border border-gray-100 dark:border-slate-700">
           <View className="flex-row items-center mb-3">
-            <Feather name="map-pin" size={24} color="#0ea5e9" className="mr-3" />
+            <Feather name="map-pin" size={24} color="#0ea5e9" style={{ marginRight: 12 }} />
             <Text className="text-xl font-bold text-gray-800 dark:text-slate-100 ml-2">Uso da Localização</Text>
           </View>
           <Text className="text-justify text-gray-600 dark:text-slate-300 leading-relaxed mb-4">
@@ -71,7 +71,7 @@ export default function PrivacyScreen({ navigation, route }: Props) {
 
         <View className="bg-white dark:bg-slate-800 rounded-xl p-5 mb-6 shadow-sm border border-gray-100 dark:border-slate-700">
           <View className="flex-row items-center mb-3">
-            <Feather name="trash-2" size={24} color="#10b981" className="mr-3" />
+            <Feather name="trash-2" size={24} color="#10b981" style={{ marginRight: 12 }} />
             <Text className="text-xl font-bold text-gray-800 dark:text-slate-100 ml-2">Exclusão de Dados</Text>
           </View>
           <Text className="text-justify text-gray-600 dark:text-slate-300 leading-relaxed mb-4">

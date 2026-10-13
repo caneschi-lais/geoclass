@@ -112,10 +112,29 @@ export default function ReplacementAttendanceModal({
     return `${day}/${month}/${year}`;
   };
 
+  if (!visible) return null;
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View className="flex-1 justify-center items-center bg-black/60 p-4">
-        <View className="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-lg max-h-[90%] shadow-2xl border border-gray-150 dark:border-slate-700">
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: 'rgba(0, 0, 0, 0.6)',
+          padding: 16,
+        }}
+      >
+        <View
+          style={{
+            elevation: 8,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.15,
+            shadowRadius: 16,
+          }}
+          className="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-lg max-h-[90%] border border-gray-200 dark:border-slate-700"
+        >
           {/* Header */}
           <View className="flex-row justify-between items-center pb-3 border-b border-gray-100 dark:border-slate-700">
             <View>
@@ -266,13 +285,13 @@ export default function ReplacementAttendanceModal({
                 <TouchableOpacity
                   onPress={handleSubmit}
                   disabled={submitting || students.length === 0}
-                  className="flex-1 bg-amber-500 hover:bg-amber-600 py-3.5 rounded-xl items-center flex-row justify-center shadow-md shadow-amber-500/20"
+                  className="flex-1 bg-amber-500 active:bg-amber-600 py-3.5 rounded-xl items-center flex-row justify-center"
                 >
                   {submitting ? (
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
                     <>
-                      <Feather name="check-square" size={14} color="#fff" className="mr-1.5" />
+                      <Feather name="check-square" size={14} color="#fff" style={{ marginRight: 6 }} />
                       <Text className="text-white font-bold text-xs uppercase ml-1.5">Concluir Chamada</Text>
                     </>
                   )}

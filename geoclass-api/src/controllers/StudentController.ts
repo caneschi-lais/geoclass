@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middlewares/authMiddleware';
 import { processExpiredAttendanceSlots } from '../jobs/AbsenceProcessor';
 import { isAcademicInstructionalDay } from '../services/CalendarService';
+import { getScheduleSlotsForDay } from '../utils/scheduleHelper';
 
 const prisma = new PrismaClient();
 
@@ -90,12 +91,15 @@ export class StudentController {
 
         const isCourseCompleted = userCourse?.is_completed || enrollment?.is_completed || false;
 
+        const todaySlots = getScheduleSlotsForDay(c.schedule_time, c.week_days, currentDayName);
+        const formattedTime = todaySlots.length > 0 ? todaySlots.join(', ') : c.schedule_time;
+
         return {
           id: c.id,
           subject: c.subject,
           course_name: c.course_name,
           professor: c.professor.name,
-          time: c.schedule_time,
+          time: formattedTime,
           room: tempLoc ? tempLoc.room_name : c.room_name,
           latitude: tempLoc ? tempLoc.latitude : c.latitude,
           longitude: tempLoc ? tempLoc.longitude : c.longitude,

@@ -191,7 +191,7 @@ export default function CreateRoomForm({
           </TouchableOpacity>
 
           {assignClass && (
-            <View className="bg-gray-50 dark:bg-slate-900/40 p-3 rounded-lg border border-gray-150 dark:border-slate-800 mb-4">
+            <View className="bg-gray-50 dark:bg-slate-900/40 p-3 rounded-lg border border-gray-200 dark:border-slate-800 mb-4">
               <Text className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Nome da Matéria</Text>
               <TextInput
                 className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-3 mb-3 text-gray-800 dark:text-slate-100"

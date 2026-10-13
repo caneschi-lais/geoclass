@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { isAcademicInstructionalDay } from '../services/CalendarService';
+import { getScheduleSlotsForDay } from '../utils/scheduleHelper';
 
 const prisma = new PrismaClient();
 
@@ -103,8 +104,8 @@ export async function processExpiredAttendanceSlots(currentDate: Date = new Date
 
       if (cancellationToday) continue;
 
-      // 3. Processar cada slot (ex: "19:00, 19:50" ou "08:00")
-      const slots = cls.schedule_time.split(',').map((s) => s.trim());
+      // 3. Processar cada slot relativo ao dia atual (ex: 19:00, 19:50 na terça e 20:50, 21:40 na quarta)
+      const slots = getScheduleSlotsForDay(cls.schedule_time, cls.week_days, currentDayName);
 
       for (const slotStr of slots) {
         const [schedHours, schedMinutes] = slotStr.split(':').map(Number);

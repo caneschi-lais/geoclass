@@ -58,7 +58,7 @@ export default function HoldButton({
       onPressOut={handlePressOut}
       onPress={handleClick}
       style={style}
-      className={`${className || ''} ${holding ? 'opacity-70 scale-95' : ''}`}
+      className={`${className || ''} ${holding ? 'opacity-70' : ''}`}
       {...props}
     >
       {children}

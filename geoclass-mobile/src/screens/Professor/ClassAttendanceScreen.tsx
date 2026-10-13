@@ -263,17 +263,17 @@ export default function ClassAttendanceScreen({ route, navigation }: Props) {
         <TouchableOpacity
           onPress={handleSaveAttendance}
           disabled={saving}
-          className={`py-3 px-4 rounded-xl mb-3 flex-row items-center justify-center shadow-md ${
+          className={`py-3 px-4 rounded-xl mb-3 flex-row items-center justify-center ${
             hasChanges
-              ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/30'
-              : 'bg-sky-500 hover:bg-sky-600 shadow-sky-500/20'
+              ? 'bg-emerald-600 active:bg-emerald-700'
+              : 'bg-sky-500 active:bg-sky-600'
           }`}
         >
           {saving ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
             <>
-              <Feather name={hasChanges ? 'save' : 'check'} size={16} color="#fff" className="mr-2" />
+              <Feather name={hasChanges ? 'save' : 'check'} size={16} color="#fff" style={{ marginRight: 8 }} />
               <Text className="text-white font-extrabold text-xs uppercase ml-1.5">
                 {hasChanges ? 'Salvar Alterações da Chamada' : 'Confirmar Presenças da Data'}
               </Text>

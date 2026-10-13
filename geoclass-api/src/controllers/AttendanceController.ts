@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middlewares/authMiddleware';
 import { isAcademicInstructionalDay } from '../services/CalendarService';
+import { getScheduleSlotsForDay } from '../utils/scheduleHelper';
 import crypto from 'crypto';
 
 const prisma = new PrismaClient();
@@ -65,8 +66,10 @@ export class AttendanceController {
         }
       }
 
-      // 1.5 Validação de Janela de Horário Estrita por Slots (Suporta múltiplos horários separados por vírgula)
-      const slots = classData.schedule_time.split(',').map((s) => s.trim());
+      // 1.5 Validação de Janela de Horário Estrita por Slots (Suporta múltiplos horários e separação por dia)
+      const daysOfWeekMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+      const currentDayName = daysOfWeekMap[checkInDate.getDay()];
+      const slots = getScheduleSlotsForDay(classData.schedule_time, classData.week_days, currentDayName);
       let activeSlot: string | null = null;
       let expiredSlot: string | null = null;
       let expiredEndTime: Date | null = null;

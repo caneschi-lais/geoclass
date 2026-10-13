@@ -30,8 +30,23 @@ export default function NotificationsModal({ visible, notifications, onClose, on
 
   return (
     <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
-      <View className="flex-1 justify-end bg-black/55">
-        <View className="bg-white dark:bg-slate-800 rounded-t-3xl p-6 min-h-[50%] max-h-[85%] shadow-2xl">
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'flex-end',
+          backgroundColor: 'rgba(0, 0, 0, 0.55)',
+        }}
+      >
+        <View
+          style={{
+            elevation: 8,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: -3 },
+            shadowOpacity: 0.15,
+            shadowRadius: 12,
+          }}
+          className="bg-white dark:bg-slate-800 rounded-t-3xl p-6 min-h-[50%] max-h-[85%]"
+        >
           {/* Header */}
           <View className="flex-row justify-between items-center mb-5">
             <View className="flex-row items-center gap-2">
@@ -39,7 +54,7 @@ export default function NotificationsModal({ visible, notifications, onClose, on
               <Text className="text-xl font-extrabold text-gray-800 dark:text-slate-100">Notificações</Text>
             </View>
             <TouchableOpacity onPress={onClose} className="p-2 bg-gray-100 dark:bg-slate-700 rounded-full">
-              <Feather name="x" size={18} color="#64748b" className="dark:text-slate-300" />
+              <Feather name="x" size={18} color="#64748b" />
             </TouchableOpacity>
           </View>
 
@@ -83,7 +98,7 @@ export default function NotificationsModal({ visible, notifications, onClose, on
                   className={`p-4 rounded-2xl mb-2.5 flex-row gap-3 border ${
                     item.read
                       ? 'bg-gray-50/50 dark:bg-slate-900/30 border-gray-100 dark:border-slate-800/60'
-                      : 'bg-white dark:bg-slate-900 border-sky-100 dark:border-sky-950/50 shadow-sm shadow-sky-500/5'
+                      : 'bg-white dark:bg-slate-900 border-sky-100 dark:border-sky-950/50'
                   }`}
                 >
                   {/* Status Indicator */}
@@ -119,6 +134,14 @@ export default function NotificationsModal({ visible, notifications, onClose, on
                     <Text className="text-xs text-gray-500 dark:text-slate-400 mt-1 font-medium leading-relaxed">
                       {item.body}
                     </Text>
+                    {item.body?.toLowerCase().includes('atestado') && (
+                      <View className="mt-2.5 pt-2 border-t border-gray-100 dark:border-slate-800 flex-row items-center">
+                        <Feather name="file-text" size={12} color="#0ea5e9" style={{ marginRight: 6 }} />
+                        <Text className="text-[11px] text-sky-600 dark:text-sky-400 font-bold flex-1">
+                          Acesse o botão "Atestados" na tela Minhas Turmas para enviar seu atestado.
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 </TouchableOpacity>
               )}

@@ -17,7 +17,7 @@ export default function ExportModal({ visible, onClose, onExport, showDetailsOpt
 
   return (
     <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
-      <View className="flex-1 justify-end bg-black/50">
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
         <View className="bg-white dark:bg-slate-800 rounded-t-3xl p-6">
           <View className="flex-row justify-between items-center mb-6">
             <Text className="text-xl font-bold text-gray-800 dark:text-slate-100">{title}</Text>
@@ -43,12 +43,12 @@ export default function ExportModal({ visible, onClose, onExport, showDetailsOpt
 
           <Text className="text-sm font-bold text-gray-500 dark:text-slate-400 mb-3 uppercase tracking-wider">Escolha o formato</Text>
           
-          <View className="flex-row space-x-4 mb-4">
+          <View className="flex-row gap-4 mb-4">
             <TouchableOpacity 
               className="flex-1 bg-red-50 p-4 rounded-xl items-center border border-red-100"
               onPress={() => onExport('pdf', includeDetails)}
             >
-              <Feather name="file-text" size={32} color="#ef4444" className="mb-2" />
+              <Feather name="file-text" size={32} color="#ef4444" style={{ marginBottom: 8 }} />
               <Text className="text-red-600 font-bold mt-2">Documento PDF</Text>
             </TouchableOpacity>
 
@@ -56,7 +56,7 @@ export default function ExportModal({ visible, onClose, onExport, showDetailsOpt
               className="flex-1 bg-emerald-50 p-4 rounded-xl items-center border border-emerald-100"
               onPress={() => onExport('excel', includeDetails)}
             >
-              <Feather name="file" size={32} color="#10b981" className="mb-2" />
+              <Feather name="file" size={32} color="#10b981" style={{ marginBottom: 8 }} />
               <Text className="text-emerald-600 font-bold mt-2">Planilha Excel</Text>
             </TouchableOpacity>
           </View>

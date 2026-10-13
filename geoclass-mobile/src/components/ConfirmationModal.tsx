@@ -69,8 +69,25 @@ export default function ConfirmationModal({
       visible={visible}
       onRequestClose={onCancel}
     >
-      <View className="flex-1 justify-center items-center bg-black/60 px-5">
-        <View className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-sm shadow-xl border border-gray-100 dark:border-slate-700 items-center">
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: 'rgba(0, 0, 0, 0.6)',
+          paddingHorizontal: 20,
+        }}
+      >
+        <View
+          style={{
+            elevation: 6,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 3 },
+            shadowOpacity: 0.15,
+            shadowRadius: 12,
+          }}
+          className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-sm border border-gray-100 dark:border-slate-700 items-center"
+        >
           
           <View className={`p-3 rounded-full mb-4 ${variant.iconBg}`}>
             <Feather name={variant.iconName} size={28} color={variant.iconColor} />

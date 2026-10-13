@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+import * as Device from 'expo-device';
 import { getToken } from './authStorage';
 
 // Determinar a URL da API (Local em desenvolvimento ou Render em produção)
@@ -11,15 +13,31 @@ const getBaseUrl = () => {
     if (Platform.OS === 'web') {
       return 'http://localhost:3000/api';
     }
-    if (Platform.OS === 'android') {
-      return 'http://10.0.2.2:3000/api';
+
+    // No Expo Go, hostUri contém o IP da máquina na rede local (ex: 192.168.15.104:8081)
+    const hostUri =
+      Constants.expoConfig?.hostUri ||
+      (Constants as any).manifest2?.extra?.expoGo?.debuggerHost ||
+      (Constants as any).manifest?.debuggerHost;
+    const hostIp = hostUri ? hostUri.split(':')[0] : null;
+
+    if (hostIp) {
+      return `http://${hostIp}:3000/api`;
     }
-    return 'http://localhost:3000/api';
+
+    if (Platform.OS === 'android') {
+      if (!Device.isDevice) {
+        return 'http://10.0.2.2:3000/api';
+      }
+      return 'http://192.168.15.104:3000/api';
+    }
+    return 'http://192.168.15.104:3000/api';
   }
   return 'https://geoclass-backend.onrender.com/api';
 };
 
 const API_BASE_URL = getBaseUrl();
+console.log('🌐 [API BASE URL]:', API_BASE_URL);
 
 const api = axios.create({
   baseURL: API_BASE_URL,

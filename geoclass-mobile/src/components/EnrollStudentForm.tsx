@@ -306,7 +306,7 @@ export default function EnrollStudentForm({ isOpen, onToggle, classes, onSuccess
             </View>
 
             {/* Campo de Busca no Modal */}
-            <View className="bg-gray-50 dark:bg-slate-900 border border-gray-250 dark:border-slate-700 rounded-lg p-2.5 mb-3 flex-row items-center">
+            <View className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg p-2.5 mb-3 flex-row items-center">
               <Feather name="search" size={18} color="#94a3b8" style={{ marginRight: 8 }} />
               <TextInput
                 className="flex-1 text-gray-800 dark:text-slate-100"
@@ -409,7 +409,7 @@ export default function EnrollStudentForm({ isOpen, onToggle, classes, onSuccess
             </View>
 
             {/* Campo de Busca no Modal de Matéria */}
-            <View className="bg-gray-50 dark:bg-slate-900 border border-gray-250 dark:border-slate-700 rounded-lg p-2.5 mb-3 flex-row items-center">
+            <View className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg p-2.5 mb-3 flex-row items-center">
               <Feather name="search" size={18} color="#94a3b8" style={{ marginRight: 8 }} />
               <TextInput
                 className="flex-1 text-gray-800 dark:text-slate-100"

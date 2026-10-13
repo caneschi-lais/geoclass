@@ -223,11 +223,11 @@ async function main() {
     {
       subject: 'Ética',
       schedule_time: '19:00, 19:50',
-      week_days: 'terca',
+      week_days: 'quarta',
       course_name: 'Análise e Desenvolvimento de Sistemas',
       room_name: 'Mini 1',
       professorEmail: 'lucas.prof@fatec.com',
-      total_classes: 38, // 19 terças x 2 aulas
+      total_classes: 38, // 19 quartas x 2 aulas
     },
     {
       subject: 'Redes de computadores',

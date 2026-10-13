@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { processExpiredAttendanceSlots, isClassScheduledToday } from './AbsenceProcessor';
 import { isAcademicInstructionalDay } from '../services/CalendarService';
+import { getScheduleSlotsForDay } from '../utils/scheduleHelper';
 
 const prisma = new PrismaClient();
 
@@ -79,7 +80,9 @@ export async function notificationJob() {
         continue;
       }
 
-      const slots = cls.schedule_time.split(',').map((s) => s.trim());
+      const daysOfWeekMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+      const currentDayName = daysOfWeekMap[now.getDay()];
+      const slots = getScheduleSlotsForDay(cls.schedule_time, cls.week_days, currentDayName);
 
       // 1. Aluno (Lembrete de Início de Aula)
       for (const slotStr of slots) {

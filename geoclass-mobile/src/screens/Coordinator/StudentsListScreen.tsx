@@ -18,7 +18,7 @@ type Props = {
 };
 
 export default function StudentsListScreen({ navigation, route }: Props) {
-  const { semesterId } = route.params;
+  const semesterId = route?.params?.semesterId || '';
   const {
     students,
     riskStudents,
