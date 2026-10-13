@@ -278,14 +278,14 @@ export default function EnrollStudentForm({ isOpen, onToggle, classes, onSuccess
             flex: 1,
             justifyContent: 'flex-end',
             backgroundColor: 'rgba(0,0,0,0.5)',
-            ...(Platform.OS === 'web' ? { height: '100vh', width: '100vw', position: 'fixed', inset: 0, zIndex: 9999 } : {})
+            ...(Platform.OS === 'web' ? ({ height: '100vh', width: '100vw', position: 'fixed', inset: 0, zIndex: 9999 } as any) : {})
           }}
         >
           <View 
             className="bg-white dark:bg-slate-800 rounded-t-3xl p-6"
             style={{ 
-              height: Platform.OS === 'web' ? '75vh' : '75%', 
-              maxHeight: Platform.OS === 'web' ? '75vh' : '85%',
+              height: Platform.OS === 'web' ? ('75vh' as any) : '75%', 
+              maxHeight: Platform.OS === 'web' ? ('75vh' as any) : '85%',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden'
@@ -381,14 +381,14 @@ export default function EnrollStudentForm({ isOpen, onToggle, classes, onSuccess
             flex: 1,
             justifyContent: 'flex-end',
             backgroundColor: 'rgba(0,0,0,0.5)',
-            ...(Platform.OS === 'web' ? { height: '100vh', width: '100vw', position: 'fixed', inset: 0, zIndex: 9999 } : {})
+            ...(Platform.OS === 'web' ? ({ height: '100vh', width: '100vw', position: 'fixed', inset: 0, zIndex: 9999 } as any) : {})
           }}
         >
           <View 
             className="bg-white dark:bg-slate-800 rounded-t-3xl p-6"
             style={{ 
-              height: Platform.OS === 'web' ? '75vh' : '75%', 
-              maxHeight: Platform.OS === 'web' ? '75vh' : '85%',
+              height: Platform.OS === 'web' ? ('75vh' as any) : '75%', 
+              maxHeight: Platform.OS === 'web' ? ('75vh' as any) : '85%',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden'

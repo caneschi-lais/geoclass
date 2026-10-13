@@ -7,6 +7,7 @@ export interface AuthRequest extends Request {
   user?: {
     id: string;
     role: string;
+    name?: string;
   };
 }
 
@@ -20,7 +21,7 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
   const [, token] = authHeader.split(' ');
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: string; role: string };
+    const decoded = jwt.verify(token, JWT_SECRET) as { id: string; role: string; name?: string };
     req.user = decoded;
     return next();
   } catch (err) {

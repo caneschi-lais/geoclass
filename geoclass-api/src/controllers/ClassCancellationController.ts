@@ -167,7 +167,10 @@ export class ClassCancellationController {
 
       const reasonLabel = REASON_LABELS[reason_type] || reason_type;
       const formattedDate = formatDateDisplay(targetDate);
-      const professorName = req.user?.name || 'Professor';
+      const professor = professorId
+        ? await prisma.user.findUnique({ where: { id: professorId }, select: { name: true } })
+        : null;
+      const professorName = professor?.name || req.user?.name || 'Professor';
 
       for (const coord of coordinators) {
         await prisma.notification.create({
@@ -397,7 +400,7 @@ export class ClassCancellationController {
     try {
       const cancellation = await (prisma as any).classCancellation.findUnique({
         where: { id },
-        include: { class: true },
+        include: { class: true, professor: { select: { name: true } } },
       });
 
       if (!cancellation) {
@@ -420,12 +423,13 @@ export class ClassCancellationController {
       });
 
       const formattedDate = formatDateDisplay(cancellation.date);
+      const professorName = cancellation.professor?.name || req.user?.name || 'Professor';
       for (const coord of coordinators) {
         await prisma.notification.create({
           data: {
             user_id: coord.id,
-            title: `Atestado Enviado: ${req.user?.name || 'Professor'}`,
-            body: `O professor enviou o atestado médico referente à aula de ${cancellation.class?.subject} em ${formattedDate}.`,
+            title: `Atestado Enviado: ${professorName}`,
+            body: `O professor ${professorName} enviou o atestado médico referente à aula de ${cancellation.class?.subject} em ${formattedDate}.`,
           },
         });
       }

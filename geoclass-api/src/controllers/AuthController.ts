@@ -32,7 +32,7 @@ export class AuthController {
       }
 
       const token = jwt.sign(
-        { id: user.id, role: user.role },
+        { id: user.id, role: user.role, name: user.name },
         JWT_SECRET,
         { expiresIn: '7d' } // Expira em 7 dias
       );
