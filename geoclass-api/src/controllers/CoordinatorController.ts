@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middlewares/authMiddleware';
 import { getCurrentAcademicSemester, incrementStudentSemester } from '../utils/academicSemester';
+import { getBrazilMidnightDate, getBrazilDateString } from '../utils/dateUtils';
 import prisma from '../prisma';
 
 export class CoordinatorController {
@@ -904,8 +905,7 @@ export class CoordinatorController {
         return res.status(400).json({ error: 'Data deve estar no formato YYYY-MM-DD' });
       }
 
-      const targetDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-      targetDate.setHours(0, 0, 0, 0);
+      const targetDate = getBrazilMidnightDate(date);
 
       const entry = await prisma.academicCalendar.upsert({
         where: { date: targetDate },
@@ -924,7 +924,7 @@ export class CoordinatorController {
         message: 'Dia não-letivo registrado no calendário acadêmico!',
         entry: {
           id: entry.id,
-          date: entry.date.toISOString().split('T')[0],
+          date: getBrazilDateString(entry.date),
           description: entry.description,
           type: entry.type,
         },

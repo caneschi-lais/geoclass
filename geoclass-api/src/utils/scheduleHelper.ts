@@ -4,6 +4,8 @@
  * e divide ou mapeia os slots correspondentes para cada dia.
  */
 
+import { getBrazilDayOfWeek } from './dateUtils';
+
 export function getScheduleSlotsForDay(
   scheduleTime?: string | null,
   weekDays?: string | null,
@@ -13,25 +15,10 @@ export function getScheduleSlotsForDay(
 
   const cleanSchedule = scheduleTime.trim();
 
-  // Obter o dayName se targetDateOrDayName for Date ou string
+  // Obter o dayName se targetDateOrDayName for Date ou string (fuso de Brasília)
   let dayName: string | undefined;
-  if (targetDateOrDayName instanceof Date) {
-    const daysOfWeekMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
-    dayName = daysOfWeekMap[targetDateOrDayName.getDay()];
-  } else if (typeof targetDateOrDayName === 'string') {
-    const trimmed = targetDateOrDayName.trim();
-    if (trimmed.includes('-')) {
-      const parts = trimmed.split('-').map(Number);
-      if (parts.length === 3) {
-        const d = new Date(parts[0], parts[1] - 1, parts[2]);
-        if (!isNaN(d.getTime())) {
-          const daysOfWeekMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
-          dayName = daysOfWeekMap[d.getDay()];
-        }
-      }
-    } else {
-      dayName = trimmed;
-    }
+  if (targetDateOrDayName) {
+    dayName = getBrazilDayOfWeek(targetDateOrDayName);
   }
 
   // 1. Suporte a formato explícito por dia:

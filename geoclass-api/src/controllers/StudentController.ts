@@ -3,6 +3,12 @@ import { AuthRequest } from '../middlewares/authMiddleware';
 import { processExpiredAttendanceSlots } from '../jobs/AbsenceProcessor';
 import { isAcademicInstructionalDay } from '../services/CalendarService';
 import { getScheduleSlotsForDay } from '../utils/scheduleHelper';
+import {
+  getBrazilMidnightDate,
+  getBrazilDayOfWeek,
+  getBrazilDateString,
+  evaluateSlotTime,
+} from '../utils/dateUtils';
 import prisma from '../prisma';
 
 export class StudentController {
@@ -15,6 +21,9 @@ export class StudentController {
 
     try {
       const now = new Date();
+      const todayDate = getBrazilMidnightDate(now);
+      const todayStr = getBrazilDateString(now);
+      const currentDayName = getBrazilDayOfWeek(now);
 
       // 0. Se hoje não for dia letivo (feriado, recesso, etc.), nenhuma aula é exibida
       const calendarCheck = await isAcademicInstructionalDay(now);
@@ -22,10 +31,8 @@ export class StudentController {
         return res.json([]);
       }
 
-      // Garantir que slots expirados tenham faltas devidamente registradas
+      // Garantir que slots expirados tenham faltas devidamente registradas e falsos positivos limpos
       await processExpiredAttendanceSlots(now);
-
-      const todayStr = new Date().toISOString().split('T')[0];
 
       const enrollments = await prisma.enrollment.findMany({
         where: { student_id: studentId },
@@ -41,33 +48,89 @@ export class StudentController {
         }
       });
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const daysOfWeekMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
-      const currentDayName = daysOfWeekMap[today.getDay()];
-
       const filteredEnrollments = enrollments.filter((e) => {
         if (!e.class.week_days) return true;
-        const days = e.class.week_days.toLowerCase().split(',').map((d) => d.trim());
-        return days.includes(currentDayName);
+        const normalizedWeekDays = e.class.week_days
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '');
+        const days = normalizedWeekDays.split(',').map((d) => d.trim());
+        return days.some((d) => d.includes(currentDayName) || currentDayName.includes(d));
       });
 
       const aulas = await Promise.all(filteredEnrollments.map(async (e) => {
         const c = e.class;
         const tempLoc = c.temporaryLocs && c.temporaryLocs.length > 0 ? c.temporaryLocs[0] : null;
         
-        const attendanceExists = await prisma.attendance.findFirst({
+        const todaySlots = getScheduleSlotsForDay(c.schedule_time, c.week_days, currentDayName);
+        const formattedTime = todaySlots.length > 0 ? todaySlots.join(', ') : c.schedule_time;
+
+        const allAttendancesToday = await prisma.attendance.findMany({
           where: {
             student_id: studentId,
             class_id: c.id,
-            date: today,
+            date: todayDate,
           },
-          orderBy: { check_in_time: 'desc' }
+          orderBy: { check_in_time: 'asc' }
         });
 
-        const alreadyCheckedIn = attendanceExists?.status === 'PRESENTE' || attendanceExists?.status === 'ATRASADO';
-        const isAbsent = attendanceExists?.status === 'FALTA';
+        // Avaliar status de cada slot hoje no Horário de Brasília
+        let hasActiveSlot = false;
+        let checkedInActiveSlot = false;
+        let anyFutureSlot = false;
+        let allSlotsExpired = todaySlots.length > 0;
+        let anyPresentToday = false;
+        let anyAbsentToday = false;
+
+        for (const slot of todaySlots) {
+          const { isActive, isExpired, isFuture } = evaluateSlotTime(slot, now);
+          const slotAtt = allAttendancesToday.find((a) => a.slot_time === slot);
+          const isSlotPresent = slotAtt ? (slotAtt.status === 'PRESENTE' || slotAtt.status === 'ATRASADO') : false;
+          const isSlotAbsent = slotAtt ? slotAtt.status === 'FALTA' : false;
+
+          if (isSlotPresent) anyPresentToday = true;
+          if (isSlotAbsent) anyAbsentToday = true;
+
+          if (isActive) {
+            hasActiveSlot = true;
+            if (isSlotPresent) checkedInActiveSlot = true;
+          }
+
+          if (isFuture) {
+            anyFutureSlot = true;
+            allSlotsExpired = false;
+          }
+
+          if (!isExpired) {
+            allSlotsExpired = false;
+          }
+        }
+
+        let alreadyCheckedIn = false;
+        let isAbsent = false;
+
+        if (hasActiveSlot) {
+          // Chamada aberta no momento: se já bateu, presença confirmada; se não, libera botão
+          alreadyCheckedIn = checkedInActiveSlot;
+          isAbsent = false;
+        } else if (anyFutureSlot) {
+          // Ainda há chamadas por vir hoje (ex: 18:40 antes das 19:00, ou intervalo entre aulas)
+          // NUNCA trava como falta antes da aula começar
+          alreadyCheckedIn = anyPresentToday;
+          isAbsent = false;
+        } else if (allSlotsExpired) {
+          // Todas as aulas do dia já terminaram
+          if (anyPresentToday) {
+            alreadyCheckedIn = true;
+            isAbsent = false;
+          } else {
+            alreadyCheckedIn = false;
+            isAbsent = true;
+          }
+        } else {
+          alreadyCheckedIn = anyPresentToday;
+          isAbsent = anyAbsentToday && !anyPresentToday;
+        }
         
         const enrollment = await prisma.enrollment.findUnique({
           where: {
@@ -89,8 +152,7 @@ export class StudentController {
 
         const isCourseCompleted = userCourse?.is_completed || enrollment?.is_completed || false;
 
-        const todaySlots = getScheduleSlotsForDay(c.schedule_time, c.week_days, currentDayName);
-        const formattedTime = todaySlots.length > 0 ? todaySlots.join(', ') : c.schedule_time;
+        const lastAttendance = allAttendancesToday.length > 0 ? allAttendancesToday[allAttendancesToday.length - 1] : null;
 
         return {
           id: c.id,
@@ -104,7 +166,7 @@ export class StudentController {
           radiusMeters: c.radius_meters,
           alreadyCheckedIn,
           isAbsent,
-          attendanceStatus: attendanceExists?.status || null,
+          attendanceStatus: lastAttendance?.status || null,
           isCourseCompleted
         };
       }));

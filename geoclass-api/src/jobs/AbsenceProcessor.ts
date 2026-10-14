@@ -1,11 +1,18 @@
 import { isAcademicInstructionalDay } from '../services/CalendarService';
 import { getScheduleSlotsForDay } from '../utils/scheduleHelper';
+import {
+  getBrazilMidnightDate,
+  getBrazilDayOfWeek,
+  getBrazilDateString,
+  getBrazilParts,
+  evaluateSlotTime,
+  createBrazilDate,
+} from '../utils/dateUtils';
 import prisma from '../prisma';
 
 export function isClassScheduledToday(weekDays?: string | null, date: Date = new Date()): boolean {
   if (!weekDays || weekDays.trim() === '') return true;
-  const daysOfWeekMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
-  const dayName = daysOfWeekMap[date.getDay()];
+  const dayName = getBrazilDayOfWeek(date);
 
   const normalizedWeekDays = weekDays
     .toLowerCase()
@@ -22,17 +29,16 @@ export function isClassScheduledToday(weekDays?: string | null, date: Date = new
  * insere automaticamente um registro de FALTA no banco de dados e notifica o aluno.
  */
 export async function processExpiredAttendanceSlots(currentDate: Date = new Date()): Promise<void> {
-  const todayDate = new Date(currentDate);
-  todayDate.setHours(0, 0, 0, 0);
-
-  const daysOfWeekMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
-  const currentDayName = daysOfWeekMap[currentDate.getDay()];
+  const todayDate = getBrazilMidnightDate(currentDate);
+  const currentDayName = getBrazilDayOfWeek(currentDate);
+  const brazilParts = getBrazilParts(currentDate);
+  const todayStr = getBrazilDateString(currentDate);
 
   try {
     // 0. Validar se hoje é um dia letivo no Calendário Acadêmico
     const calendarCheck = await isAcademicInstructionalDay(currentDate);
     if (!calendarCheck.isInstructional) {
-      console.log(`[ABSENCE] Hoje (${todayDate.toISOString().split('T')[0]}) não é dia letivo: ${calendarCheck.reason}. Faltas suspensas.`);
+      console.log(`[ABSENCE] Hoje (${todayStr}) não é dia letivo: ${calendarCheck.reason}. Faltas suspensas.`);
       return;
     }
 
@@ -105,18 +111,42 @@ export async function processExpiredAttendanceSlots(currentDate: Date = new Date
       // 3. Processar cada slot relativo ao dia atual (ex: 19:00, 19:50 na terça e 20:50, 21:40 na quarta)
       const slots = getScheduleSlotsForDay(cls.schedule_time, cls.week_days, currentDayName);
 
+      // Auto-remediação: se existirem faltas automáticas gravadas prematuramente para slots que ainda NÃO expiraram hoje, remove
+      for (const slotStr of slots) {
+        const { isExpired } = evaluateSlotTime(slotStr, currentDate);
+        if (!isExpired) {
+          try {
+            await prisma.attendance.deleteMany({
+              where: {
+                class_id: cls.id,
+                date: todayDate,
+                slot_time: slotStr,
+                status: 'FALTA',
+                manual_attendance: false,
+              },
+            });
+          } catch (cleanErr) {
+            // Ignora se não houver registros
+          }
+        }
+      }
+
       for (const slotStr of slots) {
         const [schedHours, schedMinutes] = slotStr.split(':').map(Number);
         if (isNaN(schedHours) || isNaN(schedMinutes)) continue;
 
-        const slotStartTime = new Date(currentDate);
-        slotStartTime.setHours(schedHours, schedMinutes, 0, 0);
+        const { isExpired } = evaluateSlotTime(slotStr, currentDate);
 
-        const slotEndTime = new Date(slotStartTime);
-        slotEndTime.setMinutes(slotStartTime.getMinutes() + 15); // Limite de tolerância de 15 minutos
+        // A tolerância de 15 minutos já passou hoje no Horário de Brasília?
+        if (isExpired) {
+          const slotEndTime = createBrazilDate(
+            brazilParts.year,
+            brazilParts.month,
+            brazilParts.day,
+            schedHours,
+            schedMinutes + 15
+          );
 
-        // A tolerância de 15 minutos já passou hoje?
-        if (currentDate >= slotEndTime) {
           for (const enrollment of cls.enrollments) {
             const student = enrollment.student;
 

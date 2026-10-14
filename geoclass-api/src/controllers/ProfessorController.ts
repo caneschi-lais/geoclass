@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middlewares/authMiddleware';
 import { getScheduleSlotsForDay } from '../utils/scheduleHelper';
+import { getBrazilDateString, getBrazilMidnightDate } from '../utils/dateUtils';
 import { sendPushNotification } from '../services/pushNotificationService';
 import prisma from '../prisma';
 
@@ -26,7 +27,7 @@ export class ProfessorController {
     const professorId = req.user?.id;
 
     try {
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = getBrazilDateString(new Date());
       
       const classes = await prisma.class.findMany({
         where: { professor_id: professorId },
@@ -62,21 +63,7 @@ export class ProfessorController {
     const classId = req.params.id;
     const { date, status } = req.query as { date?: string; status?: string };
 
-    let targetDate: Date;
-    if (date && typeof date === 'string') {
-      const parts = date.split('-');
-      if (parts.length === 3) {
-        const year = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10);
-        const day = parseInt(parts[2], 10);
-        targetDate = new Date(year, month - 1, day);
-      } else {
-        targetDate = new Date();
-      }
-    } else {
-      targetDate = new Date();
-    }
-    targetDate.setHours(0, 0, 0, 0);
+    const targetDate = getBrazilMidnightDate(date);
 
     try {
       const classData = await prisma.class.findUnique({
@@ -369,16 +356,7 @@ export class ProfessorController {
       return res.status(400).json({ error: 'Dados de chamada inválidos' });
     }
 
-    let targetDate = new Date();
-    if (date) {
-      const parts = String(date).split('-').map(Number);
-      if (parts.length === 3) {
-        targetDate = new Date(parts[0], parts[1] - 1, parts[2]);
-      } else {
-        targetDate = new Date(date);
-      }
-    }
-    targetDate.setHours(0, 0, 0, 0);
+    const targetDate = getBrazilMidnightDate(date);
 
     try {
       const classInfo = await prisma.class.findUnique({
@@ -509,16 +487,7 @@ export class ProfessorController {
           where: { id: attendanceId }
         });
       } else {
-        let targetDate = new Date();
-        if (date) {
-          const parts = String(date).split('-').map(Number);
-          if (parts.length === 3) {
-            targetDate = new Date(parts[0], parts[1] - 1, parts[2]);
-          } else {
-            targetDate = new Date(date);
-          }
-        }
-        targetDate.setHours(0, 0, 0, 0);
+        const targetDate = getBrazilMidnightDate(date);
 
         attendance = await prisma.attendance.findFirst({
           where: {

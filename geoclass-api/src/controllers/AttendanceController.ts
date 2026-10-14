@@ -2,6 +2,13 @@ import { Response } from 'express';
 import { AuthRequest } from '../middlewares/authMiddleware';
 import { isAcademicInstructionalDay } from '../services/CalendarService';
 import { getScheduleSlotsForDay } from '../utils/scheduleHelper';
+import {
+  getBrazilMidnightDate,
+  getBrazilDayOfWeek,
+  getBrazilDateString,
+  getBrazilParts,
+  createBrazilDate,
+} from '../utils/dateUtils';
 import crypto from 'crypto';
 import prisma from '../prisma';
 const OFFLINE_SECRET = process.env.OFFLINE_SECRET || 'geoclass_offline_secret_key_2026';
@@ -32,10 +39,11 @@ export class AttendanceController {
     }
 
     try {
-      // Determinar o momento do registro de presença
+      // Determinar o momento do registro de presença no Horário de Brasília
       const checkInTime = timestamp ? new Date(timestamp) : new Date();
-      const checkInDate = new Date(checkInTime);
-      checkInDate.setHours(0, 0, 0, 0);
+      const checkInDate = getBrazilMidnightDate(checkInTime);
+      const currentDayName = getBrazilDayOfWeek(checkInTime);
+      const brazilParts = getBrazilParts(checkInTime);
 
       // 0. Validação de Calendário Acadêmico (Feriados, Recessos, etc.)
       const calendarCheck = await isAcademicInstructionalDay(checkInTime);
@@ -64,23 +72,31 @@ export class AttendanceController {
         }
       }
 
-      // 1.5 Validação de Janela de Horário Estrita por Slots (Suporta múltiplos horários e separação por dia)
-      const daysOfWeekMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
-      const currentDayName = daysOfWeekMap[checkInDate.getDay()];
+      // 1.5 Validação de Janela de Horário Estrita por Slots (Horário de Brasília)
       const slots = getScheduleSlotsForDay(classData.schedule_time, classData.week_days, currentDayName);
       let activeSlot: string | null = null;
       let expiredSlot: string | null = null;
       let expiredEndTime: Date | null = null;
+      let nextUpcomingSlot: string | null = null;
 
       for (const slotStr of slots) {
         const [schedHours, schedMinutes] = slotStr.split(':').map(Number);
         if (isNaN(schedHours) || isNaN(schedMinutes)) continue;
 
-        const startTime = new Date(checkInTime);
-        startTime.setHours(schedHours, schedMinutes, 0, 0);
-
-        const endTime = new Date(startTime);
-        endTime.setMinutes(startTime.getMinutes() + 15); // Tolerância de 15 minutos
+        const startTime = createBrazilDate(
+          brazilParts.year,
+          brazilParts.month,
+          brazilParts.day,
+          schedHours,
+          schedMinutes
+        );
+        const endTime = createBrazilDate(
+          brazilParts.year,
+          brazilParts.month,
+          brazilParts.day,
+          schedHours,
+          schedMinutes + 15 // Tolerância estrita de 15 minutos
+        );
 
         if (checkInTime >= startTime && checkInTime <= endTime) {
           activeSlot = slotStr;
@@ -88,10 +104,19 @@ export class AttendanceController {
         } else if (checkInTime > endTime) {
           expiredSlot = slotStr;
           expiredEndTime = endTime;
+        } else if (checkInTime < startTime && !nextUpcomingSlot) {
+          nextUpcomingSlot = slotStr;
         }
       }
 
       if (!activeSlot) {
+        // Se a chamada da aula ainda não abriu hoje
+        if (nextUpcomingSlot && !expiredSlot) {
+          return res.status(403).json({
+            error: `A chamada ainda não abriu. A próxima chamada abre às ${nextUpcomingSlot} e encerra em 15 minutos (tolerância). Horários da disciplina: ${slots.join(', ')}.`
+          });
+        }
+
         // Se já passou do horário de tolerância de 15 minutos, registra a ausência (falta) no banco
         if (expiredSlot) {
           const existingExpiredAttendance = await prisma.attendance.findFirst({
@@ -126,6 +151,12 @@ export class AttendanceController {
             });
           }
 
+          if (nextUpcomingSlot) {
+            return res.status(403).json({
+              error: `A tolerância de 15 minutos para o horário das ${expiredSlot} expirou. A próxima chamada abre às ${nextUpcomingSlot}.`
+            });
+          }
+
           return res.status(403).json({ 
             error: `A tolerância de 15 minutos para o horário das ${expiredSlot} expirou. Sua ausência (falta) foi registrada no sistema.` 
           });
@@ -147,10 +178,9 @@ export class AttendanceController {
       });
 
       if (existingSlotAttendance) {
-        if (existingSlotAttendance.status === 'FALTA') {
-          return res.status(400).json({ error: `Você já possui falta registrada para o horário das ${activeSlot} hoje.` });
+        if (existingSlotAttendance.status === 'PRESENTE' || existingSlotAttendance.status === 'ATRASADO') {
+          return res.status(400).json({ error: `Você já registrou presença para o horário das ${activeSlot} hoje.` });
         }
-        return res.status(400).json({ error: `Você já registrou presença para o horário das ${activeSlot} hoje.` });
       }
 
       // 2. Verificar se o aluno está matriculado nesta turma
@@ -206,7 +236,7 @@ export class AttendanceController {
 
       // 3. Validação de Localização (Haversine)
       // Checa se há uma troca de sala para a data informada
-      const checkInDateStr = checkInTime.toISOString().split('T')[0];
+      const checkInDateStr = getBrazilDateString(checkInTime);
       const tempRoom = await prisma.temporaryClassLocation.findUnique({
         where: { class_id_date: { class_id: classId, date: checkInDateStr } }
       });
@@ -238,20 +268,36 @@ export class AttendanceController {
         }
       }
 
-      // 5. Registrar no Banco de Dados
-      const attendance = await prisma.attendance.create({
-        data: {
-          student_id: studentId,
-          class_id: classId,
-          date: checkInDate,
-          slot_time: activeSlot,
-          check_in_time: checkInTime,
-          device_id: deviceId,
-          status: 'PRESENTE',
-          student_latitude: lat,
-          student_longitude: lon
-        }
-      });
+      // 5. Registrar no Banco de Dados (cria novo ou atualiza falta automática gerada prematuramente)
+      let attendance;
+      if (existingSlotAttendance) {
+        attendance = await prisma.attendance.update({
+          where: { id: existingSlotAttendance.id },
+          data: {
+            check_in_time: checkInTime,
+            device_id: deviceId,
+            status: 'PRESENTE',
+            student_latitude: lat,
+            student_longitude: lon,
+            manual_attendance: false,
+            is_remote: false,
+          }
+        });
+      } else {
+        attendance = await prisma.attendance.create({
+          data: {
+            student_id: studentId,
+            class_id: classId,
+            date: checkInDate,
+            slot_time: activeSlot,
+            check_in_time: checkInTime,
+            device_id: deviceId,
+            status: 'PRESENTE',
+            student_latitude: lat,
+            student_longitude: lon
+          }
+        });
+      }
 
       // Notificar o aluno sobre a confirmação da presença
       const formattedDate = checkInDate.toLocaleDateString('pt-BR');

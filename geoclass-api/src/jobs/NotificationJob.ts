@@ -1,29 +1,33 @@
 import { processExpiredAttendanceSlots, isClassScheduledToday } from './AbsenceProcessor';
 import { isAcademicInstructionalDay } from '../services/CalendarService';
 import { getScheduleSlotsForDay } from '../utils/scheduleHelper';
+import {
+  getBrazilMidnightDate,
+  getBrazilDayOfWeek,
+  getBrazilParts,
+} from '../utils/dateUtils';
 import { sendPushNotification } from '../services/pushNotificationService';
 import prisma from '../prisma';
 
 // Auxiliar para adicionar 15 minutos a uma string "HH:MM"
 function add15Minutes(timeStr: string): string {
   const [h, m] = timeStr.split(':').map(Number);
-  const date = new Date();
-  date.setHours(h, m + 15, 0, 0);
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${hours}:${minutes}`;
+  const totalMin = (h * 60 + m + 15) % (24 * 60);
+  const nh = Math.floor(totalMin / 60);
+  const nm = totalMin % 60;
+  return `${String(nh).padStart(2, '0')}:${String(nm).padStart(2, '0')}`;
 }
 
 export async function notificationJob() {
   const now = new Date();
-  const todayDate = new Date();
-  todayDate.setHours(0, 0, 0, 0);
+  const todayDate = getBrazilMidnightDate(now);
+  const brazilParts = getBrazilParts(now);
 
-  const currentHours = String(now.getHours()).padStart(2, '0');
-  const currentMinutes = String(now.getMinutes()).padStart(2, '0');
+  const currentHours = String(brazilParts.hour).padStart(2, '0');
+  const currentMinutes = String(brazilParts.minute).padStart(2, '0');
   const currentTimeStr = `${currentHours}:${currentMinutes}`;
 
-  console.log(`[NOTIFICATION JOB] Iniciando execução às ${currentTimeStr}`);
+  console.log(`[NOTIFICATION JOB] Iniciando execução às ${currentTimeStr} (Horário de Brasília)`);
 
   try {
     // 0. Processar fechamento de faltas para horários cuja tolerância de 15 minutos já expirou hoje
@@ -79,8 +83,7 @@ export async function notificationJob() {
         continue;
       }
 
-      const daysOfWeekMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
-      const currentDayName = daysOfWeekMap[now.getDay()];
+      const currentDayName = getBrazilDayOfWeek(now);
       const slots = getScheduleSlotsForDay(cls.schedule_time, cls.week_days, currentDayName);
 
       // 1. Aluno (Lembrete de Início de Aula)

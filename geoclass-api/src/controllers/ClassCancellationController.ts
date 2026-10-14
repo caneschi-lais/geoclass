@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middlewares/authMiddleware';
 import { sendPushNotification } from '../services/pushNotificationService';
+import { getBrazilMidnightDate, getBrazilDayOfWeek } from '../utils/dateUtils';
 import fs from 'fs';
 import path from 'path';
 import prisma from '../prisma';
@@ -16,8 +17,7 @@ const REASON_LABELS: Record<string, string> = {
 };
 
 function parseDateOnly(dateStr: string): Date {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+  return getBrazilMidnightDate(dateStr);
 }
 
 function formatDateDisplay(d: Date | string): string {
@@ -31,19 +31,7 @@ function formatDateDisplay(d: Date | string): string {
 function isClassScheduledOnDate(weekDays?: string | null, dateInput?: Date | string): boolean {
   if (!weekDays || weekDays.trim() === '') return true;
 
-  let dayIndex: number;
-  if (typeof dateInput === 'string') {
-    const [year, month, day] = dateInput.split('-').map(Number);
-    const d = new Date(year, month - 1, day, 12, 0, 0);
-    dayIndex = d.getDay();
-  } else if (dateInput instanceof Date) {
-    dayIndex = dateInput.getUTCDay();
-  } else {
-    dayIndex = new Date().getDay();
-  }
-
-  const daysOfWeekMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
-  const dayName = daysOfWeekMap[dayIndex];
+  const dayName = getBrazilDayOfWeek(dateInput);
 
   const normalizedWeekDays = weekDays
     .toLowerCase()

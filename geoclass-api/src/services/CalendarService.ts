@@ -1,4 +1,5 @@
 import prisma from '../prisma';
+import { getBrazilMidnightDate, getBrazilDayOfWeek } from '../utils/dateUtils';
 
 export interface CalendarCheckResult {
   isInstructional: boolean;
@@ -16,8 +17,8 @@ export interface CalendarCheckResult {
 export async function isAcademicInstructionalDay(
   targetDate: Date = new Date()
 ): Promise<CalendarCheckResult> {
-  // 1. Domingo nunca é dia letivo
-  if (targetDate.getDay() === 0) {
+  // 1. Domingo nunca é dia letivo (no fuso de Brasília)
+  if (getBrazilDayOfWeek(targetDate) === 'domingo') {
     return {
       isInstructional: false,
       reason: 'Domingo (Sem aulas regulares)',
@@ -25,8 +26,7 @@ export async function isAcademicInstructionalDay(
     };
   }
 
-  const dateOnly = new Date(targetDate);
-  dateOnly.setHours(0, 0, 0, 0);
+  const dateOnly = getBrazilMidnightDate(targetDate);
 
   // 2. Verificar se a data possui bloqueio explícito no calendário acadêmico
   const calendarEntry = await prisma.academicCalendar.findUnique({
@@ -48,10 +48,9 @@ export async function isAcademicInstructionalDay(
 
   if (semesters.length > 0) {
     const isWithinAnySemester = semesters.some((sem) => {
-      const start = new Date(sem.start_date);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(sem.end_date);
-      end.setHours(23, 59, 59, 999);
+      const start = getBrazilMidnightDate(sem.start_date);
+      const end = getBrazilMidnightDate(sem.end_date);
+      end.setUTCHours(23, 59, 59, 999);
       return dateOnly >= start && dateOnly <= end;
     });
 
