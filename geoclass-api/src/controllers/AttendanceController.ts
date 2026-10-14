@@ -1,11 +1,9 @@
 import { Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middlewares/authMiddleware';
 import { isAcademicInstructionalDay } from '../services/CalendarService';
 import { getScheduleSlotsForDay } from '../utils/scheduleHelper';
 import crypto from 'crypto';
-
-const prisma = new PrismaClient();
+import prisma from '../prisma';
 const OFFLINE_SECRET = process.env.OFFLINE_SECRET || 'geoclass_offline_secret_key_2026';
 
 // Função utilitária: Fórmula de Haversine para calcular distância em metros

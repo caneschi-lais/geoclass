@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-
-const prisma = new PrismaClient();
+import prisma from '../src/prisma';
 
 async function main() {
   console.log('🌱 Iniciando o povoamento do Banco de Dados com os dados oficiais (2026.2)...');
@@ -214,7 +212,7 @@ async function main() {
     {
       subject: 'Inglês 6',
       schedule_time: '20:50, 21:40',
-      week_days: 'terca',
+      week_days: 'quarta',
       course_name: 'Análise e Desenvolvimento de Sistemas',
       room_name: 'Mini 1',
       professorEmail: 'lucas.prof@fatec.com',

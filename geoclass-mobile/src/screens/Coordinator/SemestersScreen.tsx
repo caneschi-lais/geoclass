@@ -13,11 +13,13 @@ import ConfirmationModal from '../../components/ConfirmationModal';
 import HoldButton from '../../components/HoldButton';
 import AcademicCalendarModal from '../../components/AcademicCalendarModal';
 import CoordinatorAbsenceRequestsModal from '../../components/CoordinatorAbsenceRequestsModal';
+import ReplacementAttendanceModal from '../../components/ReplacementAttendanceModal';
 
 type SemesterData = {
   id: string;
   name: string;
   absencePercentage: number;
+  attendancePercentage?: number;
 };
 
 type Props = {
@@ -46,35 +48,39 @@ export default function SemestersScreen({ navigation }: Props) {
   const [calendarModalVisible, setCalendarModalVisible] = useState(false);
   const [absenceRequestsModalVisible, setAbsenceRequestsModalVisible] = useState(false);
   const [absenceModalTab, setAbsenceModalTab] = useState<'REQUESTS' | 'DIRECT'>('REQUESTS');
+  const [replacementModalVisible, setReplacementModalVisible] = useState(false);
 
   const handleLogout = async () => {
     await deleteToken();
     navigation.replace('Login');
   };
 
-  const renderItem = ({ item }: { item: SemesterData }) => (
-    <TouchableOpacity
-      className="bg-white dark:bg-slate-800 p-4 rounded-xl mb-3 shadow-sm flex-row items-center justify-between border border-gray-100 dark:border-slate-700"
-      onPress={() => navigation.navigate('StudentsList', { semesterId: item.id })}
-    >
-      <View className="flex-row items-center">
-        <View className="bg-sky-100 p-3 rounded-full mr-4">
-          <Feather name="calendar" size={24} color="#0ea5e9" />
+  const renderItem = ({ item }: { item: SemesterData }) => {
+    const presence = item.attendancePercentage ?? Math.max(0, 100 - item.absencePercentage);
+    return (
+      <TouchableOpacity
+        className="bg-white dark:bg-slate-800 p-4 rounded-xl mb-3 shadow-sm flex-row items-center justify-between border border-gray-100 dark:border-slate-700"
+        onPress={() => navigation.navigate('StudentsList', { semesterId: item.id })}
+      >
+        <View className="flex-row items-center">
+          <View className="bg-sky-100 p-3 rounded-full mr-4">
+            <Feather name="calendar" size={24} color="#0ea5e9" />
+          </View>
+          <View>
+            <Text className="text-lg font-bold text-gray-800 dark:text-slate-100">Semestre {item.name}</Text>
+            <Text className="text-gray-500 dark:text-slate-400 mt-1">Clique para ver</Text>
+          </View>
         </View>
-        <View>
-          <Text className="text-lg font-bold text-gray-800 dark:text-slate-100">Semestre {item.name}</Text>
-          <Text className="text-gray-500 dark:text-slate-400 mt-1">Clique para ver</Text>
-        </View>
-      </View>
 
-      <View className="items-end">
-        <Text className="text-xs text-gray-400 mb-1">Faltas Geral</Text>
-        <Text className={`text-lg font-black ${item.absencePercentage >= 25 ? 'text-red-500' : 'text-emerald-500'}`}>
-          {item.absencePercentage}%
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+        <View className="items-end">
+          <Text className="text-xs text-gray-400 mb-1">Presença Geral</Text>
+          <Text className={`text-lg font-black ${presence < 75 ? 'text-red-500' : 'text-emerald-500'}`}>
+            {presence}%
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   if (loading) return <LoadingOverlay message="Carregando semestres..." />;
 
@@ -150,7 +156,7 @@ export default function SemestersScreen({ navigation }: Props) {
             />
 
             {/* Ações da Coordenação (Posicionados acima de Semestres Ativos) */}
-            <View className="flex-row gap-2 mb-5">
+            <View className="flex-row gap-2 mb-2">
               <TouchableOpacity
                 className="flex-1 flex-row items-center justify-center bg-amber-100 dark:bg-amber-950/40 py-2.5 px-2 rounded-xl border border-amber-300 dark:border-amber-800/50"
                 onPress={() => {
@@ -159,7 +165,7 @@ export default function SemestersScreen({ navigation }: Props) {
                 }}
               >
                 <Feather name="alert-triangle" size={14} color="#d97706" />
-                <Text className="text-amber-800 dark:text-amber-300 font-bold ml-1.5 text-xs">Faltas & Aulas</Text>
+                <Text numberOfLines={1} className="text-amber-800 dark:text-amber-300 font-bold ml-1.5 text-xs">Faltas & Aulas</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -170,15 +176,25 @@ export default function SemestersScreen({ navigation }: Props) {
                 }}
               >
                 <Feather name="slash" size={14} color="#e11d48" />
-                <Text className="text-rose-800 dark:text-rose-300 font-bold ml-1.5 text-xs">Suspender Aulas</Text>
+                <Text numberOfLines={1} className="text-rose-800 dark:text-rose-300 font-bold ml-1.5 text-xs">Suspender Aulas</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View className="flex-row gap-2 mb-5">
+              <TouchableOpacity
+                className="flex-1 flex-row items-center justify-center bg-sky-100 dark:bg-sky-950/40 py-2.5 px-2 rounded-xl border border-sky-300 dark:border-sky-800/50"
+                onPress={() => setReplacementModalVisible(true)}
+              >
+                <Feather name="check-square" size={14} color="#0284c7" />
+                <Text numberOfLines={1} className="text-sky-800 dark:text-sky-300 font-bold ml-1.5 text-xs">Reposições de Aulas</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                className="flex-row items-center justify-center bg-gray-200 dark:bg-slate-700 py-2.5 px-3 rounded-xl border border-gray-300 dark:border-slate-600"
+                className="flex-1 flex-row items-center justify-center bg-gray-200 dark:bg-slate-700 py-2.5 px-2 rounded-xl border border-gray-300 dark:border-slate-600"
                 onPress={() => setExportModalVisible(true)}
               >
                 <Feather name="download" size={14} color="#475569" />
-                <Text className="text-slate-700 dark:text-slate-200 font-bold ml-1.5 text-xs">Exportar</Text>
+                <Text numberOfLines={1} className="text-slate-700 dark:text-slate-200 font-bold ml-1.5 text-xs">Exportar Relatórios</Text>
               </TouchableOpacity>
             </View>
 
@@ -194,6 +210,13 @@ export default function SemestersScreen({ navigation }: Props) {
         visible={absenceRequestsModalVisible}
         initialTab={absenceModalTab}
         onClose={() => setAbsenceRequestsModalVisible(false)}
+        onSuccess={loadSemesters}
+      />
+
+      <ReplacementAttendanceModal
+        visible={replacementModalVisible}
+        userRole="COORDENADOR"
+        onClose={() => setReplacementModalVisible(false)}
         onSuccess={loadSemesters}
       />
 

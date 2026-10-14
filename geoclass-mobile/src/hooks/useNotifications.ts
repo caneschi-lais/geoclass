@@ -2,11 +2,17 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../services/api';
 import { Notification } from '../types';
 import { getToken } from '../services/authStorage';
+import {
+  registerForPushNotificationsAsync,
+  triggerLocalNotification,
+} from '../services/pushNotificationService';
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
   const isMounted = useRef(true);
+  const seenIds = useRef<Set<string>>(new Set());
+  const initialFetchDone = useRef(false);
 
   const fetchNotifications = useCallback(async (silent = false) => {
     const token = await getToken();
@@ -15,8 +21,25 @@ export function useNotifications() {
     if (!silent) setLoading(true);
     try {
       const response = await api.get<Notification[]>('/notificacoes');
+      const data = response.data || [];
+
       if (isMounted.current) {
-        setNotifications(response.data);
+        setNotifications(data);
+
+        // Se for uma atualização subsequente (polling), verificar se há novas notificações não lidas
+        if (initialFetchDone.current) {
+          data.forEach((notif) => {
+            if (!notif.read && !seenIds.current.has(notif.id)) {
+              // Disparar popup / banner nativo fora ou no topo do app
+              triggerLocalNotification(notif.title, notif.body, { id: notif.id });
+              seenIds.current.add(notif.id);
+            }
+          });
+        } else {
+          // Na primeira busca, apenas registrar os IDs existentes
+          data.forEach((notif) => seenIds.current.add(notif.id));
+          initialFetchDone.current = true;
+        }
       }
     } catch (error: any) {
       if (!silent) {
@@ -33,7 +56,7 @@ export function useNotifications() {
       if (!token) return;
 
       await api.put('/notificacoes/ler', { id });
-      
+
       // Atualiza o estado localmente sem precisar de uma nova requisição
       setNotifications((prev) =>
         prev.map((n) => {
@@ -49,14 +72,18 @@ export function useNotifications() {
     }
   }, []);
 
-  // Busca inicial e polling de 20 segundos para manter atualizado em tempo real
+  // Busca inicial, registro de push token e polling de 15 segundos para avisos em tempo real
   useEffect(() => {
     isMounted.current = true;
+
+    // Registrar o aparelho para receber push notifications no celular
+    registerForPushNotificationsAsync();
+
     fetchNotifications();
 
     const interval = setInterval(() => {
       fetchNotifications(true);
-    }, 20000);
+    }, 15000);
 
     return () => {
       isMounted.current = false;

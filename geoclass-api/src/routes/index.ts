@@ -83,5 +83,6 @@ router.put('/coordenador/reposicao/:id/agendar', cancellationController.schedule
 // --- Rotas de Notificações ---
 router.get('/notificacoes', notificationController.getNotifications);
 router.put('/notificacoes/ler', notificationController.markAsRead);
+router.post('/notificacoes/salvar-push-token', notificationController.savePushToken);
 
 export default router;

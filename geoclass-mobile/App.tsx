@@ -6,6 +6,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { StatusBar } from 'expo-status-bar';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { useOfflineQueue } from './src/hooks/useOfflineQueue';
+import { registerForPushNotificationsAsync } from './src/services/pushNotificationService';
 
 export default function App() {
   const { syncQueue } = useOfflineQueue();
@@ -13,6 +14,9 @@ export default function App() {
   useEffect(() => {
     // Tenta sincronizar presenças offline gravadas sempre que o app inicializa
     syncQueue();
+
+    // Inicializa o serviço de notificações móveis (Android e iOS)
+    registerForPushNotificationsAsync();
   }, []);
 
   return (

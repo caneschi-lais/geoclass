@@ -1,0 +1,9 @@
+name = "geoclass-api"
+main = "src/worker.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "geoclass"
+database_id = "46059ad7-7c4e-4e32-8ffd-583b6dc4ee34"

@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '../src/prisma';
 
 async function main() {
   console.log('🧹 Limpando dados do banco de dados (preservando a tabela Room)...');

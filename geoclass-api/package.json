@@ -6,14 +6,16 @@
   "scripts": {
     "start": "node dist/server.js",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
+    "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:clean": "ts-node prisma/clean.ts",
     "db:seed": "prisma db seed"
   },
   "dependencies": {
-    "@prisma/client": "^5.0.0",
+    "@prisma/adapter-d1": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
@@ -26,11 +28,12 @@
     "@types/cors": "^2.8.13",
     "@types/express": "^4.17.17",
     "@types/jsonwebtoken": "^9.0.2",
-    "@types/node": "^20.4.5",
+    "@types/node": "^20.19.43",
     "@types/node-cron": "^3.0.8",
-    "prisma": "^5.0.0",
+    "prisma": "^7.10.0",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.1.6"
+    "typescript": "^5.1.6",
+    "wrangler": "^4.151.0"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

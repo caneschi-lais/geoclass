@@ -10,10 +10,13 @@ import {
   Alert,
   Platform,
   FlatList,
+  Image,
+  Linking,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import api from '../services/api';
 import CalendarModal from './CalendarModal';
+import ScheduleReplacementModal from './ScheduleReplacementModal';
 
 interface CoordinatorAbsenceRequestsModalProps {
   visible: boolean;
@@ -65,6 +68,18 @@ const REASONS = [
   { key: 'OUTROS', label: 'Outros motivos institucionais' },
 ];
 
+const REASON_LABELS: Record<string, string> = {
+  SAUDE: 'Problemas de saúde',
+  PESSOAL: 'Problemas pessoais',
+  ACADEMICO: 'Compromisso acadêmico',
+  TRANSPORTE: 'Dificuldade de transporte',
+  MANUTENCAO: 'Manutenção na instituição',
+  FERIADO_EXTRA: 'Feriado / Recesso institucional',
+  OUTROS: 'Outros motivos',
+};
+
+type RequestSubFilter = 'PENDENTES' | 'APROVADOS' | 'REPROVADOS' | 'ATESTADOS';
+
 export default function CoordinatorAbsenceRequestsModal({
   visible,
   onClose,
@@ -73,12 +88,20 @@ export default function CoordinatorAbsenceRequestsModal({
 }: CoordinatorAbsenceRequestsModalProps) {
   const [activeTab, setActiveTab] = useState<'REQUESTS' | 'DIRECT'>(initialTab);
   const [requests, setRequests] = useState<any[]>([]);
+  const [requestFilter, setRequestFilter] = useState<RequestSubFilter>('PENDENTES');
+  const [previewCertificateUrl, setPreviewCertificateUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [schedulingCancellation, setSchedulingCancellation] = useState<any | null>(null);
 
   // Formulário de Cancelamento Direto
-  const todayStr = new Date().toISOString().split('T')[0];
-  const [directScope, setDirectScope] = useState<'INSTITUICAO' | 'CURSO' | 'TURMA'>('INSTITUICAO');
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+  const [directScope, setDirectScope] = useState<'INSTITUICAO' | 'CURSO' | 'TURMA'>('TURMA');
   const [directCourseName, setDirectCourseName] = useState('Análise e Desenvolvimento de Sistemas');
   const [directClassName, setDirectClassName] = useState('');
   const [directDate, setDirectDate] = useState(todayStr);
@@ -92,7 +115,6 @@ export default function CoordinatorAbsenceRequestsModal({
   const [loadingClasses, setLoadingClasses] = useState(false);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedClassSubject, setSelectedClassSubject] = useState('');
-  const [classModalVisible, setClassModalVisible] = useState(false);
   const [classSearch, setClassSearch] = useState('');
 
   // Date picker modal
@@ -226,8 +248,9 @@ export default function CoordinatorAbsenceRequestsModal({
       return;
     }
 
-    if (directScope === 'TURMA' && !selectedClassId && !directClassName.trim()) {
-      const msg = 'Por favor, selecione a matéria/turma afetada.';
+    const classIdentifier = selectedClassId || selectedClassSubject.trim() || directClassName.trim();
+    if (directScope === 'TURMA' && !classIdentifier) {
+      const msg = 'Por favor, selecione ou digite a matéria/turma que terá a aula suspensa.';
       if (Platform.OS === 'web') window.alert(msg);
       else Alert.alert('Atenção', msg);
       return;
@@ -235,7 +258,7 @@ export default function CoordinatorAbsenceRequestsModal({
 
     setDirectLoading(true);
     try {
-      await api.post('/coordenador/cancelar-aulas', {
+      const response = await api.post('/coordenador/cancelar-aulas', {
         scope: directScope,
         date: directDate,
         reason_type: directReason,
@@ -246,7 +269,8 @@ export default function CoordinatorAbsenceRequestsModal({
         replacement_date: directReplacementDate || undefined,
       });
 
-      const msg = 'Suspensão de aulas registrada! Professores e alunos notificados com sucesso.';
+      const count = response.data?.count ?? 1;
+      const msg = `Suspensão registrada com sucesso no banco de dados para ${count} matéria(s)! Os alunos matriculados e o professor responsável foram notificados.`;
       if (Platform.OS === 'web') window.alert(msg);
       else Alert.alert('Sucesso', msg);
 
@@ -259,7 +283,7 @@ export default function CoordinatorAbsenceRequestsModal({
       onClose();
     } catch (error: any) {
       console.error('Erro ao registrar suspensão direta:', error);
-      const err = error.response?.data?.error || 'Erro ao registrar cancelamento.';
+      const err = error.response?.data?.error || error.message || 'Erro ao registrar cancelamento.';
       if (Platform.OS === 'web') window.alert(err);
       else Alert.alert('Erro', err);
     } finally {
@@ -278,10 +302,17 @@ export default function CoordinatorAbsenceRequestsModal({
 
   const handleOpenCertificate = (url: string) => {
     const fullUrl = url.startsWith('http') ? url : `${api.defaults.baseURL?.replace('/api', '')}${url}`;
-    if (Platform.OS === 'web') {
-      window.open(fullUrl, '_blank');
+    const isImage = /\.(jpeg|jpg|png|webp)($|\?)/i.test(fullUrl);
+    if (isImage) {
+      setPreviewCertificateUrl(fullUrl);
     } else {
-      Alert.alert('Atestado Anexado', `Arquivo disponível em: ${fullUrl}`);
+      if (Platform.OS === 'web') {
+        window.open(fullUrl, '_blank');
+      } else {
+        Linking.openURL(fullUrl).catch(() => {
+          Alert.alert('Atestado Anexado', `Arquivo disponível em: ${fullUrl}`);
+        });
+      }
     }
   };
 
@@ -366,114 +397,331 @@ export default function CoordinatorAbsenceRequestsModal({
             </TouchableOpacity>
           </View>
 
-          {/* Conteúdo da Aba 1: Solicitações de Falta */}
-          {activeTab === 'REQUESTS' && (
-            <ScrollView showsVerticalScrollIndicator={false} className="max-h-[500px]">
-              {loading ? (
-                <View className="py-12 items-center justify-center">
-                  <ActivityIndicator size="large" color="#0ea5e9" />
-                  <Text className="text-xs text-gray-500 mt-2">Buscando pedidos pendentes...</Text>
+          {/* Conteúdo da Aba 1: Solicitações de Falta com Filtros */}
+          {activeTab === 'REQUESTS' && (() => {
+            const pendingRequests = requests.filter((r) => r.status === 'PENDENTE');
+            const approvedRequests = requests.filter((r) => r.status === 'APROVADO');
+            const rejectedRequests = requests.filter((r) => r.status === 'REJEITADO');
+            const certificateRequests = requests.filter((r) => !!r.certificate_url);
+
+            const displayedRequests = requests.filter((r) => {
+              if (requestFilter === 'PENDENTES') return r.status === 'PENDENTE';
+              if (requestFilter === 'APROVADOS') return r.status === 'APROVADO';
+              if (requestFilter === 'REPROVADOS') return r.status === 'REJEITADO';
+              if (requestFilter === 'ATESTADOS') return !!r.certificate_url;
+              return true;
+            });
+
+            return (
+              <View className="flex-1">
+                {/* Filtros da Aba de Pedidos: Pendentes, Aprovados, Recusados, Atestados */}
+                <View className="flex-row gap-1.5 mb-3">
+                  <TouchableOpacity
+                    onPress={() => setRequestFilter('PENDENTES')}
+                    className={`flex-1 py-1.5 px-1 rounded-xl items-center border ${
+                      requestFilter === 'PENDENTES'
+                        ? 'bg-amber-500 border-amber-600'
+                        : 'bg-gray-100 dark:bg-slate-800 border-gray-200 dark:border-slate-700'
+                    }`}
+                  >
+                    <Text
+                      numberOfLines={1}
+                      className={`text-[10px] font-bold ${
+                        requestFilter === 'PENDENTES' ? 'text-white' : 'text-gray-600 dark:text-slate-300'
+                      }`}
+                    >
+                      Pendentes ({pendingRequests.length})
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setRequestFilter('APROVADOS')}
+                    className={`flex-1 py-1.5 px-1 rounded-xl items-center border ${
+                      requestFilter === 'APROVADOS'
+                        ? 'bg-emerald-600 border-emerald-700'
+                        : 'bg-gray-100 dark:bg-slate-800 border-gray-200 dark:border-slate-700'
+                    }`}
+                  >
+                    <Text
+                      numberOfLines={1}
+                      className={`text-[10px] font-bold ${
+                        requestFilter === 'APROVADOS' ? 'text-white' : 'text-gray-600 dark:text-slate-300'
+                      }`}
+                    >
+                      Aprovados ({approvedRequests.length})
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setRequestFilter('REPROVADOS')}
+                    className={`flex-1 py-1.5 px-1 rounded-xl items-center border ${
+                      requestFilter === 'REPROVADOS'
+                        ? 'bg-rose-600 border-rose-700'
+                        : 'bg-gray-100 dark:bg-slate-800 border-gray-200 dark:border-slate-700'
+                    }`}
+                  >
+                    <Text
+                      numberOfLines={1}
+                      className={`text-[10px] font-bold ${
+                        requestFilter === 'REPROVADOS' ? 'text-white' : 'text-gray-600 dark:text-slate-300'
+                      }`}
+                    >
+                      Recusados ({rejectedRequests.length})
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setRequestFilter('ATESTADOS')}
+                    className={`flex-1 py-1.5 px-1 rounded-xl items-center border ${
+                      requestFilter === 'ATESTADOS'
+                        ? 'bg-sky-500 border-sky-600'
+                        : 'bg-gray-100 dark:bg-slate-800 border-gray-200 dark:border-slate-700'
+                    }`}
+                  >
+                    <Text
+                      numberOfLines={1}
+                      className={`text-[10px] font-bold ${
+                        requestFilter === 'ATESTADOS' ? 'text-white' : 'text-gray-600 dark:text-slate-300'
+                      }`}
+                    >
+                      Atestados ({certificateRequests.length})
+                    </Text>
+                  </TouchableOpacity>
                 </View>
-              ) : requests.length === 0 ? (
-                <View className="py-12 items-center justify-center">
-                  <Feather name="check-circle" size={40} color="#10b981" />
-                  <Text className="text-base font-bold text-gray-800 dark:text-slate-200 mt-3">
-                    Nenhuma solicitação pendente!
-                  </Text>
-                  <Text className="text-xs text-gray-500 text-center mt-1">
-                    Não há pedidos de ausência de professores aguardando aprovação.
-                  </Text>
-                </View>
-              ) : (
-                <View className="gap-3">
-                  {requests.map((req) => {
-                    const isProcessing = processingId === req.id;
-                    return (
-                      <View
-                        key={req.id}
-                        className="p-4 rounded-2xl bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700"
-                      >
-                        <View className="flex-row justify-between items-start mb-2">
-                          <View className="flex-1 pr-2">
-                            <Text className="text-sm font-extrabold text-gray-800 dark:text-slate-100">
-                              {req.class?.subject}
-                            </Text>
-                            <Text className="text-xs text-gray-600 dark:text-slate-300 font-semibold mt-0.5">
-                              Prof. {req.professor?.name}
-                            </Text>
-                            <Text className="text-[11px] text-gray-500 mt-0.5">
-                              Data da Falta: <Text className="font-bold text-sky-600">{formatDate(req.date)}</Text>
-                            </Text>
-                          </View>
-                          <View className="bg-amber-100 dark:bg-amber-950/40 px-2 py-0.5 rounded">
-                            <Text className="text-amber-800 dark:text-amber-300 font-bold text-[10px]">
-                              {req.reason_type}
-                            </Text>
-                          </View>
-                        </View>
 
-                        {req.description && (
-                          <Text className="text-xs text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-800 p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 mb-2.5">
-                            "{req.description}"
-                          </Text>
-                        )}
+                <ScrollView showsVerticalScrollIndicator={false} className="max-h-[460px]">
+                  {loading ? (
+                    <View className="py-12 items-center justify-center">
+                      <ActivityIndicator size="large" color="#0ea5e9" />
+                      <Text className="text-xs text-gray-500 mt-2 font-medium">Buscando solicitações...</Text>
+                    </View>
+                  ) : displayedRequests.length === 0 ? (
+                    <View className="py-12 items-center justify-center">
+                      <Feather
+                        name={requestFilter === 'ATESTADOS' ? 'file-text' : 'check-circle'}
+                        size={40}
+                        color={requestFilter === 'ATESTADOS' ? '#0ea5e9' : '#10b981'}
+                      />
+                      <Text className="text-base font-bold text-gray-800 dark:text-slate-200 mt-3 text-center">
+                        {requestFilter === 'PENDENTES'
+                          ? 'Nenhuma solicitação pendente!'
+                          : requestFilter === 'APROVADOS'
+                          ? 'Nenhuma ausência aprovada!'
+                          : requestFilter === 'REPROVADOS'
+                          ? 'Nenhuma ausência recusada!'
+                          : 'Nenhum atestado médico anexado!'}
+                      </Text>
+                      <Text className="text-xs text-gray-500 text-center mt-1 px-4 leading-relaxed">
+                        {requestFilter === 'PENDENTES'
+                          ? 'Não há pedidos de ausência de professores aguardando aprovação.'
+                          : requestFilter === 'APROVADOS'
+                          ? 'Nenhuma ausência aprovada registrada no momento.'
+                          : requestFilter === 'REPROVADOS'
+                          ? 'Nenhuma ausência recusada registrada.'
+                          : 'Quando um professor anexar um atestado médico, ele aparecerá aqui para visualização.'}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View className="gap-3">
+                      {displayedRequests.map((req, idx) => {
+                        const isProcessing = processingId === req.id;
+                        const isPending = req.status === 'PENDENTE';
+                        const isApproved = req.status === 'APROVADO';
+                        const isRejected = req.status === 'REJEITADO';
+                        const reasonText = REASON_LABELS[req.reason_type] || req.reason_type;
 
-                        {/* Botão para visualizar atestado se houver */}
-                        {req.certificate_url ? (
-                          <TouchableOpacity
-                            onPress={() => handleOpenCertificate(req.certificate_url)}
-                            className="flex-row items-center justify-center bg-sky-50 dark:bg-sky-950/30 border border-sky-300 dark:border-sky-800 p-2 rounded-lg mb-3"
+                        return (
+                          <View
+                            key={`${req.id || idx}-${idx}`}
+                            className={`p-4 rounded-2xl bg-gray-50 dark:bg-slate-900 border ${
+                              isApproved
+                                ? 'border-emerald-300 dark:border-emerald-800/60'
+                                : isRejected
+                                ? 'border-rose-300 dark:border-rose-800/60'
+                                : 'border-amber-300 dark:border-amber-800/60'
+                            }`}
                           >
-                            <Feather name="file-text" size={14} color="#0ea5e9" />
-                            <Text className="text-xs font-bold text-sky-700 dark:text-sky-300 ml-1.5">
-                              Visualizar Atestado Médico Anexado
-                            </Text>
-                          </TouchableOpacity>
-                        ) : req.reason_type === 'SAUDE' ? (
-                          <TouchableOpacity
-                            onPress={() => handleRequestCertificate(req.id)}
-                            disabled={isProcessing}
-                            className="flex-row items-center justify-center bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 p-2 rounded-lg mb-3"
-                          >
-                            <Feather name="bell" size={14} color="#d97706" />
-                            <Text className="text-xs font-bold text-amber-700 dark:text-amber-300 ml-1.5">
-                              Solicitar Atestado ao Professor
-                            </Text>
-                          </TouchableOpacity>
-                        ) : null}
+                            {/* Header do Card */}
+                            <View className="flex-row justify-between items-start mb-2">
+                              <View className="flex-1 pr-2">
+                                <Text className="text-sm font-extrabold text-gray-800 dark:text-slate-100">
+                                  {req.class?.subject || req.course_name || 'Aula'}
+                                </Text>
+                                <Text className="text-xs text-gray-600 dark:text-slate-300 font-semibold mt-0.5">
+                                  Prof. {req.professor?.name || 'Não informado'}
+                                </Text>
+                                <Text className="text-[11px] text-gray-500 mt-0.5">
+                                  Data da Falta: <Text className="font-bold text-sky-600">{formatDate(req.date)}</Text>
+                                </Text>
+                              </View>
 
-                        {/* Ações de Aprovar / Rejeitar */}
-                        <View className="flex-row gap-2 pt-2 border-t border-gray-200 dark:border-slate-800">
-                          <TouchableOpacity
-                            onPress={() => handleReject(req.id)}
-                            disabled={isProcessing}
-                            className="flex-1 bg-red-50 dark:bg-red-950/30 border border-red-200 py-2.5 rounded-xl items-center"
-                          >
-                            <Text className="text-red-600 dark:text-red-400 font-bold text-xs">Recusar</Text>
-                          </TouchableOpacity>
+                              <View className="items-end gap-1">
+                                <View
+                                  className={`px-2 py-0.5 rounded ${
+                                    isApproved
+                                      ? 'bg-emerald-100 dark:bg-emerald-950/40'
+                                      : isRejected
+                                      ? 'bg-rose-100 dark:bg-rose-950/40'
+                                      : 'bg-amber-100 dark:bg-amber-950/40'
+                                  }`}
+                                >
+                                  <Text
+                                    className={`font-bold text-[10px] ${
+                                      isApproved
+                                        ? 'text-emerald-800 dark:text-emerald-300'
+                                        : isRejected
+                                        ? 'text-rose-800 dark:text-rose-300'
+                                        : 'text-amber-800 dark:text-amber-300'
+                                    }`}
+                                  >
+                                    {isApproved ? 'APROVADO' : isRejected ? 'RECUSADO' : 'PENDENTE'}
+                                  </Text>
+                                </View>
 
-                          <TouchableOpacity
-                            onPress={() => handleApprove(req.id)}
-                            disabled={isProcessing}
-                            className="flex-1 bg-emerald-500 active:bg-emerald-600 py-2.5 rounded-xl items-center flex-row justify-center"
-                          >
-                            {isProcessing ? (
-                              <ActivityIndicator size="small" color="#fff" />
-                            ) : (
-                              <>
-                                <Feather name="check" size={14} color="#fff" />
-                                <Text className="text-white font-bold text-xs ml-1">Aprovar Falta</Text>
-                              </>
+                                <View className="bg-gray-200 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                                  <Text className="text-gray-600 dark:text-slate-300 text-[9px] font-medium">
+                                    {reasonText}
+                                  </Text>
+                                </View>
+                              </View>
+                            </View>
+
+                            {req.description && (
+                              <Text className="text-xs text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-800 p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 mb-2.5">
+                                "{req.description}"
+                              </Text>
                             )}
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              )}
-            </ScrollView>
-          )}
+
+                            {/* Botão de Visualização de Atestado se houver */}
+                            {req.certificate_url ? (
+                              <TouchableOpacity
+                                activeOpacity={0.8}
+                                onPress={() => handleOpenCertificate(req.certificate_url)}
+                                className="flex-row items-center justify-between bg-sky-50 dark:bg-sky-950/40 border border-sky-300 dark:border-sky-800 p-2.5 rounded-xl mb-3 shadow-sm"
+                              >
+                                <View className="flex-row items-center flex-1 pr-2">
+                                  <View className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-900/60 items-center justify-center mr-2.5">
+                                    <Feather name="file-text" size={15} color="#0284c7" />
+                                  </View>
+                                  <View className="flex-1">
+                                    <Text className="text-xs font-bold text-sky-900 dark:text-sky-200">
+                                      Atestado Médico Anexado
+                                    </Text>
+                                    <Text className="text-[10px] text-sky-600 dark:text-sky-400">
+                                      Toque para abrir e visualizar o documento
+                                    </Text>
+                                  </View>
+                                </View>
+                                <View className="bg-sky-500 px-2.5 py-1.5 rounded-lg flex-row items-center">
+                                  <Feather name="external-link" size={11} color="#fff" style={{ marginRight: 4 }} />
+                                  <Text className="text-white text-[11px] font-bold">Ver Atestado</Text>
+                                </View>
+                              </TouchableOpacity>
+                            ) : req.reason_type === 'SAUDE' && isPending ? (
+                              <TouchableOpacity
+                                onPress={() => handleRequestCertificate(req.id)}
+                                disabled={isProcessing}
+                                className="flex-row items-center justify-center bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 p-2 rounded-lg mb-3"
+                              >
+                                <Feather name="bell" size={14} color="#d97706" />
+                                <Text className="text-xs font-bold text-amber-700 dark:text-amber-300 ml-1.5">
+                                  Solicitar Atestado ao Professor
+                                </Text>
+                              </TouchableOpacity>
+                            ) : null}
+
+                            {/* Seção da Data de Reposição */}
+                            <View className="bg-sky-50/70 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800/60 p-2.5 rounded-xl mb-3 flex-row items-center justify-between">
+                              <View className="flex-1 pr-2">
+                                <View className="flex-row items-center">
+                                  <Feather
+                                    name={req.replacement_date ? 'calendar' : 'clock'}
+                                    size={12}
+                                    color={req.replacement_date ? '#0284c7' : '#d97706'}
+                                    style={{ marginRight: 4 }}
+                                  />
+                                  <Text
+                                    className={`text-[11px] font-bold ${
+                                      req.replacement_date ? 'text-sky-800 dark:text-sky-300' : 'text-amber-800 dark:text-amber-400'
+                                    }`}
+                                  >
+                                    {req.replacement_date
+                                      ? `Reposição: ${formatDateFriendly(req.replacement_date)}`
+                                      : 'Reposição não agendada'}
+                                  </Text>
+                                </View>
+                              </View>
+                              <TouchableOpacity
+                                onPress={() => setSchedulingCancellation(req)}
+                                className="bg-sky-500 px-2.5 py-1 rounded-lg flex-row items-center"
+                              >
+                                <Feather name="calendar" size={11} color="#fff" />
+                                <Text className="text-white text-[10px] font-bold ml-1">
+                                  {req.replacement_date ? 'Alterar' : 'Agendar'}
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+
+                            {/* Ações de Aprovar / Rejeitar ou Status Concluído */}
+                            {isPending ? (
+                              <View className="flex-row gap-2 pt-2 border-t border-gray-200 dark:border-slate-800">
+                                <TouchableOpacity
+                                  onPress={() => handleReject(req.id)}
+                                  disabled={isProcessing}
+                                  className="flex-1 bg-red-50 dark:bg-red-950/30 border border-red-200 py-2.5 rounded-xl items-center"
+                                >
+                                  <Text className="text-red-600 dark:text-red-400 font-bold text-xs">Recusar</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                  onPress={() => handleApprove(req.id)}
+                                  disabled={isProcessing}
+                                  className="flex-1 bg-emerald-500 active:bg-emerald-600 py-2.5 rounded-xl items-center flex-row justify-center"
+                                >
+                                  {isProcessing ? (
+                                    <ActivityIndicator size="small" color="#fff" />
+                                  ) : (
+                                    <>
+                                      <Feather name="check" size={14} color="#fff" />
+                                      <Text className="text-white font-bold text-xs ml-1">Aprovar Falta</Text>
+                                    </>
+                                  )}
+                                </TouchableOpacity>
+                              </View>
+                            ) : isApproved ? (
+                              <View className="pt-2 border-t border-emerald-200 dark:border-emerald-900/40 flex-row items-center justify-between">
+                                <View className="flex-row items-center">
+                                  <Feather name="check-circle" size={13} color="#10b981" />
+                                  <Text className="text-emerald-700 dark:text-emerald-400 font-bold text-xs ml-1.5">
+                                    Falta Aprovada pela Coordenação
+                                  </Text>
+                                </View>
+                                {req.certificate_url && (
+                                  <View className="bg-sky-100 dark:bg-sky-950/60 px-2 py-0.5 rounded flex-row items-center">
+                                    <Feather name="file-text" size={10} color="#0284c7" />
+                                    <Text className="text-[10px] font-bold text-sky-700 dark:text-sky-300 ml-1">
+                                      Com Atestado
+                                    </Text>
+                                  </View>
+                                )}
+                              </View>
+                            ) : (
+                              <View className="pt-2 border-t border-rose-200 dark:border-rose-900/40 flex-row items-center">
+                                <Feather name="x-circle" size={13} color="#ef4444" />
+                                <Text className="text-rose-700 dark:text-rose-400 font-bold text-xs ml-1.5">
+                                  Solicitação Recusada pela Coordenação
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+                </ScrollView>
+              </View>
+            );
+          })()}
 
           {/* Conteúdo da Aba 2: Cancelamento Direto Institucional */}
           {activeTab === 'DIRECT' && (
@@ -597,63 +845,154 @@ export default function CoordinatorAbsenceRequestsModal({
                     Selecione a Matéria / Turma Afetada:
                   </Text>
                   
-                  <TouchableOpacity
-                    onPress={() => setClassModalVisible(true)}
-                    activeOpacity={0.7}
-                    className="bg-white dark:bg-slate-800 border border-sky-300 dark:border-sky-700 rounded-xl p-3 flex-row items-center justify-between"
-                  >
-                    <View className="flex-row items-center flex-1 pr-2">
-                      <View className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-950/60 items-center justify-center mr-2.5">
-                        <Feather name="layers" size={16} color="#0ea5e9" />
-                      </View>
-                      <View className="flex-1">
-                        {selectedClassSubject ? (
-                          <>
+                  {selectedClassId || selectedClassSubject ? (
+                    <View className="bg-white dark:bg-slate-800 border border-sky-400 dark:border-sky-600 rounded-xl p-3">
+                      <View className="flex-row items-center justify-between mb-2">
+                        <View className="flex-row items-center flex-1 pr-2">
+                          <View className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-950/60 items-center justify-center mr-2.5">
+                            <Feather name="layers" size={16} color="#0ea5e9" />
+                          </View>
+                          <View className="flex-1">
                             <Text className="text-xs font-bold text-gray-800 dark:text-slate-100" numberOfLines={1}>
-                              {selectedClassSubject}
+                              {selectedClassSubject || directClassName}
                             </Text>
-                            {availableClasses.find(c => c.id === selectedClassId)?.professor?.name && (
+                            {availableClasses.find(c => c.id === selectedClassId)?.professor?.name ? (
                               <Text className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">
                                 Prof. {availableClasses.find(c => c.id === selectedClassId)?.professor?.name}
                               </Text>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            <Text className="text-xs font-semibold text-gray-400 dark:text-slate-400">
-                              Selecione uma matéria existente...
-                            </Text>
-                            <Text className="text-[10px] text-sky-600 dark:text-sky-400 mt-0.5">
-                              Toque para abrir a lista de matérias
-                            </Text>
-                          </>
-                        )}
+                            ) : null}
+                          </View>
+                        </View>
+                        <View className="w-5 h-5 rounded-full bg-emerald-500 items-center justify-center">
+                          <Feather name="check" size={12} color="#fff" />
+                        </View>
                       </View>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setSelectedClassId('');
+                          setSelectedClassSubject('');
+                          setDirectClassName('');
+                        }}
+                        className="self-end px-2.5 py-1 rounded bg-gray-100 dark:bg-slate-700 flex-row items-center"
+                      >
+                        <Feather name="edit-2" size={12} color="#0ea5e9" />
+                        <Text className="text-[11px] font-semibold text-sky-600 dark:text-sky-400 ml-1">
+                          Trocar Matéria
+                        </Text>
+                      </TouchableOpacity>
                     </View>
-                    <Feather name="chevron-down" size={18} color="#64748b" />
-                  </TouchableOpacity>
+                  ) : (
+                    <View>
+                      {/* Campo de Busca Rápida */}
+                      <View className="flex-row items-center bg-white dark:bg-slate-800 border border-sky-300 dark:border-sky-700 rounded-xl px-3 py-2 mb-2">
+                        <Feather name="search" size={15} color="#64748b" />
+                        <TextInput
+                          value={classSearch}
+                          onChangeText={setClassSearch}
+                          placeholder="Buscar matéria ou professor..."
+                          placeholderTextColor="#94a3b8"
+                          className="flex-1 text-xs font-semibold text-gray-800 dark:text-slate-100 ml-2"
+                        />
+                        {classSearch ? (
+                          <TouchableOpacity onPress={() => setClassSearch('')}>
+                            <Feather name="x-circle" size={15} color="#94a3b8" />
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
 
-                  {selectedClassId ? (
-                    <TouchableOpacity
-                      onPress={() => {
-                        setSelectedClassId('');
-                        setSelectedClassSubject('');
-                        setDirectClassName('');
-                      }}
-                      className="mt-2 self-start flex-row items-center px-2 py-1 rounded bg-gray-200 dark:bg-slate-700"
-                    >
-                      <Feather name="x" size={12} color="#64748b" />
-                      <Text className="text-[11px] font-semibold text-gray-600 dark:text-slate-300 ml-1">
-                        Limpar seleção
+                      {/* Lista de sugestões / turmas filtradas */}
+                      {loadingClasses ? (
+                        <View className="py-4 items-center justify-center">
+                          <ActivityIndicator size="small" color="#0ea5e9" />
+                          <Text className="text-[11px] text-gray-500 mt-1">Carregando turmas cadastradas...</Text>
+                        </View>
+                      ) : (
+                        <ScrollView
+                          nestedScrollEnabled
+                          style={{ maxHeight: 180 }}
+                          className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-1 mb-2"
+                        >
+                          {filteredClasses.length === 0 ? (
+                            <View className="p-3 items-center">
+                              <Text className="text-[11px] text-gray-500 dark:text-slate-400">
+                                Nenhuma matéria encontrada com esse filtro.
+                              </Text>
+                            </View>
+                          ) : (
+                            filteredClasses.map((item) => (
+                              <TouchableOpacity
+                                key={item.id}
+                                onPress={() => {
+                                  setSelectedClassId(item.id);
+                                  setSelectedClassSubject(item.subject);
+                                  setDirectClassName(item.subject);
+                                  setClassSearch('');
+                                }}
+                                className="p-2.5 rounded-lg border-b border-gray-100 dark:border-slate-700/60 active:bg-sky-50 dark:active:bg-sky-950/30 flex-row items-center justify-between"
+                              >
+                                <View className="flex-1 pr-2">
+                                  <Text className="text-xs font-bold text-gray-800 dark:text-slate-100" numberOfLines={1}>
+                                    {item.subject}
+                                  </Text>
+                                  {item.professor?.name && (
+                                    <Text className="text-[11px] text-gray-500 dark:text-slate-400">
+                                      Prof. {item.professor.name}
+                                    </Text>
+                                  )}
+                                </View>
+                                <Feather name="chevron-right" size={14} color="#94a3b8" />
+                              </TouchableOpacity>
+                            ))
+                          )}
+                        </ScrollView>
+                      )}
+
+                      <Text className="text-[11px] font-semibold text-gray-500 dark:text-slate-400 mb-1">
+                        Ou digite o nome da matéria manualmente:
                       </Text>
-                    </TouchableOpacity>
-                  ) : null}
+                      <TextInput
+                        value={directClassName}
+                        onChangeText={(txt) => {
+                          setDirectClassName(txt);
+                          setSelectedClassSubject(txt);
+                        }}
+                        placeholder="Ex: Banco de Dados..."
+                        placeholderTextColor="#94a3b8"
+                        className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-xs font-semibold text-gray-800 dark:text-slate-100"
+                      />
+                    </View>
+                  )}
                 </View>
               )}
 
-              <Text className="text-xs font-bold text-gray-600 dark:text-slate-300 uppercase mb-1">
-                Data sem aula:
-              </Text>
+              <View className="flex-row items-center justify-between mb-1">
+                <Text className="text-xs font-bold text-gray-600 dark:text-slate-300 uppercase">
+                  Data sem aula:
+                </Text>
+                <View className="flex-row gap-1">
+                  <TouchableOpacity
+                    onPress={() => setDirectDate(todayStr)}
+                    className={`px-2.5 py-1 rounded-md ${
+                      directDate === todayStr ? 'bg-sky-500' : 'bg-gray-200 dark:bg-slate-700'
+                    }`}
+                  >
+                    <Text className={`text-[11px] font-bold ${directDate === todayStr ? 'text-white' : 'text-gray-700 dark:text-slate-300'}`}>
+                      Hoje
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setDirectDate(tomorrowStr)}
+                    className={`px-2.5 py-1 rounded-md ${
+                      directDate === tomorrowStr ? 'bg-sky-500' : 'bg-gray-200 dark:bg-slate-700'
+                    }`}
+                  >
+                    <Text className={`text-[11px] font-bold ${directDate === tomorrowStr ? 'text-white' : 'text-gray-700 dark:text-slate-300'}`}>
+                      Amanhã
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
               <TouchableOpacity
                 onPress={() => {
                   setCalendarTarget('DATE');
@@ -671,7 +1010,7 @@ export default function CoordinatorAbsenceRequestsModal({
                       {formatDateFriendly(directDate)}
                     </Text>
                     <Text className="text-[10px] text-gray-400 dark:text-slate-500">
-                      Toque para alterar no calendário
+                      Toque para abrir calendário ({directDate})
                     </Text>
                   </View>
                 </View>
@@ -787,143 +1126,60 @@ export default function CoordinatorAbsenceRequestsModal({
       </View>
     </Modal>
 
-    {/* Modal Seletor de Matéria / Turma */}
+    {/* Modal de Pré-visualização do Atestado Médico */}
     <Modal
-      visible={classModalVisible}
+      visible={!!previewCertificateUrl}
       transparent
-      animationType="slide"
-      onRequestClose={() => setClassModalVisible(false)}
+      animationType="fade"
+      onRequestClose={() => setPreviewCertificateUrl(null)}
     >
       <View
         style={{
           flex: 1,
+          backgroundColor: 'rgba(0, 0, 0, 0.85)',
           justifyContent: 'center',
           alignItems: 'center',
-          backgroundColor: 'rgba(0, 0, 0, 0.6)',
           padding: 16,
         }}
       >
-        <View
-          style={{
-            elevation: 10,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.2,
-            shadowRadius: 16,
-          }}
-          className="bg-white dark:bg-slate-800 rounded-3xl p-5 w-full max-w-lg max-h-[85%] border border-gray-200 dark:border-slate-700"
-        >
-          {/* Header */}
-          <View className="flex-row justify-between items-center pb-3 border-b border-gray-100 dark:border-slate-700">
-            <View>
-              <Text className="text-base font-extrabold text-gray-800 dark:text-slate-100">
-                Selecionar Matéria / Turma
-              </Text>
-              <Text className="text-xs text-sky-600 dark:text-sky-400 font-semibold">
-                Escolha na lista para evitar erros de digitação
+        <View className="bg-white dark:bg-slate-800 rounded-3xl p-5 w-full max-w-lg items-center border border-gray-200 dark:border-slate-700 shadow-2xl">
+          <View className="flex-row justify-between items-center w-full mb-3 pb-2 border-b border-gray-100 dark:border-slate-700">
+            <View className="flex-row items-center">
+              <Feather name="file-text" size={20} color="#0284c7" />
+              <Text className="text-base font-bold text-gray-800 dark:text-slate-100 ml-2">
+                Atestado Médico Anexado
               </Text>
             </View>
             <TouchableOpacity
-              onPress={() => setClassModalVisible(false)}
-              className="p-1 rounded-full bg-gray-100 dark:bg-slate-700"
+              onPress={() => setPreviewCertificateUrl(null)}
+              className="p-1.5 rounded-full bg-gray-100 dark:bg-slate-700"
             >
-              <Feather name="x" size={20} color="#64748b" />
+              <Feather name="x" size={18} color="#64748b" />
             </TouchableOpacity>
           </View>
 
-          {/* Barra de Pesquisa */}
-          <View className="flex-row items-center bg-gray-100 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 my-3">
-            <Feather name="search" size={16} color="#64748b" />
-            <TextInput
-              value={classSearch}
-              onChangeText={setClassSearch}
-              placeholder="Buscar matéria, professor ou curso..."
-              placeholderTextColor="#94a3b8"
-              className="flex-1 text-xs font-semibold text-gray-800 dark:text-slate-100 ml-2"
+          {previewCertificateUrl ? (
+            <Image
+              source={{ uri: previewCertificateUrl }}
+              style={{ width: '100%', height: 380, borderRadius: 12, resizeMode: 'contain' }}
             />
-            {classSearch ? (
-              <TouchableOpacity onPress={() => setClassSearch('')}>
-                <Feather name="x-circle" size={16} color="#94a3b8" />
-              </TouchableOpacity>
-            ) : null}
-          </View>
+          ) : null}
 
-          {/* Lista de Turmas */}
-          {loadingClasses ? (
-            <View className="py-12 items-center justify-center">
-              <ActivityIndicator size="small" color="#0ea5e9" />
-              <Text className="text-xs text-gray-500 mt-2">Carregando matérias cadastradas...</Text>
-            </View>
-          ) : filteredClasses.length === 0 ? (
-            <View className="py-10 items-center justify-center">
-              <Feather name="alert-circle" size={32} color="#94a3b8" />
-              <Text className="text-xs font-bold text-gray-600 dark:text-slate-300 mt-2">
-                Nenhuma matéria encontrada
-              </Text>
-              <Text className="text-[11px] text-gray-400 text-center mt-1">
-                Verifique o termo pesquisado ou certifique-se de que há turmas ativas cadastradas.
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              data={filteredClasses}
-              keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              renderItem={({ item }) => {
-                const isSelected = selectedClassId === item.id;
-                return (
-                  <TouchableOpacity
-                    onPress={() => {
-                      setSelectedClassId(item.id);
-                      setSelectedClassSubject(item.subject);
-                      setDirectClassName(item.subject);
-                      setClassModalVisible(false);
-                    }}
-                    className={`p-3 rounded-xl border mb-2 flex-row items-center justify-between ${
-                      isSelected
-                        ? 'bg-sky-50 dark:bg-sky-950/40 border-sky-500'
-                        : 'bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-700'
-                    }`}
-                  >
-                    <View className="flex-1 pr-2">
-                      <Text
-                        className={`text-xs font-extrabold ${
-                          isSelected ? 'text-sky-700 dark:text-sky-300' : 'text-gray-800 dark:text-slate-100'
-                        }`}
-                      >
-                        {item.subject}
-                      </Text>
-                      {item.professor?.name && (
-                        <Text className="text-[11px] text-gray-600 dark:text-slate-300 font-semibold mt-0.5">
-                          Prof. {item.professor.name}
-                        </Text>
-                      )}
-                      <View className="flex-row items-center gap-2 mt-1">
-                        {item.course_name && (
-                          <Text className="text-[10px] text-sky-600 dark:text-sky-400 font-medium">
-                            {item.course_name}
-                          </Text>
-                        )}
-                        {item.room_name && (
-                          <Text className="text-[10px] text-gray-400">
-                            • {item.room_name}
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-                    <View
-                      className={`w-5 h-5 rounded-full border items-center justify-center ${
-                        isSelected ? 'border-sky-500 bg-sky-500' : 'border-gray-300 dark:border-slate-600'
-                      }`}
-                    >
-                      {isSelected && <Feather name="check" size={12} color="#fff" />}
-                    </View>
-                  </TouchableOpacity>
-                );
-              }}
-            />
-          )}
+          <TouchableOpacity
+            onPress={() => {
+              if (previewCertificateUrl) {
+                if (Platform.OS === 'web') {
+                  window.open(previewCertificateUrl, '_blank');
+                } else {
+                  Linking.openURL(previewCertificateUrl);
+                }
+              }
+            }}
+            className="mt-4 bg-sky-500 hover:bg-sky-600 active:bg-sky-600 py-3 px-4 rounded-xl flex-row items-center justify-center w-full shadow-sm"
+          >
+            <Feather name="external-link" size={16} color="#fff" />
+            <Text className="text-white font-bold text-xs ml-2">Abrir em Nova Aba / Download</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -934,6 +1190,19 @@ export default function CoordinatorAbsenceRequestsModal({
       onClose={() => setCalendarVisible(false)}
       selectedDate={parseDateStrToDate(calendarTarget === 'DATE' ? directDate : (directReplacementDate || directDate))}
       onSelectDate={handleSelectCalendarDate}
+    />
+
+    {/* Modal de Agendamento de Reposição */}
+    <ScheduleReplacementModal
+      visible={!!schedulingCancellation}
+      cancellation={schedulingCancellation}
+      userRole="COORDENADOR"
+      onClose={() => setSchedulingCancellation(null)}
+      onSuccess={() => {
+        setSchedulingCancellation(null);
+        loadRequests();
+        if (onSuccess) onSuccess();
+      }}
     />
   </>
 );

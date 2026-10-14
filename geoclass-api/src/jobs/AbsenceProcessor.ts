@@ -1,8 +1,6 @@
-import { PrismaClient } from '@prisma/client';
 import { isAcademicInstructionalDay } from '../services/CalendarService';
 import { getScheduleSlotsForDay } from '../utils/scheduleHelper';
-
-const prisma = new PrismaClient();
+import prisma from '../prisma';
 
 export function isClassScheduledToday(weekDays?: string | null, date: Date = new Date()): boolean {
   if (!weekDays || weekDays.trim() === '') return true;

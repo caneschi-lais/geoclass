@@ -1,9 +1,8 @@
-import { PrismaClient } from '@prisma/client';
 import { processExpiredAttendanceSlots, isClassScheduledToday } from './AbsenceProcessor';
 import { isAcademicInstructionalDay } from '../services/CalendarService';
 import { getScheduleSlotsForDay } from '../utils/scheduleHelper';
-
-const prisma = new PrismaClient();
+import { sendPushNotification } from '../services/pushNotificationService';
+import prisma from '../prisma';
 
 // Auxiliar para adicionar 15 minutos a uma string "HH:MM"
 function add15Minutes(timeStr: string): string {
@@ -109,6 +108,12 @@ export async function notificationJob() {
                   title,
                   body: `Sua aula de ${cls.subject} começou às ${slotStr}. Registre sua presença nos próximos 15 minutos para não receber falta!`,
                 },
+              });
+
+              sendPushNotification(student.id, {
+                title,
+                body: `Sua aula de ${cls.subject} começou às ${slotStr}. Registre sua presença nos próximos 15 minutos!`,
+                data: { type: 'LEMBRETE_AULA', classId: cls.id },
               });
             }
           }

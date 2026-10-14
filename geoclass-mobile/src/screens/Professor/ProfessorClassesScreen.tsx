@@ -85,15 +85,15 @@ export default function ProfessorClassesScreen({ navigation }: Props) {
           onPress={() => openChangeRoomModal(item.id, item.time)}
         >
           <Feather name="map" size={14} color="#64748b" />
-          <Text className="text-gray-600 dark:text-slate-300 font-bold ml-1 text-xs">Trocar Sala</Text>
+          <Text numberOfLines={1} className="text-gray-600 dark:text-slate-300 font-bold ml-1 text-xs">Trocar Sala</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          className="flex-1 flex-row items-center justify-center bg-gray-50 dark:bg-slate-900 py-2.5 rounded-lg border border-gray-200 dark:border-slate-700 mr-1.5"
+          className="flex-1 flex-row items-center justify-center bg-sky-50 dark:bg-sky-950/30 py-2.5 rounded-lg border border-sky-200 dark:border-sky-800/60 mr-1.5"
           onPress={() => navigation.navigate('ManualAttendance', { classId: item.id, subjectName: item.subject })}
         >
-          <Feather name="user-check" size={14} color="#0ea5e9" />
-          <Text className="text-sky-600 font-bold ml-1 text-xs">Presença Manual</Text>
+          <Feather name="user-check" size={14} color="#0284c7" />
+          <Text numberOfLines={1} className="text-sky-700 dark:text-sky-300 font-bold ml-1 text-xs">Presença</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -104,7 +104,7 @@ export default function ProfessorClassesScreen({ navigation }: Props) {
           className="flex-1 flex-row items-center justify-center bg-red-50 dark:bg-red-950/30 py-2.5 rounded-lg border border-red-200 dark:border-red-900/60"
         >
           <Feather name="alert-circle" size={14} color="#ef4444" />
-          <Text className="text-red-600 dark:text-red-400 font-bold ml-1 text-xs">Avisar Falta</Text>
+          <Text numberOfLines={1} className="text-red-600 dark:text-red-400 font-bold ml-1 text-xs">Avisar Falta</Text>
         </TouchableOpacity>
       </View>
     </View>

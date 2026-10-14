@@ -5,13 +5,34 @@
  */
 
 export function getScheduleSlotsForDay(
-  scheduleTime: string,
+  scheduleTime?: string | null,
   weekDays?: string | null,
-  dayName?: string
+  targetDateOrDayName?: Date | string | null
 ): string[] {
-  if (!scheduleTime) return [];
+  if (!scheduleTime) return ['19:00', '19:50', '20:50', '21:40'];
 
   const cleanSchedule = scheduleTime.trim();
+
+  // Obter o dayName se targetDateOrDayName for Date ou string
+  let dayName: string | undefined;
+  if (targetDateOrDayName instanceof Date) {
+    const daysOfWeekMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+    dayName = daysOfWeekMap[targetDateOrDayName.getDay()];
+  } else if (typeof targetDateOrDayName === 'string') {
+    const trimmed = targetDateOrDayName.trim();
+    if (trimmed.includes('-')) {
+      const parts = trimmed.split('-').map(Number);
+      if (parts.length === 3) {
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        if (!isNaN(d.getTime())) {
+          const daysOfWeekMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+          dayName = daysOfWeekMap[d.getDay()];
+        }
+      }
+    } else {
+      dayName = trimmed;
+    }
+  }
 
   // 1. Suporte a formato explícito por dia:
   // Exemplo: "terca: 19:00, 19:50 | quarta: 20:50, 21:40" ou com ponto-e-vírgula ";"
@@ -30,11 +51,21 @@ export function getScheduleSlotsForDay(
         return timePart.split(',').map((s) => s.trim()).filter(Boolean);
       }
     }
+
+    if (parts.length > 0) {
+      const colonIndex = parts[0].indexOf(':');
+      const timePart = colonIndex !== -1 ? parts[0].substring(colonIndex + 1) : parts[0];
+      return timePart.split(',').map((s) => s.trim()).filter(Boolean);
+    }
   }
 
-  // 2. Formato padrão com vírgulas (ex: "19:00, 19:50, 20:50, 21:40")
+  // 2. Formato padrão com vírgulas (ex: "19:00, 19:50" ou "19:00, 19:50, 20:50, 21:40")
   const allSlots = cleanSchedule.split(',').map((s) => s.trim()).filter(Boolean);
-  if (!weekDays || !dayName) return allSlots;
+  if (allSlots.length === 0) {
+    return ['19:00', '19:50', '20:50', '21:40'];
+  }
+
+  if (!weekDays) return allSlots;
 
   const normalizedWeekDays = weekDays
     .toLowerCase()
@@ -42,20 +73,31 @@ export function getScheduleSlotsForDay(
     .replace(/[\u0300-\u036f]/g, '');
   const daysList = normalizedWeekDays.split(',').map((d) => d.trim()).filter(Boolean);
 
-  // Se a matéria só tiver 1 dia letivo associado, todos os slots pertencem a esse dia
+  // Se a matéria só tiver 1 dia letivo associado, retorna exatamente os horários daquele dia
+  // (Ex: se tem 2 horários -> retorna os 2; se tem 4 horários -> retorna os 4)
   if (daysList.length <= 1) {
     return allSlots;
   }
 
-  // Se houver múltiplos dias (ex: 2 dias: 'terca' e 'quarta') e os slots puderem ser divididos igualmente:
-  // Ex: 4 slots divididos por 2 dias = 2 slots para o primeiro dia, 2 slots para o segundo dia
-  const currentNormalizedDay = dayName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const dayIndex = daysList.findIndex((d) => d === currentNormalizedDay || d.includes(currentNormalizedDay) || currentNormalizedDay.includes(d));
-
-  if (dayIndex !== -1 && allSlots.length % daysList.length === 0) {
+  // Se houver múltiplos dias (ex: 2 dias: 'terca' e 'quarta') e mais horários do que dias
+  // Exemplo: 4 aulas na semana divididas em 2 dias = 2 aulas por dia
+  if (allSlots.length > daysList.length && allSlots.length % daysList.length === 0) {
     const slotsPerDay = allSlots.length / daysList.length;
-    const start = dayIndex * slotsPerDay;
-    return allSlots.slice(start, start + slotsPerDay);
+
+    if (dayName) {
+      const currentNormalizedDay = dayName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const dayIndex = daysList.findIndex(
+        (d) => d === currentNormalizedDay || d.includes(currentNormalizedDay) || currentNormalizedDay.includes(d)
+      );
+
+      if (dayIndex !== -1) {
+        const start = dayIndex * slotsPerDay;
+        return allSlots.slice(start, start + slotsPerDay);
+      }
+    }
+
+    // Se o dia não foi informado ou não bate com os dias da turma, retorna a quantidade por dia
+    return allSlots.slice(0, slotsPerDay);
   }
 
   return allSlots;

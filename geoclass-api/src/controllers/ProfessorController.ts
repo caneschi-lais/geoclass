@@ -1,8 +1,25 @@
 import { Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middlewares/authMiddleware';
+import { getScheduleSlotsForDay } from '../utils/scheduleHelper';
+import { sendPushNotification } from '../services/pushNotificationService';
+import prisma from '../prisma';
 
-const prisma = new PrismaClient();
+function parseCourses(courses: any): string[] {
+  if (!courses) return [];
+  if (Array.isArray(courses)) return courses;
+  if (typeof courses === 'string') {
+    try { return JSON.parse(courses); } catch { return [courses]; }
+  }
+  return [];
+}
+
+function resolveClassSlots(
+  scheduleTime?: string | null,
+  weekDays?: string | null,
+  targetDate?: Date | string | null
+): string[] {
+  return getScheduleSlotsForDay(scheduleTime, weekDays, targetDate);
+}
 
 export class ProfessorController {
   async getTurmas(req: AuthRequest, res: Response) {
@@ -62,17 +79,33 @@ export class ProfessorController {
     targetDate.setHours(0, 0, 0, 0);
 
     try {
-      const whereClause: any = {
-        class_id: classId,
-        date: targetDate,
-      };
+      const classData = await prisma.class.findUnique({
+        where: { id: classId },
+        include: {
+          enrollments: {
+            where: { is_completed: false },
+            include: {
+              student: {
+                include: { userCourses: true }
+              }
+            }
+          }
+        }
+      });
 
-      if (status && ['PRESENTE', 'FALTA', 'ATRASADO', 'PRESENCA_PARCIAL'].includes(status.toUpperCase())) {
-        whereClause.status = status.toUpperCase();
+      if (!classData) {
+        return res.status(404).json({ error: 'Turma não encontrada' });
       }
 
+      // Determinar os horários / slots de aula para o dia específico (respeitando se a matéria tem 2 ou 4 horários no dia)
+      const classSlots = resolveClassSlots(classData.schedule_time, classData.week_days, targetDate);
+
+      // Buscar todos os registros de presença da data
       const attendances = await prisma.attendance.findMany({
-        where: whereClause,
+        where: {
+          class_id: classId,
+          date: targetDate,
+        },
         include: {
           student: {
             include: { userCourses: true }
@@ -83,17 +116,86 @@ export class ProfessorController {
         }
       });
 
-      const records = attendances.map(a => ({
-        id: a.student.id,
-        name: a.student.name,
-        ra: a.student.ra || 'N/A',
-        time: a.check_in_time.toISOString().split('T')[1].substring(0, 5),
-        status: a.status,
-        student_semester: a.student.student_semester || undefined,
-        courses: a.student.courses
-      }));
+      // Mapear estudantes únicos a partir das matrículas e presenças
+      const studentMap = new Map<string, any>();
+      for (const enr of classData.enrollments) {
+        const s = enr.student;
+        studentMap.set(s.id, {
+          id: s.id,
+          name: s.name,
+          ra: s.ra || 'N/A',
+          student_semester: s.student_semester || undefined,
+          courses: parseCourses(s.courses),
+          userCourses: s.userCourses,
+        });
+      }
+      for (const att of attendances) {
+        if (!studentMap.has(att.student.id)) {
+          studentMap.set(att.student.id, {
+            id: att.student.id,
+            name: att.student.name,
+            ra: att.student.ra || 'N/A',
+            student_semester: att.student.student_semester || undefined,
+            courses: parseCourses(att.student.courses),
+            userCourses: (att.student as any).userCourses || [],
+          });
+        }
+      }
 
-      return res.json(records);
+      // Construir 1 card único por aluno contendo o detalhamento de cada um dos 4 slots
+      const studentsList = Array.from(studentMap.values()).map((student) => {
+        const studentAttendances = attendances.filter((a) => a.student_id === student.id);
+        const deviceAttendance = studentAttendances.find((a) => !!a.device_id);
+
+        const slots = classSlots.map((slotTime, idx) => {
+          const slotAtt = studentAttendances.find((a) => a.slot_time === slotTime) 
+            || (studentAttendances.length === 1 && studentAttendances[0].slot_time === 'MANUAL' ? studentAttendances[0] : null);
+
+          const isPresent = slotAtt ? (slotAtt.status === 'PRESENTE' || slotAtt.status === 'ATRASADO') : false;
+          const slotStatus = slotAtt ? slotAtt.status : 'FALTA';
+
+          return {
+            slot_index: idx + 1,
+            slot_time: slotTime,
+            label: `${idx + 1}ª Aula (${slotTime})`,
+            isPresent,
+            status: slotStatus,
+            attendance_id: slotAtt?.id || null,
+          };
+        });
+
+        const presentSlotsCount = slots.filter((s) => s.isPresent).length;
+        const totalSlots = slots.length;
+        const isAllPresent = presentSlotsCount === totalSlots;
+        const isParcial = presentSlotsCount > 0 && presentSlotsCount < totalSlots;
+        const overallStatus = isAllPresent ? 'PRESENTE' : isParcial ? 'PRESENCA_PARCIAL' : 'FALTA';
+
+        const slotsMap: Record<string, boolean> = {};
+        slots.forEach((s) => {
+          slotsMap[s.slot_time] = s.isPresent;
+        });
+
+        return {
+          id: student.id,
+          attendance_id: studentAttendances[0]?.id || null,
+          name: student.name,
+          ra: student.ra,
+          status: overallStatus,
+          presentSlotsCount,
+          totalSlots,
+          slots,
+          slotsMap,
+          has_device: !!deviceAttendance,
+          device_id: deviceAttendance?.device_id || null,
+          student_semester: student.student_semester,
+          courses: parseCourses(student.courses),
+        };
+      });
+
+      // Ordenar alfabeticamente por nome
+      studentsList.sort((a, b) => a.name.localeCompare(b.name));
+
+      return res.json(studentsList);
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao buscar presenças da turma' });
@@ -185,6 +287,7 @@ export class ProfessorController {
       });
 
       // Notificar alunos sobre a alteração de sala
+      const studentIds = classData.enrollments.map((e) => e.student_id);
       for (const enrollment of classData.enrollments) {
         await prisma.notification.create({
           data: {
@@ -194,6 +297,13 @@ export class ProfessorController {
           }
         });
       }
+
+      // Enviar notificação push aos celulares dos alunos
+      sendPushNotification(studentIds, {
+        title: `Troca de Sala: ${classData.subject}`,
+        body: `Atenção: A aula de hoje de ${classData.subject} foi alterada para ${roomData.name}.`,
+        data: { type: 'TROCA_SALA', classId: classData.id },
+      });
 
       return res.json({ message: 'Sala alterada com sucesso!', tempLoc });
     } catch (error) {
@@ -207,10 +317,13 @@ export class ProfessorController {
     const classId = req.params.id;
 
     try {
+      const dateQuery = req.query.date as string | undefined;
       const classInfo = await prisma.class.findUnique({
         where: { id: classId },
-        select: { course_name: true }
+        select: { course_name: true, schedule_time: true, week_days: true }
       });
+
+      const classSlots = resolveClassSlots(classInfo?.schedule_time, classInfo?.week_days, dateQuery || new Date());
 
       const enrollments = await prisma.enrollment.findMany({
         where: { class_id: classId },
@@ -229,10 +342,11 @@ export class ProfessorController {
           id: e.student.id,
           name: e.student.name,
           ra: e.student.ra || 'N/A',
-          courses: e.student.courses,
+          courses: parseCourses(e.student.courses),
           student_semester: specificSemester,
           userCourses: e.student.userCourses,
-          active: e.student.active
+          active: e.student.active,
+          classSlots: classSlots
         };
       });
 
@@ -249,7 +363,7 @@ export class ProfessorController {
   // Registrar chamada manual (EAD)
   async registerManualAttendance(req: AuthRequest, res: Response) {
     const classId = req.params.id;
-    const { attendances, date } = req.body; // array de { studentId, isPresent } e opcional date "YYYY-MM-DD"
+    const { attendances, date } = req.body; // array de { studentId, slots?: Record<string, boolean>, isPresent?: boolean } e opcional date "YYYY-MM-DD"
 
     if (!attendances || !Array.isArray(attendances)) {
       return res.status(400).json({ error: 'Dados de chamada inválidos' });
@@ -257,64 +371,113 @@ export class ProfessorController {
 
     let targetDate = new Date();
     if (date) {
-      const parts = String(date).split('-');
+      const parts = String(date).split('-').map(Number);
       if (parts.length === 3) {
-        targetDate = new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 0, 0, 0, 0));
+        targetDate = new Date(parts[0], parts[1] - 1, parts[2]);
       } else {
-        targetDate.setHours(0, 0, 0, 0);
+        targetDate = new Date(date);
       }
-    } else {
-      targetDate.setHours(0, 0, 0, 0);
     }
+    targetDate.setHours(0, 0, 0, 0);
 
     try {
       const classInfo = await prisma.class.findUnique({
         where: { id: classId },
-        select: { subject: true }
+        select: { subject: true, schedule_time: true, week_days: true }
       });
+
+      if (!classInfo) {
+        return res.status(404).json({ error: 'Turma não encontrada' });
+      }
+
+      // Determinar os slots de aula para a data específica (respeitando 2 ou 4 horários do dia)
+      const classSlots = resolveClassSlots(classInfo.schedule_time, classInfo.week_days, targetDate);
 
       const formattedDate = targetDate.toLocaleDateString('pt-BR');
 
-      // Registrar ou atualizar as presenças de cada aluno na data especificada
+      // Registrar ou atualizar as presenças de cada aluno na data especificada para todos os 4 slots
       for (const record of attendances) {
-        const existing = await prisma.attendance.findFirst({
+        const studentId = record.studentId || record.id;
+        if (!studentId) continue;
+
+        // Limpar registros manuais antigos com slot 'MANUAL' ou nulo para evitar duplicidade ou divergência
+        await prisma.attendance.deleteMany({
           where: {
-            student_id: record.studentId,
+            student_id: studentId,
             class_id: classId,
-            date: targetDate
+            date: targetDate,
+            OR: [
+              { slot_time: 'MANUAL' },
+              { slot_time: null }
+            ]
           }
         });
 
-        if (existing) {
-          await prisma.attendance.update({
-            where: { id: existing.id },
-            data: {
-              status: record.isPresent ? 'PRESENTE' : 'FALTA',
-              manual_attendance: true
+        let anyPresent = false;
+
+        for (const slot of classSlots) {
+          let isSlotPresent = false;
+
+          if (record.slots && typeof record.slots === 'object') {
+            if (Array.isArray(record.slots)) {
+              const found = record.slots.find((s: any) => s.slot_time === slot);
+              isSlotPresent = found ? !!found.isPresent : !!record.isPresent;
+            } else if (typeof record.slots[slot] === 'boolean') {
+              isSlotPresent = record.slots[slot];
+            } else {
+              isSlotPresent = !!record.isPresent;
             }
-          });
-        } else {
-          await prisma.attendance.create({
-            data: {
-              student_id: record.studentId,
+          } else if (typeof record.isPresent === 'boolean') {
+            isSlotPresent = record.isPresent;
+          }
+
+          if (isSlotPresent) {
+            anyPresent = true;
+          }
+
+          await prisma.attendance.upsert({
+            where: {
+              student_id_class_id_date_slot_time: {
+                student_id: studentId,
+                class_id: classId,
+                date: targetDate,
+                slot_time: slot
+              }
+            },
+            update: {
+              status: isSlotPresent ? 'PRESENTE' : 'FALTA',
+              manual_attendance: true
+            },
+            create: {
+              student_id: studentId,
               class_id: classId,
               date: targetDate,
-              slot_time: 'MANUAL',
+              slot_time: slot,
               check_in_time: new Date(),
-              status: record.isPresent ? 'PRESENTE' : 'FALTA',
+              status: isSlotPresent ? 'PRESENTE' : 'FALTA',
               manual_attendance: true
             }
           });
         }
 
-        if (record.isPresent) {
-          await prisma.notification.create({
-            data: {
-              user_id: record.studentId,
-              title: `Presença Confirmada: ${classInfo?.subject}`,
-              body: `Sua presença na aula de ${classInfo?.subject} em ${formattedDate} foi registrada pelo professor.`
+        if (anyPresent) {
+          const alreadyNotified = await prisma.notification.findFirst({
+            where: {
+              user_id: studentId,
+              title: `Presença Confirmada: ${classInfo.subject}`,
+              created_at: { gte: targetDate }
             }
           });
+
+          if (!alreadyNotified) {
+            await prisma.notification.create({
+              data: {
+                user_id: studentId,
+                title: `Presença Confirmada: ${classInfo.subject}`,
+                body: `Sua presença na aula de ${classInfo.subject} em ${formattedDate} foi registrada pelo professor.`
+              }
+            });
+          }
         }
       }
 
@@ -332,7 +495,7 @@ export class ProfessorController {
       return res.status(403).json({ error: 'Acesso negado. Apenas professores ou coordenadores podem realizar esta ação.' });
     }
 
-    const { attendanceId, studentId, classId } = req.body;
+    const { attendanceId, studentId, classId, date } = req.body;
 
     if (!attendanceId && (!studentId || !classId)) {
       return res.status(400).json({ error: 'Informe o attendanceId ou (studentId e classId)' });
@@ -346,14 +509,22 @@ export class ProfessorController {
           where: { id: attendanceId }
         });
       } else {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        let targetDate = new Date();
+        if (date) {
+          const parts = String(date).split('-').map(Number);
+          if (parts.length === 3) {
+            targetDate = new Date(parts[0], parts[1] - 1, parts[2]);
+          } else {
+            targetDate = new Date(date);
+          }
+        }
+        targetDate.setHours(0, 0, 0, 0);
 
         attendance = await prisma.attendance.findFirst({
           where: {
             student_id: studentId,
             class_id: classId,
-            date: today
+            date: targetDate
           }
         });
       }

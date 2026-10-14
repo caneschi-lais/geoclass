@@ -1,9 +1,7 @@
 import { Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middlewares/authMiddleware';
 import { getCurrentAcademicSemester, incrementStudentSemester } from '../utils/academicSemester';
-
-const prisma = new PrismaClient();
+import prisma from '../prisma';
 
 export class CoordinatorController {
   // 1. Obter semestres ativos e a média global de faltas
@@ -30,24 +28,25 @@ export class CoordinatorController {
         }
 
         let totalExpectedClasses = 0;
-        let totalAttendances = 0;
+        let totalFaltas = 0;
 
         for (const enr of enrollments) {
           totalExpectedClasses += enr.class.total_classes;
-          const presencas = await prisma.attendance.count({
-            where: { class_id: enr.class_id, student_id: enr.student_id, status: 'PRESENTE' }
+          const faltas = await prisma.attendance.count({
+            where: { class_id: enr.class_id, student_id: enr.student_id, status: 'FALTA' }
           });
-          totalAttendances += presencas;
+          totalFaltas += faltas;
         }
 
-        // Faltas = Aulas Esperadas - Presenças
-        const totalFaltas = totalExpectedClasses - totalAttendances;
+        // Faltas reais registradas e percentual de presença invertido (100 - ausência)
         const absencePercentage = totalExpectedClasses === 0 ? 0 : Math.round((totalFaltas / totalExpectedClasses) * 100);
+        const attendancePercentage = Math.max(0, 100 - absencePercentage);
 
         return {
           id: semester,
           name: semester,
-          absencePercentage
+          absencePercentage,
+          attendancePercentage
         };
       }));
 
@@ -78,7 +77,7 @@ export class CoordinatorController {
             include: { class: true }
           },
           attendances: {
-            where: { class: { semester, active: true }, status: 'PRESENTE' }
+            where: { class: { semester, active: true }, status: 'FALTA' }
           }
         }
       });
@@ -89,14 +88,14 @@ export class CoordinatorController {
           totalExpectedClasses += enr.class.total_classes;
         });
 
-        const totalAttendances = student.attendances.length;
-        const totalFaltas = totalExpectedClasses - totalAttendances;
+        const totalFaltas = student.attendances.length;
         const absencePercentage = totalExpectedClasses === 0 ? 0 : Math.round((totalFaltas / totalExpectedClasses) * 100);
+        const attendancePercentage = Math.max(0, 100 - absencePercentage);
 
         const subjects = Array.from(new Set(student.enrollments.map(enr => enr.class.subject)));
         const classCourses = student.enrollments.map(enr => enr.class.course_name).filter(Boolean) as string[];
         const userCourseNames = student.userCourses?.map(uc => uc.course_name) || [];
-        const userCoursesArray = student.courses || [];
+        const userCoursesArray = typeof student.courses === 'string' ? JSON.parse(student.courses) : (student.courses || []);
         const courses = Array.from(new Set([...userCourseNames, ...userCoursesArray, ...classCourses]));
 
         return {
@@ -107,12 +106,13 @@ export class CoordinatorController {
           subjects,
           userCourses: student.userCourses || [],
           active: student.active !== false,
-          absencePercentage
+          absencePercentage,
+          attendancePercentage
         };
       });
 
-      // Ordenar por alunos com MAIS faltas primeiro
-      studentsData.sort((a, b) => b.absencePercentage - a.absencePercentage);
+      // Ordenar por alunos com menor presença (maior risco acadêmico) primeiro
+      studentsData.sort((a, b) => a.attendancePercentage - b.attendancePercentage);
 
       return res.json(studentsData);
     } catch (error) {
@@ -140,13 +140,13 @@ export class CoordinatorController {
       });
 
       const subjectsData = await Promise.all(enrollments.map(async (enr) => {
-        const presencas = await prisma.attendance.count({
-          where: { student_id: studentId, class_id: enr.class_id, status: 'PRESENTE' }
+        const faltas = await prisma.attendance.count({
+          where: { student_id: studentId, class_id: enr.class_id, status: 'FALTA' }
         });
 
         const totalAulas = enr.class.total_classes;
-        const faltas = totalAulas - presencas;
         const absencePercentage = totalAulas === 0 ? 0 : Math.round((faltas / totalAulas) * 100);
+        const attendancePercentage = Math.max(0, 100 - absencePercentage);
 
         return {
           classId: enr.class.id,
@@ -154,12 +154,13 @@ export class CoordinatorController {
           room_name: enr.class.room_name,
           total_classes: totalAulas,
           absencePercentage,
+          attendancePercentage,
           is_completed: enr.is_completed || false
         };
       }));
 
-      // Ordenar por matérias com mais faltas primeiro
-      subjectsData.sort((a, b) => b.absencePercentage - a.absencePercentage);
+      // Ordenar por matérias com menor presença primeiro
+      subjectsData.sort((a, b) => a.attendancePercentage - b.attendancePercentage);
 
       return res.json(subjectsData);
     } catch (error) {
@@ -180,12 +181,13 @@ export class CoordinatorController {
           const enrollments = await prisma.enrollment.findMany({ where: { class: { semester, active: true } }, include: { class: true } });
           
           let totalExpectedClasses = 0;
-          let totalAttendances = 0;
+          let totalFaltas = 0;
           for (const enr of enrollments) {
             totalExpectedClasses += enr.class.total_classes;
-            totalAttendances += await prisma.attendance.count({ where: { class_id: enr.class_id, student_id: enr.student_id, status: 'PRESENTE' } });
+            totalFaltas += await prisma.attendance.count({ where: { class_id: enr.class_id, student_id: enr.student_id, status: 'FALTA' } });
           }
-          const absencePercentage = totalExpectedClasses === 0 ? 0 : Math.round(((totalExpectedClasses - totalAttendances) / totalExpectedClasses) * 100);
+          const absencePercentage = totalExpectedClasses === 0 ? 0 : Math.round((totalFaltas / totalExpectedClasses) * 100);
+          const attendancePercentage = Math.max(0, 100 - absencePercentage);
 
           let details: any = null;
           if (includeDetails === 'true') {
@@ -194,18 +196,19 @@ export class CoordinatorController {
                where: { role: 'ALUNO', enrollments: { some: { class: { semester, active: true } } } },
                include: {
                  enrollments: { where: { class: { semester, active: true } }, include: { class: true } },
-                 attendances: { where: { class: { semester, active: true }, status: 'PRESENTE' } }
+                 attendances: { where: { class: { semester, active: true }, status: 'FALTA' } }
                }
              });
              details = students.map(student => {
                let sTotal = 0;
                student.enrollments.forEach(e => sTotal += e.class.total_classes);
-               const sAbsence = sTotal === 0 ? 0 : Math.round(((sTotal - student.attendances.length) / sTotal) * 100);
-               return { id: student.id, name: student.name, ra: student.ra, absencePercentage: sAbsence };
+               const sAbsence = sTotal === 0 ? 0 : Math.round((student.attendances.length / sTotal) * 100);
+               const sAttendance = Math.max(0, 100 - sAbsence);
+               return { id: student.id, name: student.name, ra: student.ra, absencePercentage: sAbsence, attendancePercentage: sAttendance };
              });
           }
 
-          return { semester, absencePercentage, details };
+          return { semester, absencePercentage, attendancePercentage, details };
         }));
         return res.json(data);
       }
@@ -217,26 +220,29 @@ export class CoordinatorController {
           where: { role: 'ALUNO', enrollments: { some: { class: { semester: String(semesterId), active: true } } } },
           include: {
             enrollments: { where: { class: { semester: String(semesterId), active: true } }, include: { class: true } },
-            attendances: { where: { class: { semester: String(semesterId), active: true }, status: 'PRESENTE' } }
+            attendances: { where: { class: { semester: String(semesterId), active: true }, status: 'FALTA' } }
           }
         });
 
         const data = await Promise.all(students.map(async student => {
           let totalExpectedClasses = 0;
           student.enrollments.forEach(enr => { totalExpectedClasses += enr.class.total_classes; });
-          const absencePercentage = totalExpectedClasses === 0 ? 0 : Math.round(((totalExpectedClasses - student.attendances.length) / totalExpectedClasses) * 100);
+          const totalFaltas = student.attendances.length;
+          const absencePercentage = totalExpectedClasses === 0 ? 0 : Math.round((totalFaltas / totalExpectedClasses) * 100);
+          const attendancePercentage = Math.max(0, 100 - absencePercentage);
 
           let details: any = null;
           if (includeDetails === 'true') {
             details = await Promise.all(student.enrollments.map(async (enr) => {
-              const presencas = await prisma.attendance.count({ where: { student_id: student.id, class_id: enr.class_id, status: 'PRESENTE' } });
+              const cFaltas = await prisma.attendance.count({ where: { student_id: student.id, class_id: enr.class_id, status: 'FALTA' } });
               const cTotal = enr.class.total_classes;
-              const cAbsence = cTotal === 0 ? 0 : Math.round(((cTotal - presencas) / cTotal) * 100);
-              return { subject: enr.class.subject, room_name: enr.class.room_name, absencePercentage: cAbsence };
+              const cAbsence = cTotal === 0 ? 0 : Math.round((cFaltas / cTotal) * 100);
+              const cAttendance = Math.max(0, 100 - cAbsence);
+              return { subject: enr.class.subject, room_name: enr.class.room_name, absencePercentage: cAbsence, attendancePercentage: cAttendance };
             }));
           }
 
-          return { id: student.id, name: student.name, ra: student.ra, absencePercentage, details };
+          return { id: student.id, name: student.name, ra: student.ra, absencePercentage, attendancePercentage, details };
         }));
         return res.json(data);
       }
@@ -429,7 +435,11 @@ export class CoordinatorController {
         },
         orderBy: { name: 'asc' }
       });
-      return res.json(students);
+      const formatted = students.map((s) => ({
+        ...s,
+        courses: typeof s.courses === 'string' ? JSON.parse(s.courses) : (s.courses || [])
+      }));
+      return res.json(formatted);
     } catch (error) {
       console.error('Erro getAllStudents', error);
       return res.status(500).json({ error: 'Erro ao buscar todos os alunos' });
@@ -590,19 +600,19 @@ export class CoordinatorController {
         const student = enr.student;
         const cls = enr.class;
 
-        const presences = await prisma.attendance.count({
+        const faltas = await prisma.attendance.count({
           where: {
             student_id: student.id,
             class_id: cls.id,
-            status: { in: ['PRESENTE', 'ATRASADO'] }
+            status: 'FALTA'
           }
         });
 
         const totalClasses = cls.total_classes || 40;
-        const attendancePercentage = Math.round((presences / totalClasses) * 100);
-        const absencePercentage = 100 - attendancePercentage;
+        const absencePercentage = Math.round((faltas / totalClasses) * 100);
+        const attendancePercentage = Math.max(0, 100 - absencePercentage);
 
-        // Critério de risco: frequência < 75%
+        // Critério de risco: frequência < 75% (ou seja, faltas > 25%)
         if (attendancePercentage < 75) {
           const matchingCourse = student.userCourses?.find(uc => uc.course_name === cls.course_name);
           const semesterInfo = matchingCourse?.semester || student.student_semester || cls.semester;
@@ -616,7 +626,7 @@ export class CoordinatorController {
             subject: cls.subject,
             course_name: cls.course_name || 'Geral',
             semester: semesterInfo,
-            presences,
+            presences: Math.max(0, totalClasses - faltas),
             totalClasses,
             attendancePercentage,
             absencePercentage,

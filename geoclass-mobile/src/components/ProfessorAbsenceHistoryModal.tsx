@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import api from '../services/api';
+import ScheduleReplacementModal from './ScheduleReplacementModal';
 
 interface ProfessorAbsenceHistoryModalProps {
   visible: boolean;
@@ -18,13 +19,13 @@ interface ProfessorAbsenceHistoryModalProps {
   onSuccess?: () => void;
 }
 
+const ALLOWED_PROFESSOR_REASONS = ['SAUDE', 'PESSOAL', 'ACADEMICO', 'TRANSPORTE', 'OUTROS'];
+
 const REASON_LABELS: Record<string, string> = {
   SAUDE: 'Problemas de saúde',
   PESSOAL: 'Problemas pessoais',
   ACADEMICO: 'Compromisso acadêmico / Congresso',
   TRANSPORTE: 'Dificuldade de transporte / deslocamento',
-  MANUTENCAO: 'Manutenção na instituição',
-  FERIADO_EXTRA: 'Feriado / Recesso institucional',
   OUTROS: 'Outros motivos',
 };
 
@@ -53,6 +54,7 @@ export default function ProfessorAbsenceHistoryModal({
   const [absences, setAbsences] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [schedulingCancellation, setSchedulingCancellation] = useState<any | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -64,7 +66,9 @@ export default function ProfessorAbsenceHistoryModal({
     setLoading(true);
     try {
       const response = await api.get('/professor/minhas-ausencias');
-      setAbsences(response.data || []);
+      const list = response.data || [];
+      const filtered = list.filter((item: any) => ALLOWED_PROFESSOR_REASONS.includes(item.reason_type));
+      setAbsences(filtered);
     } catch (error) {
       console.error('Erro ao carregar histórico de ausências:', error);
     } finally {
@@ -150,7 +154,8 @@ export default function ProfessorAbsenceHistoryModal({
   if (!visible) return null;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <>
+      <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View
         style={{
           flex: 1,
@@ -203,7 +208,7 @@ export default function ProfessorAbsenceHistoryModal({
           ) : (
             <ScrollView showsVerticalScrollIndicator={false} className="max-h-[500px]">
               <View className="gap-3">
-                {absences.map((item) => {
+                {absences.map((item, idx) => {
                   const isUploading = uploadingId === item.id;
                   const reasonLabel = REASON_LABELS[item.reason_type] || item.reason_type;
                   const isHealth = item.reason_type === 'SAUDE';
@@ -214,7 +219,7 @@ export default function ProfessorAbsenceHistoryModal({
 
                   return (
                     <View
-                      key={item.id}
+                      key={`${item.id || idx}-${idx}`}
                       className="p-4 rounded-2xl bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700"
                     >
                       {/* Top info */}
@@ -272,7 +277,7 @@ export default function ProfessorAbsenceHistoryModal({
                         </Text>
                       ) : null}
 
-                      {/* Seção de Atestado Médico */}
+                      {/* Seção de Atestado Médico (apenas se houver atestado ou se o motivo for saúde) */}
                       {hasCertificate ? (
                         <View className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 p-2.5 rounded-xl flex-row items-center justify-between mt-1">
                           <View className="flex-row items-center flex-1 pr-2">
@@ -301,18 +306,16 @@ export default function ProfessorAbsenceHistoryModal({
                             </TouchableOpacity>
                           </View>
                         </View>
-                      ) : (
+                      ) : isHealth ? (
                         <View className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 p-3 rounded-xl mt-1">
                           <View className="flex-row items-center mb-2">
                             <Feather name="alert-triangle" size={14} color="#d97706" />
                             <Text className="text-xs font-bold text-amber-800 dark:text-amber-300 ml-1.5">
-                              {isHealth ? 'Atestado Médico Não Anexado' : 'Comprovante / Atestado Opcional'}
+                              Atestado Médico Não Anexado
                             </Text>
                           </View>
                           <Text className="text-[11px] text-amber-700 dark:text-amber-400 mb-2.5">
-                            {isHealth
-                              ? 'A coordenação solicita o atestado para aprovar sua ausência e abonar as faltas dos alunos.'
-                              : 'Caso possua comprovante ou documento da ausência, você pode anexá-lo aqui.'}
+                            A coordenação solicita o atestado médico para aprovar sua ausência e abonar as faltas dos alunos.
                           </Text>
 
                           <TouchableOpacity
@@ -333,7 +336,49 @@ export default function ProfessorAbsenceHistoryModal({
                             )}
                           </TouchableOpacity>
                         </View>
-                      )}
+                      ) : null}
+
+                      {/* Seção de Reposição de Aula */}
+                      <View className="bg-sky-50/70 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800/60 p-3 rounded-xl mt-2.5">
+                        <View className="flex-row items-center justify-between">
+                          <View className="flex-1 pr-2">
+                            <View className="flex-row items-center mb-0.5">
+                              <Feather
+                                name={item.replacement_date ? 'calendar' : 'clock'}
+                                size={13}
+                                color={item.replacement_date ? '#0284c7' : '#d97706'}
+                                style={{ marginRight: 5 }}
+                              />
+                              <Text
+                                className={`text-xs font-bold ${
+                                  item.replacement_date
+                                    ? 'text-sky-800 dark:text-sky-300'
+                                    : 'text-amber-800 dark:text-amber-400'
+                                }`}
+                              >
+                                {item.replacement_date
+                                  ? `Reposição: ${formatDateFriendly(item.replacement_date)}`
+                                  : 'Data de reposição não definida'}
+                              </Text>
+                            </View>
+                            <Text className="text-[10px] text-gray-500 dark:text-slate-400">
+                              {item.replacement_date
+                                ? 'Alunos foram notificados sobre esta reposição.'
+                                : 'Defina quando a aula será reposta para notificar os alunos.'}
+                            </Text>
+                          </View>
+
+                          <TouchableOpacity
+                            onPress={() => setSchedulingCancellation(item)}
+                            className="bg-sky-500 active:bg-sky-600 px-3 py-1.5 rounded-lg flex-row items-center"
+                          >
+                            <Feather name="calendar" size={12} color="#fff" />
+                            <Text className="text-white text-[11px] font-bold ml-1">
+                              {item.replacement_date ? 'Alterar' : 'Agendar'}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
                     </View>
                   );
                 })}
@@ -351,5 +396,18 @@ export default function ProfessorAbsenceHistoryModal({
         </View>
       </View>
     </Modal>
+
+    <ScheduleReplacementModal
+      visible={!!schedulingCancellation}
+      cancellation={schedulingCancellation}
+      userRole="PROFESSOR"
+      onClose={() => setSchedulingCancellation(null)}
+      onSuccess={() => {
+        setSchedulingCancellation(null);
+        loadAbsences();
+        if (onSuccess) onSuccess();
+      }}
+    />
+  </>
   );
 }

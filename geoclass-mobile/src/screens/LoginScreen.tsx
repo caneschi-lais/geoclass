@@ -10,21 +10,18 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   Platform,
-  TouchableWithoutFeedback,
+  Pressable,
   Keyboard,
   LayoutAnimation,
-  UIManager,
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import api from '../services/api';
 import { saveToken, saveRole } from '../services/authStorage';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeToggle } from '../components/ThemeToggle';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+import { registerForPushNotificationsAsync } from '../services/pushNotificationService';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
@@ -35,6 +32,7 @@ export default function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
@@ -58,19 +56,28 @@ export default function LoginScreen({ navigation }: Props) {
   }, []);
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Atenção', 'Por favor, preencha todos os campos.');
+    setErrorMessage(null);
+
+    if (!email.trim() || !password) {
+      const msg = 'Por favor, preencha todos os campos.';
+      setErrorMessage(msg);
+      if (Platform.OS !== 'web') {
+        Alert.alert('Atenção', msg);
+      }
       return;
     }
 
     setLoading(true);
     try {
-      const response = await api.post('/login', { email, password });
+      const response = await api.post('/login', { email: email.trim(), password });
       const { token, user } = response.data;
 
       if (token && user?.role) {
         await saveToken(token);
         await saveRole(user.role);
+
+        // Registrar o token de push do aparelho no backend
+        registerForPushNotificationsAsync().catch(() => {});
 
         if (!user.privacy_terms_accepted_at) {
           navigation.replace('Privacy', { fromLogin: true });
@@ -80,12 +87,23 @@ export default function LoginScreen({ navigation }: Props) {
           else navigation.replace('AlunoApp');
         }
       } else {
-        Alert.alert('Erro', 'Token ou perfil não retornado pelo servidor.');
+        const msg = 'Token ou perfil não retornado pelo servidor.';
+        setErrorMessage(msg);
+        if (Platform.OS !== 'web') {
+          Alert.alert('Erro', msg);
+        }
       }
     } catch (error: any) {
       console.log('Erro de login:', error);
-      const message = error.response?.data?.error || 'Falha ao conectar com o servidor. Verifique se a API está rodando.';
-      Alert.alert('Erro de Autenticação', message);
+      const message =
+        error.response?.data?.error ||
+        (error.response?.status === 401
+          ? 'Usuário não cadastrado ou credenciais incorretas.'
+          : 'Falha ao conectar com o servidor. Verifique se a API está rodando.');
+      setErrorMessage(message);
+      if (Platform.OS !== 'web') {
+        Alert.alert('Erro de Autenticação', message);
+      }
     } finally {
       setLoading(false);
     }
@@ -97,7 +115,7 @@ export default function LoginScreen({ navigation }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={{ flex: 1 }}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <Pressable onPress={Keyboard.dismiss} accessible={false} style={{ flex: 1, width: '100%' }}>
         <ScrollView
           contentContainerStyle={{
             flexGrow: 1,
@@ -138,17 +156,54 @@ export default function LoginScreen({ navigation }: Props) {
               <Text className={`${keyboardVisible ? 'text-2xl' : 'text-3xl'} font-extrabold text-[#00b489]`}>Class</Text>
             </View>
 
+            {/* Aviso de Erro de Credenciais / Validação */}
+            {errorMessage ? (
+              <View
+                style={{
+                  elevation: 2,
+                  shadowColor: '#e11d48',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 4,
+                }}
+                className="w-full max-w-sm mb-4 p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 rounded-2xl flex-row items-center"
+              >
+                <View className="w-8 h-8 rounded-xl bg-rose-100 dark:bg-rose-900/60 items-center justify-center mr-3">
+                  <Feather name="alert-triangle" size={16} color="#e11d48" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-[11px] font-extrabold text-rose-800 dark:text-rose-200 uppercase tracking-wider">
+                    Não foi possível entrar
+                  </Text>
+                  <Text className="text-xs text-rose-700 dark:text-rose-300 font-semibold leading-relaxed mt-0.5">
+                    {errorMessage}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setErrorMessage(null)}
+                  className="p-1 rounded-full active:bg-rose-200 dark:active:bg-rose-900/60 ml-1"
+                >
+                  <Feather name="x" size={16} color="#e11d48" />
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
             {/* Campo E-mail */}
             <View className={`w-full max-w-sm ${keyboardVisible ? 'mb-3' : 'mb-4'}`}>
               <Text className="text-gray-600 dark:text-slate-300 mb-1.5 font-medium">E-mail</Text>
               <TextInput
-                className={`w-full bg-white dark:bg-slate-800 rounded-lg ${keyboardVisible ? 'p-3' : 'p-4'} text-gray-800 dark:text-slate-100 border border-gray-200 dark:border-slate-700`}
+                className={`w-full bg-white dark:bg-slate-800 rounded-lg ${keyboardVisible ? 'p-3' : 'p-4'} text-gray-800 dark:text-slate-100 border ${
+                  errorMessage ? 'border-rose-300 dark:border-rose-700' : 'border-gray-200 dark:border-slate-700'
+                }`}
                 placeholder="Digite seu e-mail"
                 placeholderTextColor="#94a3b8"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(val) => {
+                  setEmail(val);
+                  if (errorMessage) setErrorMessage(null);
+                }}
               />
             </View>
 
@@ -156,12 +211,17 @@ export default function LoginScreen({ navigation }: Props) {
             <View className={`w-full max-w-sm ${keyboardVisible ? 'mb-4' : 'mb-6'}`}>
               <Text className="text-gray-600 dark:text-slate-300 mb-1.5 font-medium">Senha</Text>
               <TextInput
-                className={`w-full bg-white dark:bg-slate-800 rounded-lg ${keyboardVisible ? 'p-3' : 'p-4'} text-gray-800 dark:text-slate-100 border border-gray-200 dark:border-slate-700`}
+                className={`w-full bg-white dark:bg-slate-800 rounded-lg ${keyboardVisible ? 'p-3' : 'p-4'} text-gray-800 dark:text-slate-100 border ${
+                  errorMessage ? 'border-rose-300 dark:border-rose-700' : 'border-gray-200 dark:border-slate-700'
+                }`}
                 placeholder="Digite sua senha"
                 placeholderTextColor="#94a3b8"
                 secureTextEntry
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(val) => {
+                  setPassword(val);
+                  if (errorMessage) setErrorMessage(null);
+                }}
               />
             </View>
 
@@ -179,7 +239,7 @@ export default function LoginScreen({ navigation }: Props) {
             </TouchableOpacity>
           </View>
         </ScrollView>
-      </TouchableWithoutFeedback>
+      </Pressable>
     </KeyboardAvoidingView>
   );
 }

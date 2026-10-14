@@ -1,8 +1,6 @@
 import { Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middlewares/authMiddleware';
-
-const prisma = new PrismaClient();
+import prisma from '../prisma';
 
 export class RoomController {
   // Retorna todas as salas disponíveis para um dado horário e data

@@ -1,10 +1,8 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { AuthRequest } from '../middlewares/authMiddleware';
-
-const prisma = new PrismaClient();
+import prisma from '../prisma';
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_geoclass_123';
 
 export class AuthController {
@@ -18,13 +16,13 @@ export class AuthController {
       });
 
       if (!user) {
-        return res.status(401).json({ error: 'Credenciais inválidas' });
+        return res.status(401).json({ error: 'Usuário não cadastrado ou credenciais incorretas.' });
       }
 
       const isValidPassword = await bcrypt.compare(password, user.password_hash);
 
       if (!isValidPassword) {
-        return res.status(401).json({ error: 'Credenciais inválidas' });
+        return res.status(401).json({ error: 'Senha incorreta. Verifique suas credenciais.' });
       }
 
       if (user.active === false) {
@@ -43,7 +41,7 @@ export class AuthController {
           name: user.name,
           email: user.email,
           role: user.role,
-          courses: user.courses || [],
+          courses: typeof user.courses === 'string' ? JSON.parse(user.courses) : (user.courses || []),
           userCourses: user.userCourses || [],
           student_semester: user.student_semester || null,
           active: user.active ?? true,

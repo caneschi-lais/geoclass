@@ -104,6 +104,7 @@ export default function StudentsListScreen({ navigation, route }: Props) {
 
   const renderItem = ({ item }: { item: StudentData }) => {
     const isInactive = item.active === false;
+    const presence = item.attendancePercentage ?? Math.max(0, 100 - item.absencePercentage);
 
     return (
       <View className={`bg-white dark:bg-slate-800 p-4 rounded-xl mb-3 shadow-sm border ${isInactive ? 'border-red-200 dark:border-red-900/50 bg-red-50/20' : 'border-gray-100 dark:border-slate-700'}`}>
@@ -116,8 +117,8 @@ export default function StudentsListScreen({ navigation, route }: Props) {
           })}
         >
           <View className="flex-row items-center flex-1">
-            <View className={`p-3 rounded-full mr-3 ${isInactive ? 'bg-gray-200 dark:bg-slate-700' : item.absencePercentage >= 25 ? 'bg-red-100' : 'bg-emerald-100'}`}>
-              <Feather name={isInactive ? "user-x" : "user"} size={22} color={isInactive ? '#94a3b8' : item.absencePercentage >= 25 ? '#ef4444' : '#10b981'} />
+            <View className={`p-3 rounded-full mr-3 ${isInactive ? 'bg-gray-200 dark:bg-slate-700' : presence < 75 ? 'bg-red-100' : 'bg-emerald-100'}`}>
+              <Feather name={isInactive ? "user-x" : "user"} size={22} color={isInactive ? '#94a3b8' : presence < 75 ? '#ef4444' : '#10b981'} />
             </View>
             <View className="flex-1 pr-2">
               <View className="flex-row items-center gap-1.5 flex-wrap">
@@ -133,9 +134,9 @@ export default function StudentsListScreen({ navigation, route }: Props) {
           </View>
 
           <View className="items-end pl-2">
-            <Text className="text-[10px] text-gray-400 mb-0.5">Faltas</Text>
-            <Text className={`text-base font-black ${item.absencePercentage >= 25 ? 'text-red-500' : 'text-emerald-500'}`}>
-              {item.absencePercentage}%
+            <Text className="text-[10px] text-gray-400 mb-0.5">Presença</Text>
+            <Text className={`text-base font-black ${presence < 75 ? 'text-red-500' : 'text-emerald-500'}`}>
+              {presence}%
             </Text>
           </View>
         </TouchableOpacity>

@@ -138,7 +138,11 @@ export default function NotificationsModal({ visible, notifications, onClose, on
                       <View className="mt-2.5 pt-2 border-t border-gray-100 dark:border-slate-800 flex-row items-center">
                         <Feather name="file-text" size={12} color="#0ea5e9" style={{ marginRight: 6 }} />
                         <Text className="text-[11px] text-sky-600 dark:text-sky-400 font-bold flex-1">
-                          Acesse o botão "Atestados" na tela Minhas Turmas para enviar seu atestado.
+                          {item.title?.toLowerCase().includes('atestado enviado') ||
+                          item.body?.toLowerCase().includes('enviou o atestado') ||
+                          item.body?.toLowerCase().includes('faltas & aulas')
+                            ? 'Acesse o menu "Faltas & Aulas" para visualizar o atestado médico.'
+                            : 'Acesse o botão "Atestados" na tela Minhas Turmas para enviar seu atestado.'}
                         </Text>
                       </View>
                     )}

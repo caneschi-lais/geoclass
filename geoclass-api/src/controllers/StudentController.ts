@@ -1,11 +1,9 @@
 import { Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middlewares/authMiddleware';
 import { processExpiredAttendanceSlots } from '../jobs/AbsenceProcessor';
 import { isAcademicInstructionalDay } from '../services/CalendarService';
 import { getScheduleSlotsForDay } from '../utils/scheduleHelper';
-
-const prisma = new PrismaClient();
+import prisma from '../prisma';
 
 export class StudentController {
   async getAulasHoje(req: AuthRequest, res: Response) {

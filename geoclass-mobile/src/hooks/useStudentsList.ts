@@ -9,6 +9,7 @@ export interface StudentData {
   name: string;
   ra: string;
   absencePercentage: number;
+  attendancePercentage?: number;
   active?: boolean;
   courses?: string[];
   subjects?: string[];
@@ -183,36 +184,40 @@ export function useStudentsList(semesterId: string) {
       if (format === 'excel') {
         let excelData: any[] = [];
         data.forEach((s: any) => {
-          excelData.push({ 'RA': s.ra, 'Nome': s.name, 'Faltas (%)': s.absencePercentage, 'Matéria': '', 'Sala': '' });
+          const presence = s.attendancePercentage ?? Math.max(0, 100 - s.absencePercentage);
+          excelData.push({ 'RA': s.ra, 'Nome': s.name, 'Presença (%)': presence, 'Matéria': '', 'Sala': '' });
           if (includeDetails && s.details) {
             s.details.forEach((d: any) => {
-              excelData.push({ 'RA': '', 'Nome': '', 'Faltas (%)': d.absencePercentage, 'Matéria': d.subject, 'Sala': d.room_name });
+              const dPresence = d.attendancePercentage ?? Math.max(0, 100 - d.absencePercentage);
+              excelData.push({ 'RA': '', 'Nome': '', 'Presença (%)': dPresence, 'Matéria': d.subject, 'Sala': d.room_name });
             });
           }
         });
         await ExportService.exportToExcel(excelData, `Relatorio_Alunos_${semesterId}`);
       } else {
-        const headers = includeDetails ? ['Aluno', 'RA', 'Faltas (%)', 'Matérias'] : ['Aluno', 'RA', 'Faltas (%)'];
+        const headers = includeDetails ? ['Aluno', 'RA', 'Presença (%)', 'Matérias'] : ['Aluno', 'RA', 'Presença (%)'];
         let rows: any[] = [];
         data.forEach((s: any) => {
-          const sPercHtml = s.absencePercentage >= 25 ? `<span class="high-absence">${s.absencePercentage}%</span>` : `${s.absencePercentage}%`;
+          const presence = s.attendancePercentage ?? Math.max(0, 100 - s.absencePercentage);
+          const sPercHtml = presence < 75 ? `<span class="high-absence">${presence}%</span>` : `${presence}%`;
           if (!includeDetails) {
             rows.push([s.name, s.ra, sPercHtml]);
           } else {
             rows.push([`<strong style="color:#0ea5e9">${s.name}</strong>`, s.ra, `<strong>${sPercHtml}</strong>`, '']);
             if (s.details) {
               s.details.forEach((d: any) => {
-                const dPercHtml = d.absencePercentage >= 25 ? `<span class="high-absence">${d.absencePercentage}%</span>` : `${d.absencePercentage}%`;
+                const dPresence = d.attendancePercentage ?? Math.max(0, 100 - d.absencePercentage);
+                const dPercHtml = dPresence < 75 ? `<span class="high-absence">${dPresence}%</span>` : `${dPresence}%`;
                 rows.push(['', '', dPercHtml, `${d.subject} (${d.room_name})`]);
               });
             }
           }
         });
 
-        const sortedData = [...data].sort((a: any, b: any) => b.absencePercentage - a.absencePercentage).slice(0, 5);
+        const sortedData = [...data].sort((a: any, b: any) => (a.attendancePercentage ?? Math.max(0, 100 - a.absencePercentage)) - (b.attendancePercentage ?? Math.max(0, 100 - b.absencePercentage))).slice(0, 5);
         let chartData: { label: string, value: number }[] = sortedData.map((s: any) => ({
           label: s.name,
-          value: s.absencePercentage
+          value: s.attendancePercentage ?? Math.max(0, 100 - s.absencePercentage)
         }));
 
         const html = ExportService.generateHTMLTable(`Relatório de Alunos - ${semesterId}`, headers, rows, chartData);

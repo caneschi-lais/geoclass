@@ -5,7 +5,6 @@ import cron from 'node-cron';
 import { lgpdWiperJob } from './jobs/LgpdWiperJob';
 import { notificationJob } from './jobs/NotificationJob';
 import router from './routes';
-import { PrismaClient } from '@prisma/client';
 
 import path from 'path';
 import fs from 'fs';
@@ -35,7 +34,7 @@ app.get('/health', (req, res) => {
   res.json({ status: 'API Online', timestamp: new Date() });
 });
 
-const prisma = new PrismaClient();
+import prisma from './prisma';
 
 const PORT = process.env.PORT || 3000;
 

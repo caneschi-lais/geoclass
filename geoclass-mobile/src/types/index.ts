@@ -40,17 +40,34 @@ export interface AttendanceLog {
 
 export type UserRole = 'ALUNO' | 'PROFESSOR' | 'COORDENADOR';
 
+export interface SlotAttendance {
+  slot_index: number;
+  slot_time: string;
+  label: string;
+  isPresent: boolean;
+  status: 'PRESENTE' | 'FALTA' | 'ATRASADO';
+  attendance_id?: string | null;
+}
+
 export interface StudentAttendance {
   id: string;
+  attendance_id?: string;
   name: string;
   ra: string;
   email?: string;
   time?: string; // Hora que bateu o ponto
   status?: 'PRESENTE' | 'FALTA' | 'ATRASADO' | 'PRESENCA_PARCIAL';
+  presentSlotsCount?: number;
+  totalSlots?: number;
+  slots?: SlotAttendance[];
+  slotsMap?: Record<string, boolean>;
+  device_id?: string | null;
+  has_device?: boolean;
   student_semester?: string;
   courses?: string[];
   userCourses?: UserCourseInfo[];
   active?: boolean;
+  classSlots?: string[];
 }
 
 export interface CoordinatorAnalytics {

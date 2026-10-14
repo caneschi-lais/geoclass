@@ -16,6 +16,7 @@ type SubjectData = {
   room_name: string;
   total_classes: number;
   absencePercentage: number;
+  attendancePercentage?: number;
   is_completed?: boolean;
 };
 
@@ -118,28 +119,32 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
     setExporting(true);
     try {
       if (format === 'excel') {
-        const excelData = subjects.map(s => ({
-          'Matéria': s.subject,
-          'Sala': s.room_name,
-          'Aulas Previstas': s.total_classes,
-          'Faltas (%)': s.absencePercentage,
-          'Status': s.is_completed ? 'Concluída (Modo Leitura)' : 'Em Andamento'
-        }));
+        const excelData = subjects.map(s => {
+          const presence = s.attendancePercentage ?? Math.max(0, 100 - s.absencePercentage);
+          return {
+            'Matéria': s.subject,
+            'Sala': s.room_name,
+            'Aulas Previstas': s.total_classes,
+            'Presença (%)': presence,
+            'Status': s.is_completed ? 'Concluída (Modo Leitura)' : 'Em Andamento'
+          };
+        });
         await ExportService.exportToExcel(excelData, `Relatorio_Materias_${studentName.replace(/\s+/g, '_')}`);
       } else {
-        const headers = ['Matéria', 'Sala', 'Aulas Previstas', 'Faltas (%)', 'Status'];
+        const headers = ['Matéria', 'Sala', 'Aulas Previstas', 'Presença (%)', 'Status'];
         const rows = subjects.map(s => {
-          const percHtml = s.absencePercentage >= 25 ? `<span class="high-absence">${s.absencePercentage}%</span>` : `${s.absencePercentage}%`;
+          const presence = s.attendancePercentage ?? Math.max(0, 100 - s.absencePercentage);
+          const percHtml = presence < 75 ? `<span class="high-absence">${presence}%</span>` : `${presence}%`;
           const statusText = s.is_completed ? 'Concluída' : 'Em Andamento';
           return [s.subject, s.room_name, s.total_classes.toString(), percHtml, statusText];
         });
 
-        // Gráfico com as matérias com mais faltas
+        // Gráfico com matérias mais críticas (menor presença) primeiro
         const chartData = [...subjects]
-          .sort((a, b) => b.absencePercentage - a.absencePercentage)
+          .sort((a, b) => (a.attendancePercentage ?? Math.max(0, 100 - a.absencePercentage)) - (b.attendancePercentage ?? Math.max(0, 100 - b.absencePercentage)))
           .map(s => ({
             label: s.subject,
-            value: s.absencePercentage
+            value: s.attendancePercentage ?? Math.max(0, 100 - s.absencePercentage)
           }));
 
         const html = ExportService.generateHTMLTable(`Relatório do Aluno: ${studentName}`, headers, rows, chartData);
@@ -152,39 +157,43 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
     }
   };
 
-  const renderItem = ({ item }: { item: SubjectData }) => (
-    <View className="bg-white dark:bg-slate-800 p-4 rounded-xl mb-4 shadow-sm border border-gray-100 dark:border-slate-700">
-      <View className="flex-row items-start justify-between border-b border-gray-100 dark:border-slate-700 pb-3 mb-3">
-        <View className="flex-1 pr-2">
-          <Text className="text-lg font-bold text-gray-800 dark:text-slate-100">{item.subject}</Text>
-          <View className="flex-row items-center mt-2">
-            <Feather name="map-pin" size={14} color="#64748b" />
-            <Text className="text-gray-500 dark:text-slate-400 ml-1 font-medium">{item.room_name}</Text>
+  const renderItem = ({ item }: { item: SubjectData }) => {
+    const presence = item.attendancePercentage ?? Math.max(0, 100 - item.absencePercentage);
+    const absence = item.absencePercentage ?? Math.max(0, 100 - presence);
+
+    return (
+      <View className="bg-white dark:bg-slate-800 p-4 rounded-xl mb-4 shadow-sm border border-gray-100 dark:border-slate-700">
+        <View className="flex-row items-start justify-between border-b border-gray-100 dark:border-slate-700 pb-3 mb-3">
+          <View className="flex-1 pr-2">
+            <Text className="text-lg font-bold text-gray-800 dark:text-slate-100">{item.subject}</Text>
+            <View className="flex-row items-center mt-2">
+              <Feather name="map-pin" size={14} color="#64748b" />
+              <Text className="text-gray-500 dark:text-slate-400 ml-1 font-medium">{item.room_name}</Text>
+            </View>
+          </View>
+
+          <View className="items-end bg-gray-50 dark:bg-slate-900 p-2 rounded-lg">
+            <Text className="text-xs text-gray-400 mb-1">Aulas Previstas</Text>
+            <Text className="text-md font-bold text-gray-700 dark:text-slate-200">{item.total_classes}</Text>
           </View>
         </View>
 
-        <View className="items-end bg-gray-50 dark:bg-slate-900 p-2 rounded-lg">
-          <Text className="text-xs text-gray-400 mb-1">Aulas Previstas</Text>
-          <Text className="text-md font-bold text-gray-700 dark:text-slate-200">{item.total_classes}</Text>
+        <View className="flex-row items-center justify-between">
+          <Text className="text-gray-600 dark:text-slate-300 font-medium">Presença</Text>
+          <Text className={`text-xl font-black ${presence < 75 ? 'text-red-500' : 'text-emerald-500'}`}>
+            {presence}%
+          </Text>
         </View>
-      </View>
-
-      <View className="flex-row items-center justify-between">
-        <Text className="text-gray-600 dark:text-slate-300 font-medium">Índice de Faltas</Text>
-        <Text className={`text-xl font-black ${item.absencePercentage >= 25 ? 'text-red-500' : 'text-emerald-500'}`}>
-          {item.absencePercentage}%
-        </Text>
-      </View>
-      <View className="w-full h-2 bg-gray-200 dark:bg-slate-700 rounded-full mt-3 overflow-hidden flex-row">
-        <View
-          className="h-full bg-emerald-400"
-          style={{ width: `${100 - item.absencePercentage}%` }}
-        />
-        <View
-          className="h-full bg-red-400"
-          style={{ width: `${item.absencePercentage}%` }}
-        />
-      </View>
+        <View className="w-full h-2 bg-gray-200 dark:bg-slate-700 rounded-full mt-3 overflow-hidden flex-row">
+          <View
+            className="h-full bg-emerald-400"
+            style={{ width: `${presence}%` }}
+          />
+          <View
+            className="h-full bg-red-400"
+            style={{ width: `${absence}%` }}
+          />
+        </View>
 
       {/* Ação do Coordenador: Alternar Conclusão da Matéria (Exige segurar 1s) */}
       <View className="mt-4 pt-3 border-t border-gray-100 dark:border-slate-700 flex-row justify-between items-center">
@@ -215,7 +224,8 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
         </HoldButton>
       </View>
     </View>
-  );
+    );
+  };
 
   if (loading) return <LoadingOverlay message="Carregando matérias..." />;
 

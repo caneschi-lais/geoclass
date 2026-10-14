@@ -1,8 +1,6 @@
 import { Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middlewares/authMiddleware';
-
-const prisma = new PrismaClient();
+import prisma from '../prisma';
 
 export class NotificationController {
   async getNotifications(req: AuthRequest, res: Response) {
@@ -58,6 +56,32 @@ export class NotificationController {
     } catch (error) {
       console.error('Erro ao marcar notificações como lidas:', error);
       return res.status(500).json({ error: 'Erro ao marcar notificações como lidas' });
+    }
+  }
+
+  async savePushToken(req: AuthRequest, res: Response) {
+    const userId = req.user?.id;
+    const { token } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Não autorizado' });
+    }
+
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ error: 'Push token inválido' });
+    }
+
+    try {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { push_token: token },
+      });
+
+      console.log(`📲 [PUSH TOKEN SALVO] Usuário ${userId} registrou token: ${token.substring(0, 25)}...`);
+      return res.json({ message: 'Push token salvo com sucesso' });
+    } catch (error) {
+      console.error('Erro ao salvar push token:', error);
+      return res.status(500).json({ error: 'Erro ao salvar push token' });
     }
   }
 }

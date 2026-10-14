@@ -1,10 +1,9 @@
 import { Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middlewares/authMiddleware';
+import { sendPushNotification } from '../services/pushNotificationService';
 import fs from 'fs';
 import path from 'path';
-
-const prisma = new PrismaClient();
+import prisma from '../prisma';
 
 const REASON_LABELS: Record<string, string> = {
   SAUDE: 'Problemas de saúde',
@@ -182,6 +181,14 @@ export class ClassCancellationController {
         });
       }
 
+      // Enviar push notification para os coordenadores
+      const coordIds = coordinators.map((c) => c.id);
+      sendPushNotification(coordIds, {
+        title: `Aviso de Falta: Prof. ${professorName}`,
+        body: `O prof. ${professorName} informou ausência para ${classData.subject} em ${formattedDate}.`,
+        data: { type: 'AVISO_FALTA', cancellationId: cancellation.id },
+      });
+
       return res.status(201).json({
         message: 'Aviso de ausência registrado com sucesso e enviado para aprovação da coordenação.',
         cancellation,
@@ -192,23 +199,32 @@ export class ClassCancellationController {
     }
   }
 
-  // 2. Coordenador lista solicitações pendentes
+  // 2. Coordenador lista solicitações (todas ou filtradas por status)
   async listPendingRequests(req: AuthRequest, res: Response) {
+    const { status } = req.query as { status?: string };
     try {
+      const whereClause: any = {};
+      if (status && status !== 'TODOS' && status !== 'ALL') {
+        whereClause.status = status;
+      }
+
       const requests = await (prisma as any).classCancellation.findMany({
-        where: { status: 'PENDENTE' },
+        where: whereClause,
         include: {
           class: true,
           professor: {
             select: { id: true, name: true, email: true },
           },
         },
-        orderBy: { date: 'asc' },
+        orderBy: [
+          { date: 'desc' },
+          { created_at: 'desc' },
+        ],
       });
 
       return res.json(requests);
     } catch (error) {
-      console.error('Erro ao listar solicitações pendentes:', error);
+      console.error('Erro ao listar solicitações:', error);
       return res.status(500).json({ error: 'Erro ao listar solicitações de ausência.' });
     }
   }
@@ -303,6 +319,22 @@ export class ClassCancellationController {
             title: 'Ausência Aprovada pela Coordenação',
             body: `Sua ausência para a turma ${classData?.subject || ''} no dia ${formattedDate} foi aprovada. Lembre-se de definir a data de reposição.`,
           },
+        });
+
+        sendPushNotification(cancellation.professor_id, {
+          title: 'Ausência Aprovada pela Coordenação',
+          body: `Sua ausência para ${classData?.subject || ''} em ${formattedDate} foi aprovada.`,
+          data: { type: 'AUSENCIA_APROVADA', classId: classData?.id },
+        });
+      }
+
+      // Enviar push notification para os alunos matriculados
+      if (classData?.enrollments) {
+        const studentIds = classData.enrollments.map((e: any) => e.student_id);
+        sendPushNotification(studentIds, {
+          title: `Aviso: Aula Cancelada (${classData.subject})`,
+          body: `Não haverá aula de ${classData.subject} no dia ${formattedDate}. Motivo: ${reasonLabel}.`,
+          data: { type: 'AULA_CANCELADA', classId: classData.id },
         });
       }
 
@@ -429,10 +461,18 @@ export class ClassCancellationController {
           data: {
             user_id: coord.id,
             title: `Atestado Enviado: ${professorName}`,
-            body: `O professor ${professorName} enviou o atestado médico referente à aula de ${cancellation.class?.subject} em ${formattedDate}.`,
+            body: `O professor ${professorName} enviou o atestado médico referente à aula de ${cancellation.class?.subject} em ${formattedDate}. Acesse o menu "Faltas & Aulas" para visualizar o atestado.`,
           },
         });
       }
+
+      // Enviar push notification para os coordenadores
+      const coordIds = coordinators.map((c) => c.id);
+      sendPushNotification(coordIds, {
+        title: `Atestado Enviado: ${professorName}`,
+        body: `O professor ${professorName} enviou atestado médico referente a ${cancellation.class?.subject} em ${formattedDate}.`,
+        data: { type: 'ATESTADO_ENVIADO', cancellationId: cancellation.id },
+      });
 
       return res.json({
         message: 'Atestado médico anexado com sucesso!',
@@ -456,6 +496,9 @@ export class ClassCancellationController {
       const absences = await (prisma as any).classCancellation.findMany({
         where: {
           professor_id: professorId,
+          reason_type: {
+            in: ['SAUDE', 'PESSOAL', 'ACADEMICO', 'TRANSPORTE', 'OUTROS'],
+          },
         },
         include: {
           class: {
@@ -512,17 +555,21 @@ export class ClassCancellationController {
             include: { enrollments: true, professor: true },
           });
           if (c) affectedClasses.push(c);
-        } else if (req.body.subject_name || req.body.subject) {
+        }
+        if (affectedClasses.length === 0 && (req.body.subject_name || req.body.subject)) {
           const subj = String(req.body.subject_name || req.body.subject).trim();
           affectedClasses = await prisma.class.findMany({
-            where: { subject: { contains: subj, mode: 'insensitive' }, active: true },
+            where: { subject: { contains: subj }, active: true },
             include: { enrollments: true, professor: true },
           });
+        }
+        if (affectedClasses.length === 0) {
+          return res.status(404).json({ error: 'Nenhuma matéria ou turma ativa encontrada com as informações fornecidas.' });
         }
       } else if (scope === 'CURSO' && course_name) {
         const cName = String(course_name).trim();
         affectedClasses = await prisma.class.findMany({
-          where: { course_name: { contains: cName, mode: 'insensitive' }, active: true },
+          where: { course_name: { contains: cName }, active: true },
           include: { enrollments: true, professor: true },
         });
       } else {
@@ -678,6 +725,25 @@ export class ClassCancellationController {
         }
       }
 
+      // Enviar push para todos os alunos e professores afetados
+      const allStudentIds = affectedClasses.flatMap((c) => c.enrollments.map((e: any) => e.student_id));
+      const allProfessorIds = affectedClasses.map((c) => c.professor_id).filter(Boolean) as string[];
+
+      if (allStudentIds.length > 0) {
+        sendPushNotification(allStudentIds, {
+          title: 'Aviso Institucional: Aula Suspensa',
+          body: `A coordenação informou suspensão de aulas em ${formattedDate}. Motivo: ${reasonLabel}.`,
+          data: { type: 'SUSPENSAO_AULA' },
+        });
+      }
+      if (allProfessorIds.length > 0) {
+        sendPushNotification(allProfessorIds, {
+          title: 'Aviso Institucional: Atividades Suspensas',
+          body: `A coordenação suspendeu as atividades em ${formattedDate}. Motivo: ${reasonLabel}.`,
+          data: { type: 'SUSPENSAO_AULA' },
+        });
+      }
+
       return res.status(201).json({
         message: `Cancelamento de aulas registrado com sucesso para ${affectedClasses.length} turma(s).`,
         count: affectedClasses.length,
@@ -702,7 +768,7 @@ export class ClassCancellationController {
         where: { id },
         include: {
           class: {
-            include: { enrollments: true },
+            include: { enrollments: true, professor: true },
           },
         },
       });
@@ -719,18 +785,46 @@ export class ClassCancellationController {
 
       const formattedOriginalDate = formatDateDisplay(cancellation.date);
       const formattedRepDate = formatDateDisplay(repDateObj);
+      const subjectName = cancellation.class?.subject || cancellation.subject_name || 'Aula';
 
       // Notificar Alunos sobre a data de reposição
-      if (cancellation.class) {
+      if (cancellation.class?.enrollments) {
         for (const enrollment of cancellation.class.enrollments) {
           await prisma.notification.create({
             data: {
               user_id: enrollment.student_id,
-              title: `Reposição Agendada: ${cancellation.class.subject}`,
-              body: `A reposição da aula de ${cancellation.class.subject} (referente ao dia ${formattedOriginalDate}) foi agendada para ${formattedRepDate}.`,
+              title: `Reposição Agendada: ${subjectName}`,
+              body: `A reposição da aula de ${subjectName} (referente ao dia sem aula de ${formattedOriginalDate}) foi agendada para ${formattedRepDate}.`,
             },
           });
         }
+      }
+
+      // Notificar Professor da matéria (se quem agendou for a coordenação)
+      const professorId = cancellation.class?.professor_id || cancellation.professor_id;
+      if (professorId && professorId !== req.user?.id) {
+        await prisma.notification.create({
+          data: {
+            user_id: professorId,
+            title: `Reposição Agendada: ${subjectName}`,
+            body: `A reposição da aula de ${subjectName} (referente ao dia sem aula de ${formattedOriginalDate}) foi definida para ${formattedRepDate}.`,
+          },
+        });
+
+        sendPushNotification(professorId, {
+          title: `Reposição Agendada: ${subjectName}`,
+          body: `A reposição da aula de ${subjectName} foi definida para ${formattedRepDate}.`,
+          data: { type: 'REPOSICAO_AGENDADA', classId: cancellation.class_id },
+        });
+      }
+
+      if (cancellation.class?.enrollments) {
+        const studentIds = cancellation.class.enrollments.map((e: any) => e.student_id);
+        sendPushNotification(studentIds, {
+          title: `Reposição Agendada: ${subjectName}`,
+          body: `A reposição da aula de ${subjectName} foi agendada para ${formattedRepDate}.`,
+          data: { type: 'REPOSICAO_AGENDADA', classId: cancellation.class_id },
+        });
       }
 
       return res.json({
