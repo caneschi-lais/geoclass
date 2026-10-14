@@ -19,7 +19,7 @@ sequenceDiagram
     actor Aluno
     participant App as Aplicativo Mobile (Expo)
     participant API as Backend API (Render.com)
-    participant DB as Banco PostgreSQL (Neon.tech)
+    participant DB as Banco Cloudflare D1 (Edge SQL)
 
     Aluno->>App: Digita E-mail e Senha e clica em "Entrar"
     App->>API: POST /api/login {email, password}
@@ -37,16 +37,22 @@ sequenceDiagram
     end
 
     App->>API: GET /api/aluno/aulas/hoje (Header Authorization: Bearer JWT)
-    API->>DB: Consulta matrículas (Enrollment) e salas ativas (padrão ou override temporário)
+    rect rgb(241, 245, 249)
+        note right of API: Processamento com Fuso Horário de Brasília (America/Sao_Paulo)
+        API->>API: 1. Valida Calendário Acadêmico (isAcademicInstructionalDay)
+        API->>API: 2. Executa processExpiredAttendanceSlots (fecha faltas >15m e auto-remedia faltas prematuras)
+        API->>DB: Consulta matrículas (Enrollment) e salas ativas (padrão ou override temporário)
+    end
     DB-->>API: Retorna disciplinas, horários, professores e centróides GPS
-    API-->>App: Retorna lista de aulas do dia
-    App-->>Aluno: Renderiza os Cards de Aulas na Home
+    API->>API: Avalia slots de hoje (já bateu / chamada aberta / aula futura / expirada)
+    API-->>App: Retorna lista de aulas com status contextual por slot
+    App-->>Aluno: Renderiza os Cards de Aulas na Home (botão ativo para chamada aberta ou aula futura)
 ```
 
 ---
 
 ### 1.2 Registro de Presença com Geofencing & Antifraude (Online)
-Fluxo principal de check-in onde a API valida a localização por Haversine, a janela estrita de 15 minutos e a colisão de ID do hardware.
+Fluxo principal de check-in onde a API valida a localização por Haversine, a janela estrita de 15 minutos no Horário de Brasília e a colisão de ID do hardware.
 
 ```mermaid
 sequenceDiagram
@@ -55,7 +61,8 @@ sequenceDiagram
     participant App as Aplicativo Mobile
     participant Hardware as Sensores (GPS/Device ID)
     participant API as Backend API (Render.com)
-    participant DB as Banco PostgreSQL (Neon.tech)
+    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant Push as Expo Push Service
 
     Aluno->>App: Clica no botão "Confirmar Presença" no Card da Aula
     App->>Hardware: Solicita Permissão e Coordenadas GPS (Alta Precisão)
@@ -66,26 +73,36 @@ sequenceDiagram
     App->>API: POST /api/aluno/presenca {classId, lat, lon, deviceId, accuracy}
 
     rect rgb(241, 245, 249)
-        note right of API: Processamento e Antifraude Server-Side
-        API->>API: 1. Valida Janela de Horário (Hora da Aula + 15 min de tolerância)
-        API->>API: 2. Verifica se a chamada já foi controlada manualmente (EAD)
-        API->>API: 3. Calcula Distância pela Fórmula de Haversine ajustada por precisão GPS
-        API->>API: 4. Checa se o Device ID já registrou presença para outro RA no dia
+        note right of API: Processamento e Antifraude Server-Side (Fuso de Brasília)
+        API->>API: 1. Converte horário para Horário de Brasília (America/Sao_Paulo UTC-3)
+        API->>API: 2. Valida Janela de Horário por Slot (Tolerância Estrita de 15 min)
+        API->>API: 3. Verifica se a chamada já foi controlada manualmente (EAD)
+        API->>API: 4. Calcula Distância pela Fórmula de Haversine ajustada por precisão GPS
+        API->>API: 5. Checa se o Device ID já registrou presença para outro RA no dia
     end
 
-    alt Fora do Horário Permite / Expirado
-        API-->>App: Erro 403: "Tolerância de 15 minutos expirou"
-        App-->>Aluno: Exibe mensagem de alerta
+    alt Chamada Ainda Não Aberta (Acesso Antecipado, ex: 18:40 para aula das 19:00)
+        API-->>App: Erro 403: "A chamada ainda não abriu. Abre às 19:00 com 15m de tolerância"
+        App-->>Aluno: Exibe mensagem com horário de abertura previsto
+    else Fora da Janela de Tolerância (> 15 minutos do slot)
+        API->>DB: Registra ausência automática (status=FALTA)
+        API-->>App: Erro 403: "Tolerância de 15 minutos expirou. Ausência registrada."
+        App-->>Aluno: Exibe aviso de falta registrada
     else Fora do Raio do Geofencing
         API-->>App: Erro 400: "Você está fora da área permitida da sala"
         App-->>Aluno: Exibe distância calculada e raio limite
     else Fraude de Aparelho Detectada
         API-->>App: Erro 403: "Dispositivo já utilizado por outro aluno hoje"
         App-->>Aluno: Exibe alerta vermelho de fraude
-    else Check-in Válido
-        API->>DB: Insere registro na tabela Attendance (status=PRESENTE)
+    else Check-in Válido Dentro da Janela de 15 minutos
+        alt Havia Falta Prematura Gravada por Bug Anterior
+            API->>DB: Atualiza registro anterior de FALTA para status=PRESENTE
+        else Registro Novo
+            API->>DB: Insere registro na tabela Attendance (status=PRESENTE)
+        end
         API->>DB: Insere notificação em Notification ("Presença Confirmada")
-        DB-->>API: Registro criado
+        API-)Push: Dispara Push Notification via Expo Push API
+        DB-->>API: Registro confirmado no Cloudflare D1
         API-->>App: Status 201: Presença confirmada!
         App-->>Aluno: Exibe feedback visual de sucesso (Card Atualizado)
     end
@@ -103,7 +120,7 @@ sequenceDiagram
     participant App as Aplicativo Mobile (Expo)
     participant Queue as Fila Offline (AsyncStorage)
     participant API as Backend API (Render.com)
-    participant DB as Banco PostgreSQL (Neon.tech)
+    participant DB as Banco Cloudflare D1 (Edge SQL)
 
     Aluno->>App: Clica em "Confirmar Presença" (Sem Internet)
     App->>App: Captura GPS e Device ID do hardware local
@@ -150,7 +167,7 @@ sequenceDiagram
     actor Aluno
     participant App as Aplicativo Mobile
     participant API as Backend API (Render.com)
-    participant DB as Banco PostgreSQL (Neon.tech)
+    participant DB as Banco Cloudflare D1 (Edge SQL)
 
     %% Dashboard de Frequência
     Aluno->>App: Acessa aba "Dashboard"
@@ -196,7 +213,7 @@ sequenceDiagram
     actor Professor
     participant App as Aplicativo Mobile (Expo)
     participant API as Backend API (Render.com)
-    participant DB as Banco PostgreSQL (Neon.tech)
+    participant DB as Banco Cloudflare D1 (Edge SQL)
 
     Professor->>App: Acessa aba "Minhas Turmas"
     App->>API: GET /api/professor/turmas
@@ -223,7 +240,7 @@ sequenceDiagram
     actor Professor
     participant App as Aplicativo Mobile
     participant API as Backend API (Render.com)
-    participant DB as Banco PostgreSQL (Neon.tech)
+    participant DB as Banco Cloudflare D1 (Edge SQL)
 
     Professor->>App: Seleciona turma e clica em "Trocar Sala"
     App->>API: GET /api/professor/salas-disponiveis
@@ -264,7 +281,7 @@ sequenceDiagram
     actor Professor
     participant App as Aplicativo Mobile
     participant API as Backend API (Render.com)
-    participant DB as Banco PostgreSQL (Neon.tech)
+    participant DB as Banco Cloudflare D1 (Edge SQL)
 
     Professor->>App: Seleciona a turma e clica em "Chamada Manual / EAD"
     App->>API: GET /api/professor/turma/:id/alunos
@@ -297,7 +314,7 @@ sequenceDiagram
     actor Professor
     participant App as Aplicativo Mobile
     participant API as Backend API (Render.com)
-    participant DB as Banco PostgreSQL (Neon.tech)
+    participant DB as Banco Cloudflare D1 (Edge SQL)
 
     Professor->>App: Seleciona aluno na lista de chamada e clica em "Resetar Aparelho"
     App->>API: POST /api/professor/presenca/reset-device {studentId, classId}
@@ -325,7 +342,7 @@ sequenceDiagram
     actor Professor
     participant App as Aplicativo Mobile (Expo)
     participant API as Backend API (Render.com)
-    participant DB as Banco PostgreSQL (Neon.tech)
+    participant DB as Banco Cloudflare D1 (Edge SQL)
     actor Coordenador
 
     Professor->>App: Clica em "Avisar Falta" na tela da turma
@@ -367,7 +384,7 @@ sequenceDiagram
     actor Professor
     participant App as Aplicativo Mobile
     participant API as Backend API (Render.com)
-    participant DB as Banco PostgreSQL (Neon.tech)
+    participant DB as Banco Cloudflare D1 (Edge SQL)
     actor Alunos as Alunos Matriculados
 
     Professor->>App: Acessa "Atestados" ou "Reposições" e clica em "Agendar / Alterar Data"
@@ -396,7 +413,7 @@ sequenceDiagram
     actor Professor
     participant App as Aplicativo Mobile
     participant API as Backend API (Render.com)
-    participant DB as Banco PostgreSQL (Neon.tech)
+    participant DB as Banco Cloudflare D1 (Edge SQL)
 
     Professor->>App: Clica no botão "Reposições / Chamadas" na tela Minhas Turmas
     App->>API: GET /api/professor/reposicoes-pendentes
@@ -430,7 +447,7 @@ sequenceDiagram
     actor Coordenador
     participant Web as Painel Coordenador / App
     participant API as Backend API (Render.com)
-    participant DB as Banco PostgreSQL (Neon.tech)
+    participant DB as Banco Cloudflare D1 (Edge SQL)
 
     Coordenador->>Web: Acessa "Gestão de Semestres"
     Web->>API: GET /api/coordenador/semestres
@@ -464,7 +481,7 @@ sequenceDiagram
     actor Coordenador
     participant Web as Painel Coordenador / App
     participant API as Backend API (Render.com)
-    participant DB as Banco PostgreSQL (Neon.tech)
+    participant DB as Banco Cloudflare D1 (Edge SQL)
 
     Coordenador->>Web: Preenche formulário "Cadastrar Sala" (Nome, Latitude, Longitude)
     opt Vincular Nova Turma/Matéria
@@ -499,7 +516,7 @@ sequenceDiagram
     actor Coordenador
     participant Web as Painel Coordenador / App
     participant API as Backend API (Render.com)
-    participant DB as Banco PostgreSQL (Neon.tech)
+    participant DB as Banco Cloudflare D1 (Edge SQL)
 
     Coordenador->>Web: Acessa tela "Matricular Aluno"
     Web->>API: GET /api/coordenador/alunos
@@ -534,7 +551,7 @@ sequenceDiagram
     actor Coordenador
     participant Web as Painel Coordenador / App
     participant API as Backend API (Render.com)
-    participant DB as Banco PostgreSQL (Neon.tech)
+    participant DB as Banco Cloudflare D1 (Edge SQL)
     participant Export as Motor de Exportação (PDF / XLSX)
 
     Coordenador->>Web: Clica em "Exportar Relatório Geral"
@@ -573,7 +590,7 @@ sequenceDiagram
     autonumber
     participant Cron as node-cron (Express Server)
     participant Job as lgpdWiperJob()
-    participant DB as Banco PostgreSQL (Neon.tech)
+    participant DB as Banco Cloudflare D1 (Edge SQL)
 
     note over Cron: Disparo agendado diariamente às 03:00 AM (Cron '0 3 * * *')
     Cron->>Job: Executa rotina de expurgo LGPD
@@ -588,29 +605,40 @@ sequenceDiagram
 
 ---
 
-### 4.2 Cron Job de Notificações Automáticas (Processamento Minutual)
-Varre continuamente as aulas agendadas e cria notificações proativas para os alunos.
+### 4.2 Cron Job de Notificações Automáticas e Relatórios de Chamada (Processamento Minutual)
+Varre continuamente as aulas agendadas no **Horário de Brasília** (`America/Sao_Paulo`), disparando lembretes aos alunos no início de cada slot e relatórios de fechamento de chamada aos professores após 15 minutos de tolerância.
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant Cron as node-cron (Express Server)
     participant Job as notificationJob()
-    participant DB as Banco PostgreSQL (Neon.tech)
+    participant Absence as AbsenceProcessor
+    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant Push as Expo Push Service
 
     note over Cron: Disparo agendado a cada minuto (Cron '* * * * *')
-    Cron->>Job: Executa rotina de varredura de notificações
-    Job->>DB: Busca aulas ativas com início nos próximos minutos
-    DB-->>Job: Retorna turmas encontradas
+    Cron->>Job: Executa rotina no Horário de Brasília (currentTimeStr)
+    Job->>Absence: processExpiredAttendanceSlots(now)
+    note right of Absence: Fecha tolerância de slots expirados e limpa faltas prematuras
 
-    loop Para cada turma encontrada
-        Job->>DB: Busca alunos matriculados que ainda não receberam alerta
-        DB-->>Job: Retorna alunos
-        loop Para cada aluno
-            Job->>DB: INSERT INTO Notification (user_id, title, body)
+    Job->>DB: Busca turmas ativas agendadas para o dia
+    DB-->>Job: Retorna turmas
+
+    loop Para cada turma ativa hoje
+        alt Início de Aula (slotStr == currentTimeStr, ex: 19:00)
+            loop Para cada aluno matriculado
+                Job->>DB: INSERT INTO Notification (user_id=aluno, title="Lembrete de Aula")
+                Job-)Push: sendPushNotification(studentId, "Sua aula começou às 19:00. Registre presença nos próximos 15 minutos!")
+            end
+        else Fechamento de Tolerância (+15 min, ex: 19:15)
+            Job->>DB: Conta presentes e faltas daquele slot
+            DB-->>Job: Retorna total presentes e ausentes
+            Job->>DB: INSERT INTO Notification (user_id=professor, title="Fechamento de Chamada")
+            Job-)Push: sendPushNotification(professorId, "A tolerância de 15 min encerrou. Resultado: X presentes, Y faltas")
         end
     end
-    Job->>Job: Imprime Log: "[CRON] Processamento de notificações concluído."
+    Job->>Job: Imprime Log: "[NOTIFICATION JOB] Processamento concluído."
 ```
 
 ---
@@ -643,7 +671,7 @@ sequenceDiagram
     participant Web as Painel Coordenador / App
     participant API as Backend API (Render.com)
     participant Util as Utilitário AcademicSemester
-    participant DB as Banco PostgreSQL (Neon.tech)
+    participant DB as Banco Cloudflare D1 (Edge SQL)
 
     Coordenador->>Web: Carrega tela de Gestão Acadêmica
     Web->>API: GET /api/coordenador/semestre-atual
@@ -684,7 +712,7 @@ sequenceDiagram
     actor Coordenador
     participant Web as Painel Coordenador / App
     participant API as Backend API (Render.com)
-    participant DB as Banco PostgreSQL (Neon.tech)
+    participant DB as Banco Cloudflare D1 (Edge SQL)
 
     %% Alternar Status Ativo / Inativo
     Coordenador->>Web: Alterna Switch "Ativo" de um Aluno
@@ -714,7 +742,7 @@ sequenceDiagram
     actor Coordenador
     participant Web as Painel Coordenador / App
     participant API as Backend API (Render.com)
-    participant DB as Banco PostgreSQL (Neon.tech)
+    participant DB as Banco Cloudflare D1 (Edge SQL)
     actor Alunos as Alunos Matriculados
     actor Professores as Professores
 
@@ -754,7 +782,7 @@ sequenceDiagram
     actor Coordenador
     participant Web as Painel Coordenador / App
     participant API as Backend API (Render.com)
-    participant DB as Banco PostgreSQL (Neon.tech)
+    participant DB as Banco Cloudflare D1 (Edge SQL)
     actor Professor
 
     Coordenador->>Web: Acessa aba "Solicitações de Falta"
@@ -792,7 +820,7 @@ sequenceDiagram
     autonumber
     actor Aluno
     participant API as Backend API (Render.com)
-    participant DB as Banco PostgreSQL (Neon.tech)
+    participant DB as Banco Cloudflare D1 (Edge SQL)
 
     note over API: Processado durante o registro de presença ou job
     API->>DB: Calcula porcentagem de presença acumulada da disciplina
@@ -802,6 +830,57 @@ sequenceDiagram
         API->>DB: INSERT INTO Notification (user_id, title, body) VALUES ("Atenção: Limite Crítico de Faltas (70% de presença em ADS)")
         DB-->>API: Notificação gravada
         note right of DB: Notificação enviada instantaneamente ao celular do aluno
+    end
+```
+
+---
+
+### 4.5 Fechamento Automático de Faltas & Auto-Remediação de Horários (`AbsenceProcessor` - Fuso BRT)
+Rotina executada tanto no cron minutual quanto sob demanda na abertura da grade pelo aluno. Avalia a tolerância estrita de 15 minutos no Horário de Brasília (`America/Sao_Paulo`), fechando slots expirados e limpando faltas gravadas indevidamente antes do término da tolerância.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Trigger as Acionador (notificationJob / GET /aluno/aulas/hoje)
+    participant Proc as processExpiredAttendanceSlots()
+    participant Cal as CalendarService (isAcademicInstructionalDay)
+    participant Time as Motor de Fuso Horário (dateUtils - BRT UTC-3)
+    participant DB as Banco Cloudflare D1 (Edge SQL)
+
+    Trigger->>Proc: Executa processExpiredAttendanceSlots(now)
+    Proc->>Time: getBrazilMidnightDate(now) & getBrazilParts(now)
+    Proc->>Cal: isAcademicInstructionalDay(now)
+    
+    alt Hoje Não É Dia Letivo (Domingo, Feriado ou Recesso)
+        Cal-->>Proc: { isInstructional: false, reason: "Feriado/Recesso" }
+        note over Proc: Faltas suspensas. Processamento finalizado sem registrar ausências.
+    else Dia Letivo Confirmado
+        Cal-->>Proc: { isInstructional: true }
+        Proc->>DB: Busca turmas ativas e alunos matriculados
+        DB-->>Proc: Retorna turmas e matrículas
+
+        loop Para cada turma ativa do dia
+            Proc->>Time: getScheduleSlotsForDay(cls.schedule_time, cls.week_days)
+            Time-->>Proc: Retorna slots do dia (ex: ["19:00", "19:50"])
+
+            rect rgb(254, 242, 242)
+                note right of Proc: Fase 1: Auto-Remediação de Faltas Prematuras
+                loop Para cada slot ainda NÃO expirado hoje (isExpired == false)
+                    Proc->>DB: DELETE FROM Attendance WHERE class_id, date=today, slot_time, status='FALTA', manual=false
+                    note over DB: Remove faltas geradas indevidamente antes do encerramento da tolerância
+                end
+            end
+
+            rect rgb(240, 253, 244)
+                note right of Proc: Fase 2: Fechamento de Ausências de Slots Expirados
+                loop Para cada slot expirado hoje no fuso BRT (currentMinutes > slotStart + 15)
+                    loop Para cada aluno matriculado sem registro de presença
+                        Proc->>DB: INSERT INTO Attendance (student_id, class_id, date, slot_time, status='FALTA')
+                        Proc->>DB: INSERT INTO Notification (user_id=student_id, title="Falta Registrada")
+                    end
+                end
+            end
+        end
     end
 ```
 

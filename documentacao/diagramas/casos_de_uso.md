@@ -2,7 +2,7 @@
 
 O **Diagrama de Casos de Uso (UML)** é essencial na monografia/TCC pois ilustra de forma clara e estruturada quais interações cada Ator (Usuário/Sistema) executa no ecossistema do GeoClass.
 
-O diagrama a seguir utiliza a notação **Mermaid**, categorizando os atores (Aluno, Professor, Coordenador e Sistema Autônomo) e os relacionamentos de `<<include>>` (inclusão obrigatória) e `<<extend>>` (extensão condicional).
+O diagrama a seguir utiliza a notação **Mermaid**, categorizando os atores (Aluno, Professor, Coordenador e Sistema Autônomo) e os relacionamentos de `<<include>>` (inclusão obrigatória) e `<<extend>>` (extensão condicional), atualizado com o **Motor de Fuso Horário de Brasília (UTC-3)**, **Fechamento de Faltas com Auto-Remediação** e **Push Notifications**.
 
 ---
 
@@ -17,14 +17,16 @@ flowchart LR
     Aluno["Aluno"] --- Login(["Autenticar no App"]) & AceitarLGPD(["Aceitar Termos de Privacidade LGPD"]) & ViewTurmas(["Consultar Aulas do Dia & Modo Leitura"]) & RegistrarPonto(["Marcar Presença via GPS / Multi-Slot"]) & ViewHistorico(["Consultar Histórico Acadêmico"]) & ViewNotif(["Visualizar Notificações & Alertas de Risco"])
     Prof["Professor"] --- Login & ViewTurmas & ViewAlunosTurma(["Consultar Alunos da Turma & Semestre"]) & RealocarSala(["Realocar Sala Temporariamente"]) & ChamadaManual(["Realizar Chamada Manual / EAD"]) & ResetDevice(["Resetar Device Binding de Aluno"]) & AvisarFalta(["Avisar Falta / Solicitar Ausência"]) & AnexarAtestado(["Anexar Atestado Médico"]) & AgendarReposicao(["Agendar Data de Reposição"]) & ChamadaReposicao(["Realizar Chamada de Reposição"])
     Coord["Coordenador"] --- Login & CadastrarSala(["Cadastrar Sala/Infraestrutura"]) & MatricularAluno(["Matricular Aluno em Disciplina"]) & ViewDashboardRisk(["Monitorar Evasão e Alunos em Risco (<75%)"]) & GerarRelatorio(["Exportar Relatórios PDF/XLSX"]) & ToggleStatus(["Alternar Status Ativo/Trancamento"]) & ToggleConclusao(["Gerenciar Conclusão de Curso"]) & ViradaSemestre(["Executar Virada de Semestre em Lote"]) & SuspenderAula(["Suspender Aula Direta"]) & GerenciarFaltas(["Aprovar/Recusar Falta & Solicitar Atestado"]) & AgendarReposicaoCoord(["Agendar / Alterar Reposição"])
-    Sistema["Sistema (Job / Nuvem)"] --- Expurgo(["Expurgar Geodados e Device ID - LGPD"]) & KeepAlive(["Manter API Ativa via Keep-Alive"]) & NotifJob(["Processar Notificações Automáticas"]) & RiskNotification(["Disparar Alerta Auto de Risco (<75%)"]) & DetectSemestre(["Detectar Semestre Atual Automático YYYY.1/2"])
-    RegistrarPonto -. &lt;&gt; .-> ValidarAntiFraude(["Validar Geofencing, Janela 15m, Device ID & Slot"])
+    Sistema["Sistema (Job / Nuvem)"] --- Expurgo(["Expurgar Geodados e Device ID - LGPD"]) & KeepAlive(["Manter API Ativa via Keep-Alive"]) & NotifJob(["Processar Notificações Automáticas"]) & RiskNotification(["Disparar Alerta Auto de Risco (<75%)"]) & DetectSemestre(["Detectar Semestre Atual Automático YYYY.1/2"]) & AbsenceProcessorCase(["Processar Fechamento de Faltas 15m & Auto-Remediação - Fuso BRT"]) & PushNotificationsCase(["Disparar Push Notifications Proativas - Expo Push API"])
+    RegistrarPonto -. &lt;&gt; .-> ValidarAntiFraude(["Validar Geofencing, Janela 15m no Fuso BRT, Device ID & Slot"])
     RegistrarOffline(["Registrar Presença Offline SHA-256"]) -. &lt;&gt; .-> RegistrarPonto
     RealocarSala -. &lt;&gt; .-> NotifJob
     ViradaSemestre -. &lt;&gt; .-> DetectSemestre
     SuspenderAula -. &lt;&gt; .-> NotifJob
     AgendarReposicao -. &lt;&gt; .-> NotifJob
     AvisarFalta -. &lt;&gt; .-> NotifJob
+    NotifJob -. &lt;&gt; .-> PushNotificationsCase
+    AbsenceProcessorCase -. &lt;&gt; .-> NotifJob
 
      Aluno:::actor
      Login:::usecase
@@ -61,6 +63,8 @@ flowchart LR
      DetectSemestre:::usecase
      ValidarAntiFraude:::usecase
      RegistrarOffline:::usecase
+     AbsenceProcessorCase:::usecase
+     PushNotificationsCase:::usecase
     classDef actor fill:#f8fafc,stroke:#94a3b8,stroke-width:2px,font-weight:bold,color:#1e293b
     classDef systemActor fill:#fee2e2,stroke:#ef4444,stroke-width:2px,font-weight:bold,color:#991b1b
     classDef usecase fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
@@ -78,20 +82,27 @@ flowchart LR
 * **Ator Principal:** Aluno
 * **Descrição:** Apresentação e coleta do consentimento expresso do aluno para o processamento de geolocalização e captura de identificadores de hardware.
 
+### CDU-03: Consultar Aulas do Dia & Modo Leitura
+* **Ator Principal:** Aluno
+* **Descrição:** Consulta as aulas programadas para o dia no Horário de Brasília. Caso o dia seja não-letivo no Calendário Acadêmico (feriado/recesso), oculta as aulas. Avalia o status de cada slot: se a aula ainda não iniciou, mantém o botão habilitado sem marcar ausência antecipada; se estiver na janela de tolerância aberta (15 minutos), libera o check-in; se todos os slots expiraram sem presença, exibe o selo de ausência.
+
 ### CDU-04: Marcar Presença via GPS / Multi-Slot
 * **Ator Principal:** Aluno
-* **Descrição:** Registro de presença para cada bloco de horário (`slot_time`) da aula atual do dia. Captura latitude, longitude e `Device ID`. Se o curso do aluno estiver marcado como concluído (`is_completed: true`), o sistema trava o check-in e ativa o **Modo Leitura**.
+* **Descrição:** Registro de presença para cada bloco de horário (`slot_time`) da aula atual do dia. Captura latitude, longitude e `Device ID`. Se o curso do aluno estiver marcado como concluído (`is_completed: true`), o sistema trava o check-in e ativa o **Modo Leitura**. Avalia a chamada com base no Horário de Brasília (UTC-3): se o aluno acessar antes do horário (ex: 18:40 para aula das 19:00), a API informa quando a chamada abrirá; se estiver no horário, valida a geolocalização e confirma a presença.
 * **Pré-condições:** Estar logado, conta ativa, dentro da janela de horário de aula e permissão de GPS concedida.
-* **Includes:** `CDU-06: Validar Geofencing, Janela 15m, Device ID & Slot`.
+* **Includes:** `CDU-06: Validar Geofencing, Janela 15m no Fuso BRT, Device ID & Slot`.
 
 ### CDU-05: Registrar Presença Offline (SHA-256)
 * **Ator Principal:** Aluno
 * **Descrição:** Caso não haja conexão com a internet, o app valida o Geofencing localmente e enfileira um pacote criptográfico assinado com SHA-256 (`timestamp` + `deviceId` + `secret`), enviando automaticamente à API ao reconectar.
 * **Extends:** `CDU-04: Marcar Presença via GPS`.
 
-### CDU-06: Validar Geofencing, Janela 15m, Device ID & Slot (Automático)
+### CDU-06: Validar Geofencing, Janela 15m no Fuso BRT, Device ID & Slot (Automático)
 * **Ator Principal:** Sistema (Backend API)
-* **Descrição:** Algoritmo server-side que calcula a distância pela Fórmula de Haversine ajustada por margem de GPS, bloqueia registros fora da tolerância de 15 minutos do slot e impede a reutilização do mesmo `Device ID` para matrículas distintas no mesmo dia.
+* **Descrição:** Algoritmo server-side executado no fuso horário canônico de Brasília (`America/Sao_Paulo`, UTC-3) via módulo `dateUtils`. Valida:
+  1. **Janela de Tolerância Estrita (15 min):** Se o acesso ocorrer antes do início do slot, avisa o horário de abertura; se ocorrer no intervalo `[início, início + 15 min]`, processa o check-in e autorrecupera eventuais faltas prematuras; se ultrapassar 15 min, grava a falta e bloqueia a chamada.
+  2. **Geofencing:** Calcula a distância pela Fórmula de Haversine ajustada por margem de acurácia de GPS.
+  3. **Antifraude de Dispositivo:** Impede a reutilização do mesmo `Device ID` para matrículas distintas no mesmo dia.
 
 ### CDU-09: Realocar Sala Temporariamente
 * **Ator Principal:** Professor
@@ -100,7 +111,7 @@ flowchart LR
 
 ### CDU-10: Realizar Chamada Manual / EAD
 * **Ator Principal:** Professor
-* **Descrição:** Permite o lançamento manual da lista de presenças/faltas para aulas remotas (EAD) ou em casos excepcionais de imprevisto tecnológico dos alunos, exibindo o semestre específico do aluno em cada curso.
+* **Descrição:** Permite o lançamento manual da lista de presenças/faltas para aulas remotas (EAD) ou em casos excepcionais de imprevisto tecnológico dos alunos, exibindo o semestre específico do aluno em cada curso e normalizando a data de presença no fuso de Brasília.
 
 ### CDU-11: Resetar Device Binding de Aluno
 * **Atores:** Professor, Coordenador
@@ -124,7 +135,7 @@ flowchart LR
 
 ### CDU-17: Expurgar Geodados e Device ID (LGPD)
 * **Ator Principal:** Sistema (Job Agendado `LgpdWiperJob`)
-* **Descrição:** Rotina automatizada `node-cron` que roda diariamente às 03:00 AM. Anonimiza as colunas de geolocalização e `device_id` em registros de presença com mais de 6 meses de antiguidade.
+* **Descrição:** Rotina automatizada `node-cron` que roda diariamente às 03:00 AM no fuso de Brasília. Anonimiza as colunas de geolocalização e `device_id` em registros de presença com mais de 6 meses de antiguidade.
 
 ### CDU-19: Manter API Ativa via Keep-Alive
 * **Ator Principal:** Sistema (Pinger `UptimeRobot`)
@@ -174,3 +185,16 @@ flowchart LR
 * **Ator Principal:** Professor
 * **Descrição:** Permite ao professor abrir o modal de "Reposições / Chamadas", selecionar a aula reposta com todos os alunos matriculados pré-selecionados por padrão (conforme requisito), desmarcar eventuais faltosos e concluir a chamada, convertendo as presenças parciais para presença final da reposição.
 
+### CDU-31: Processar Fechamento Automático de Faltas e Auto-Remediação (Fuso BRT)
+* **Ator Principal:** Sistema (`AbsenceProcessor`)
+* **Descrição:** Rotina autônoma sincronizada no Horário de Brasília (`America/Sao_Paulo`, UTC-3) executada tanto periodicamente no cron minutual quanto sob demanda no carregamento da grade do aluno:
+  1. Verifica se hoje é dia letivo no Calendário Acadêmico (ignora feriados/recessos/domingos);
+  2. Identifica slots de aula cuja tolerância de 15 minutos já expirou no dia e insere o registro `status: 'FALTA'` para alunos matriculados sem presença registrada;
+  3. Realiza auto-remediação: identifica e exclui registros de falta indevidos que tenham sido gravados prematuramente para horários que ainda não expiraram no dia corrente.
+
+### CDU-32: Disparar Push Notifications Proativas (Expo Push API)
+* **Ator Principal:** Sistema (`pushNotificationService`)
+* **Descrição:** Envia notificações remotas em tempo real diretamente para os aparelhos dos usuários utilizando o `push_token` registrado:
+  - **Lembrete de Início de Aula:** Disparado ao aluno no minuto exato de início de cada slot letivo (ex: 19:00), alertando sobre o prazo de 15 minutos de tolerância;
+  - **Fechamento de Chamada:** Disparado ao professor ao final dos 15 minutos de tolerância (ex: 19:15), com o resumo consolidado de alunos presentes e ausentes;
+  - **Avisos Institucionais & Risco:** Disparado na aprovação de cancelamento, agendamento de reposição e alertas de evasão (< 75%).
