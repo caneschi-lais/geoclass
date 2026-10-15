@@ -12,7 +12,11 @@ export class AuthController {
     try {
       const user = await prisma.user.findUnique({
         where: { email },
-        include: { userCourses: true }
+        include: {
+          userCourses: {
+            include: { course: true, semester: true }
+          }
+        }
       });
 
       if (!user) {
@@ -35,15 +39,26 @@ export class AuthController {
         { expiresIn: '7d' } // Expira em 7 dias
       );
 
+      const courseNames = user.userCourses.map(uc => uc.course.name);
+      const studentSemester = user.userCourses.find(uc => uc.student_term)?.student_term || null;
+      const userCoursesFormatted = user.userCourses.map(uc => ({
+        id: uc.id,
+        user_id: uc.user_id,
+        course_id: uc.course_id,
+        course_name: uc.course.name,
+        semester: uc.student_term,
+        is_completed: uc.is_completed
+      }));
+
       return res.json({
         user: {
           id: user.id,
           name: user.name,
           email: user.email,
           role: user.role,
-          courses: typeof user.courses === 'string' ? JSON.parse(user.courses) : (user.courses || []),
-          userCourses: user.userCourses || [],
-          student_semester: user.student_semester || null,
+          courses: courseNames,
+          userCourses: userCoursesFormatted,
+          student_semester: studentSemester,
           active: user.active ?? true,
           privacy_terms_accepted_at: user.privacy_terms_accepted_at
         },

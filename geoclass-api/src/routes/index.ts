@@ -60,6 +60,7 @@ router.get('/coordenador/relatorio', coordinatorController.getReportData);
 router.post('/coordenador/sala', coordinatorController.createRoom);
 router.post('/coordenador/materia', coordinatorController.createClass);
 router.get('/coordenador/salas', coordinatorController.getAllRooms);
+router.get('/coordenador/cursos', coordinatorController.getAllCourses);
 router.get('/coordenador/professores', coordinatorController.getProfessors);
 router.get('/coordenador/alunos', coordinatorController.getAllStudents);
 router.post('/coordenador/matricular', coordinatorController.enrollStudent);

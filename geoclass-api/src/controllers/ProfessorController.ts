@@ -5,13 +5,9 @@ import { getBrazilDateString, getBrazilMidnightDate } from '../utils/dateUtils';
 import { sendPushNotification } from '../services/pushNotificationService';
 import prisma from '../prisma';
 
-function parseCourses(courses: any): string[] {
-  if (!courses) return [];
-  if (Array.isArray(courses)) return courses;
-  if (typeof courses === 'string') {
-    try { return JSON.parse(courses); } catch { return [courses]; }
-  }
-  return [];
+function parseStudentCourses(userCourses?: any[]): string[] {
+  if (!userCourses || !Array.isArray(userCourses)) return [];
+  return userCourses.map(uc => uc.course?.name || uc.course_name).filter(Boolean);
 }
 
 function resolveClassSlots(
@@ -27,13 +23,16 @@ export class ProfessorController {
     const professorId = req.user?.id;
 
     try {
-      const todayStr = getBrazilDateString(new Date());
+      const todayDate = getBrazilMidnightDate(new Date());
       
       const classes = await prisma.class.findMany({
         where: { professor_id: professorId },
         include: {
+          room: true,
+          course: true,
           temporaryLocs: {
-            where: { date: todayStr }
+            where: { date: todayDate },
+            include: { room: true }
           },
           _count: {
             select: { enrollments: true }
@@ -42,12 +41,13 @@ export class ProfessorController {
       });
 
       const turmas = classes.map(c => {
-        const tempRoom = c.temporaryLocs && c.temporaryLocs.length > 0 ? c.temporaryLocs[0].room_name : null;
+        const tempRoom = c.temporaryLocs && c.temporaryLocs.length > 0 ? c.temporaryLocs[0].room.name : null;
         return {
           id: c.id,
           subject: c.subject,
           time: c.schedule_time,
-          room: tempRoom || c.room_name,
+          room: tempRoom || c.room.name,
+          course_name: c.course?.name || null,
           enrolledCount: c._count.enrollments
         };
       });
@@ -73,7 +73,11 @@ export class ProfessorController {
             where: { is_completed: false },
             include: {
               student: {
-                include: { userCourses: true }
+                include: {
+                  userCourses: {
+                    include: { course: true }
+                  }
+                }
               }
             }
           }
@@ -95,7 +99,11 @@ export class ProfessorController {
         },
         include: {
           student: {
-            include: { userCourses: true }
+            include: {
+              userCourses: {
+                include: { course: true }
+              }
+            }
           }
         },
         orderBy: {
@@ -107,24 +115,31 @@ export class ProfessorController {
       const studentMap = new Map<number, any>();
       for (const enr of classData.enrollments) {
         const s = enr.student;
+        const matchingCourse = s.userCourses?.find((uc: any) => uc.course_id === classData.course_id);
+        const specificSemester = matchingCourse?.student_term || s.userCourses?.[0]?.student_term || undefined;
+
         studentMap.set(s.id, {
           id: s.id,
           name: s.name,
           ra: s.ra || 'N/A',
-          student_semester: s.student_semester || undefined,
-          courses: parseCourses(s.courses),
+          student_semester: specificSemester,
+          courses: parseStudentCourses(s.userCourses),
           userCourses: s.userCourses,
         });
       }
       for (const att of attendances) {
         if (!studentMap.has(att.student.id)) {
-          studentMap.set(att.student.id, {
-            id: att.student.id,
-            name: att.student.name,
-            ra: att.student.ra || 'N/A',
-            student_semester: att.student.student_semester || undefined,
-            courses: parseCourses(att.student.courses),
-            userCourses: (att.student as any).userCourses || [],
+          const s = att.student as any;
+          const matchingCourse = s.userCourses?.find((uc: any) => uc.course_id === classData.course_id);
+          const specificSemester = matchingCourse?.student_term || s.userCourses?.[0]?.student_term || undefined;
+
+          studentMap.set(s.id, {
+            id: s.id,
+            name: s.name,
+            ra: s.ra || 'N/A',
+            student_semester: specificSemester,
+            courses: parseStudentCourses(s.userCourses),
+            userCourses: s.userCourses || [],
           });
         }
       }
@@ -175,7 +190,7 @@ export class ProfessorController {
           has_device: !!deviceAttendance,
           device_id: deviceAttendance?.device_id || null,
           student_semester: student.student_semester,
-          courses: parseCourses(student.courses),
+          courses: student.courses,
         };
       });
 
@@ -185,7 +200,7 @@ export class ProfessorController {
       return res.json(studentsList);
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ error: 'Erro ao buscar presenças da turma' });
+      return res.status(500).json({ error: 'Erro ao buscar presenças' });
     }
   }
 
@@ -200,14 +215,17 @@ export class ProfessorController {
     try {
       const classData = await prisma.class.findUnique({
         where: { id: classId },
-        include: { enrollments: true }
+        include: { enrollments: true, room: true }
       });
       if (!classData) return res.status(404).json({ error: 'Turma não encontrada' });
+
+      const targetDate = new Date(String(date).includes('T') ? String(date) : `${date}T12:00:00Z`);
+      const targetDateMidnight = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate()));
 
       if (!roomId) {
         // Restaurar sala padrão deletando a entrada temporária
         await prisma.temporaryClassLocation.deleteMany({
-          where: { class_id: classId, date: String(date) }
+          where: { class_id: classId, date: targetDateMidnight }
         });
 
         // Notificar alunos sobre o retorno à sala padrão
@@ -216,7 +234,7 @@ export class ProfessorController {
             data: {
               user_id: enrollment.student_id,
               title: `Troca de Sala: ${classData.subject}`,
-              body: `Atenção: A aula de hoje da matéria ${classData.subject} retornou para a sala padrão ${classData.room_name}.`
+              body: `Atenção: A aula de hoje da matéria ${classData.subject} retornou para a sala padrão ${classData.room.name}.`
             }
           });
         }
@@ -231,18 +249,18 @@ export class ProfessorController {
       // Verificação dupla de conflito
       const classesAtSameTime = await prisma.class.findMany({
         where: { schedule_time: classData.schedule_time, active: true },
-        select: { room_name: true, id: true }
+        select: { room_id: true, id: true }
       });
 
       const temporaryLocsAtDate = await prisma.temporaryClassLocation.findMany({
-        where: { date: String(date) },
+        where: { date: targetDateMidnight },
         include: { class: true }
       });
 
       const busyTemporaryLocs = temporaryLocsAtDate.filter(loc => loc.class.schedule_time === classData.schedule_time);
 
       const isStandardOccupied = classesAtSameTime.some(c => {
-        if (c.room_name === roomData.name && c.id !== classId) {
+        if (c.room_id === roomData.id && c.id !== classId) {
           const classHasTemporaryLocation = temporaryLocsAtDate.some(t => t.class_id === c.id);
           return !classHasTemporaryLocation; 
         }
@@ -257,20 +275,14 @@ export class ProfessorController {
 
       // Salva ou atualiza a troca
       const tempLoc = await prisma.temporaryClassLocation.upsert({
-        where: { class_id_date: { class_id: classId, date: String(date) } },
+        where: { class_id_date: { class_id: classId, date: targetDateMidnight } },
         update: {
           room_id: roomData.id,
-          room_name: roomData.name,
-          latitude: roomData.latitude,
-          longitude: roomData.longitude
         },
         create: {
           class_id: classId,
-          date: String(date),
+          date: targetDateMidnight,
           room_id: roomData.id,
-          room_name: roomData.name,
-          latitude: roomData.latitude,
-          longitude: roomData.longitude
         }
       });
 
@@ -308,7 +320,7 @@ export class ProfessorController {
       const dateQuery = req.query.date as string | undefined;
       const classInfo = await prisma.class.findUnique({
         where: { id: classId },
-        select: { course_name: true, schedule_time: true, week_days: true }
+        select: { course_id: true, schedule_time: true, week_days: true }
       });
 
       const classSlots = resolveClassSlots(classInfo?.schedule_time, classInfo?.week_days, dateQuery || new Date());
@@ -317,20 +329,24 @@ export class ProfessorController {
         where: { class_id: classId },
         include: {
           student: {
-            include: { userCourses: true }
+            include: {
+              userCourses: {
+                include: { course: true }
+              }
+            }
           }
         }
       });
 
       const students = enrollments.map(e => {
-        const matchingCourse = e.student.userCourses?.find(uc => uc.course_name === classInfo?.course_name);
-        const specificSemester = matchingCourse?.semester || e.student.student_semester || 'Não informado';
+        const matchingCourse = e.student.userCourses?.find(uc => uc.course_id === classInfo?.course_id);
+        const specificSemester = matchingCourse?.student_term || e.student.userCourses?.[0]?.student_term || 'Não informado';
 
         return {
           id: e.student.id,
           name: e.student.name,
           ra: e.student.ra || 'N/A',
-          courses: parseCourses(e.student.courses),
+          courses: e.student.userCourses.map(uc => uc.course.name),
           student_semester: specificSemester,
           userCourses: e.student.userCourses,
           active: e.student.active,

@@ -18,12 +18,15 @@ export class RoomController {
       // 2. Verifica as turmas regulares (salas padrão) ativas que ocorrem neste horário
       const classesAtSameTime = await prisma.class.findMany({
         where: { schedule_time: String(schedule_time), active: true },
-        select: { room_name: true, id: true }
+        select: { room_id: true, id: true }
       });
 
       // 3. Verifica as salas temporárias já agendadas para essa data
+      const targetDate = new Date(String(date).includes('T') ? String(date) : `${date}T12:00:00Z`);
+      const targetDateMidnight = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate()));
+
       const temporaryLocsAtDate = await prisma.temporaryClassLocation.findMany({
-        where: { date: String(date) },
+        where: { date: targetDateMidnight },
         include: { class: true }
       });
 
@@ -32,15 +35,11 @@ export class RoomController {
 
       // 4. Filtrar as salas disponíveis
       const availableRooms = allRooms.filter(room => {
-        // A sala está ocupada de forma padrão se uma turma a usa E não tem troca temporária para hoje
-        // (Se a turma trocou de sala hoje, a sala padrão DELE ficaria livre. Mas para MVP, vamos simplificar:
-        // se é a sala padrão de uma turma no mesmo horário, ela está ocupada, a menos que saibamos com certeza).
-        // Simplificação: se a sala padrão está sendo usada por uma turma do mesmo horário e essa turma não trocou de sala.
         const isStandardOccupied = classesAtSameTime.some(c => {
-          if (c.room_name === room.name) {
+          if (c.room_id === room.id) {
             // Verifica se a turma c TEM uma sala temporária hoje (se tiver, essa sala padrão fica livre!)
             const classHasTemporaryLocation = temporaryLocsAtDate.some(t => t.class_id === c.id);
-            return !classHasTemporaryLocation; // Se NÃO tem troca, a sala está ocupada pela padrão
+            return !classHasTemporaryLocation; 
           }
           return false;
         });

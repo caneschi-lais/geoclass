@@ -7,7 +7,7 @@ O **Dicionário de Dados** descreve a estrutura física do banco de dados relaci
 ## 🗄️ Tabelas do Banco de Dados
 
 ### 1. Tabela: `User` (Usuários do Sistema)
-Armazena todos os usuários cadastrados no sistema (Alunos, Professores e Coordenadores).
+Armazena todos os usuários cadastrados no sistema (Alunos, Professores e Coordenadores). Os vínculos com cursos e termos acadêmicos foram normalizados na tabela `UserCourse`.
 
 | Atributo | Tipo Prisma / PostgreSQL (Supabase) | Nulo? | Chave | Descrição / Regra de Negócio |
 | :--- | :--- | :--- | :--- | :--- |
@@ -17,8 +17,6 @@ Armazena todos os usuários cadastrados no sistema (Alunos, Professores e Coorde
 | `password_hash` | `String` (Text / Varchar) | Não | - | Senha criptografada com algoritmo `bcryptjs` (salt 10). |
 | `role` | `Enum (Role)` | Não | - | Papel do usuário: `ALUNO` (default), `PROFESSOR`, `COORDENADOR`. |
 | `ra` | `String` (Text / Varchar) | Sim | **Unique** | Registro Acadêmico único (obrigatório para perfis de `ALUNO`). |
-| `courses` | `String[]` (Text Array) | Não | - | Lista de cursos aos quais o usuário está vinculado (padrão: `[]`). |
-| `student_semester` | `String` (Text / Varchar) | Sim | - | Semestre letivo legado/padrão do aluno (ex: "6º Semestre"). |
 | `active` | `Boolean` | Não | - | Flag indicando se a conta está ativa (`true`) ou trancada/inativa (`false`). |
 | `privacy_terms_accepted_at` | `DateTime` (Timestamp) | Sim | - | Data/hora do aceite dos termos de privacidade da LGPD. |
 | `push_token` | `String` (Text / Varchar) | Sim | - | Token de Push Notifications do dispositivo gerado pela Expo Notifications. |
@@ -26,37 +24,48 @@ Armazena todos os usuários cadastrados no sistema (Alunos, Professores e Coorde
 
 ---
 
-### 1.1 Tabela: `UserCourse` (Vínculo de Cursos e Semestres por Aluno)
-Armazena a relação N:M entre alunos e múltiplos cursos simultâneos com semestre independente e controle de conclusão.
+### 1.1 Tabela: `Course` (Cursos / Graduações)
+Catálogo oficial dos cursos e graduações oferecidos pela instituição, evitando divergências de digitação e duplicidade.
+
+| Atributo | Tipo Prisma / PostgreSQL (Supabase) | Nulo? | Chave | Descrição / Regra de Negócio |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | `Int` (Serial / Autoincrement) | Não | **PK** | Identificador único numérico sequencial do curso. |
+| `name` | `String` (Text / Varchar) | Não | **Unique** | Nome oficial completo do curso (ex: "Análise e Desenvolvimento de Sistemas"). |
+| `code` | `String` (Text / Varchar) | Sim | **Unique** | Sigla ou código acadêmico do curso (ex: "ADS", "GE", "COMEX"). |
+| `created_at` | `DateTime` (Timestamp) | Não | - | Timestamp de cadastro do curso (`now()`). |
+
+---
+
+### 1.2 Tabela: `UserCourse` (Vínculo de Alunos aos Cursos)
+Armazena a relação N:M entre alunos e seus respectivos cursos cadastrados, com controle de termo curricular, semestre letivo e status de conclusão.
 
 | Atributo | Tipo Prisma / PostgreSQL (Supabase) | Nulo? | Chave | Descrição / Regra de Negócio |
 | :--- | :--- | :--- | :--- | :--- |
 | `id` | `Int` (Serial / Autoincrement) | Não | **PK** | Identificador único numérico sequencial do vínculo. |
 | `user_id` | `Int` | Não | **FK** | Referência ao aluno (`User.id`) com integridade `onDelete: Cascade`. |
-| `course_name` | `String` (Text / Varchar) | Não | - | Nome oficial da graduação/curso. |
-| `semester` | `String` (Text / Varchar) | Sim | - | Semestre cursado especificamente nesta graduação (ex: "4º Semestre"). |
+| `course_id` | `Int` | Não | **FK** | Referência à graduação oficial (`Course.id`) com integridade `onDelete: Restrict`. |
+| `semester_id` | `Int` | Sim | **FK** | Referência ao período letivo oficial vigente (`AcademicSemester.id`). |
+| `student_term` | `String` (Text / Varchar) | Sim | - | Termo/período curricular cursado pelo aluno (ex: "6º Semestre", "1º Semestre"). |
 | `is_completed` | `Boolean` | Não | - | Flag indicando se o curso foi concluído (ativa o Modo Leitura). Default: `false`. |
 
-> 📌 **Restrição de Integridade:** `@@unique([user_id, course_name])` impede duplicidade de matrícula no mesmo curso.
+> 📌 **Restrição de Integridade:** `@@unique([user_id, course_id])` impede duplicidade de matrícula no mesmo curso.
 
 ---
 
 ### 2. Tabela: `Class` (Disciplinas / Turmas)
-Armazena o cadastro de turmas, matérias, horários, professores e centróide geográfico oficial.
+Armazena as turmas, matérias, horários, vinculação ao curso, professor responsável, semestre letivo e sala padrão.
 
 | Atributo | Tipo Prisma / PostgreSQL (Supabase) | Nulo? | Chave | Descrição / Regra de Negócio |
 | :--- | :--- | :--- | :--- | :--- |
 | `id` | `Int` (Serial / Autoincrement) | Não | **PK** | Identificador único numérico da turma. |
 | `subject` | `String` (Text / Varchar) | Não | - | Nome da disciplina (ex: "Algoritmos e Estrutura de Dados"). |
-| `course_name` | `String` (Text / Varchar) | Sim | - | Nome do curso ao qual a matéria pertence (padrão: "Análise e Desenvolvimento de Sistemas"). |
+| `course_id` | `Int` | Não | **FK** | Referência à graduação oficial (`Course.id`). |
+| `room_id` | `Int` | Não | **FK** | Referência à sala física padrão (`Room.id`), de onde derivam nome e coordenadas de geofencing. |
+| `semester_id` | `Int` | Não | **FK** | Referência ao período acadêmico oficial (`AcademicSemester.id`). |
 | `schedule_time` | `String` (Text / Varchar) | Não | - | Horário oficial de início da aula (ex: "08:00" ou "19:00, 19:50"). |
 | `week_days` | `String` (Text / Varchar) | Sim | - | Dias da semana das aulas (ex: "segunda", "terca,quarta"). |
-| `latitude` | `Float` (Double Precision) | Não | - | Latitude georreferenciada do centróide da sala padrão. |
-| `longitude` | `Float` (Double Precision) | Não | - | Longitude georreferenciada do centróide da sala padrão. |
 | `radius_meters` | `Int` | Não | - | Raio de tolerância de Geofencing em metros (padrão: 50m). |
 | `active` | `Boolean` | Não | - | Status da turma (`true` = ativa, `false` = encerrada/inativa). |
-| `semester` | `String` (Text / Varchar) | Não | - | Semestre letivo da turma (padrão: "2026.1"). |
-| `room_name` | `String` (Text / Varchar) | Não | - | Nome legível da sala padrão (ex: "Laboratório 3"). |
 | `total_classes` | `Int` | Não | - | Quantidade total de aulas previstas no semestre (default: 40). |
 | `professor_id` | `Int` | Não | **FK** | Referência ao professor responsável (`User.id`). |
 | `created_at` | `DateTime` (Timestamp) | Não | - | Timestamp de criação da turma (`now()`). |
@@ -113,17 +122,14 @@ Cadastro de salas físicas, auditórios e laboratórios do campus com coordenada
 ---
 
 ### 6. Tabela: `TemporaryClassLocation` (Trocas Temporárias de Sala)
-Registro de realocações temporárias de sala efetuadas pelo professor para uma data específica.
+Registro de realocações temporárias de sala efetuadas pelo professor para uma data específica. Os dados de centróide e nome derivam exclusivamente da entidade `Room` referenciada por `room_id`.
 
 | Atributo | Tipo Prisma / PostgreSQL (Supabase) | Nulo? | Chave | Descrição / Regra de Negócio |
 | :--- | :--- | :--- | :--- | :--- |
 | `id` | `Int` (Serial / Autoincrement) | Não | **PK** | Identificador único numérico da troca de sala. |
-| `class_id` | `Int` | Não | **FK** | Referência ao id da turma (`Class.id`). |
-| `date` | `String` (Text / Varchar) | Não | - | Data da troca de sala (formato YYYY-MM-DD). |
-| `room_id` | `Int` | Sim | **FK** | Referência ao id da nova sala (`Room.id`). |
-| `room_name` | `String` (Text / Varchar) | Não | - | Nome da nova sala temporária. |
-| `latitude` | `Float` (Double Precision) | Não | - | Nova latitude temporária para validação de Geofencing. |
-| `longitude` | `Float` (Double Precision) | Não | - | Nova longitude temporária para validação de Geofencing. |
+| `class_id` | `Int` | Não | **FK** | Referência ao id da turma (`Class.id`) com `onDelete: Cascade`. |
+| `room_id` | `Int` | Não | **FK** | Referência obrigatória ao id da nova sala (`Room.id`). |
+| `date` | `DateTime` (`@db.Date`) | Não | - | Data da troca de sala (tipo DATE nativo do PostgreSQL). |
 
 > 📌 **Restrição de Integridade:** `@@unique([class_id, date])` garante no máximo um override temporário por turma/dia.
 
@@ -144,7 +150,7 @@ Armazena avisos de presença confirmada, trocas de sala e alertas acadêmicos.
 ---
 
 ### 8. Tabela: `AcademicCalendar` (Dias Não Letivos / Feriados)
-Armazena os dias em que não haverá aula por motivo de feriado, emenda, recesso escolar, SPAP ou período de exames finais.
+Armazena os dias em que não haverá aula por motivo de feriado, emenda, recesso escolar, SPAP ou período de exames finais, associados opcionalmente ao período letivo correspondente.
 
 | Atributo | Tipo Prisma / PostgreSQL (Supabase) | Nulo? | Chave | Descrição / Regra de Negócio |
 | :--- | :--- | :--- | :--- | :--- |
@@ -152,12 +158,13 @@ Armazena os dias em que não haverá aula por motivo de feriado, emenda, recesso
 | `date` | `DateTime` (`@db.Date`) | Não | **Unique** | Data do dia não letivo canônica. |
 | `description` | `String` (Text / Varchar) | Não | - | Descrição do evento (ex: "Feriado de Tiradentes", "Carnaval", "18ª SPAP"). |
 | `type` | `String` (Text / Varchar) | Não | - | Categoria do dia: `FERIADO`, `RECESSO`, `SPAP`, `EXAME`, `NAO_LETIVO`. Default: `NAO_LETIVO`. |
+| `semester_id` | `Int` | Sim | **FK** | Referência ao período letivo correspondente (`AcademicSemester.id`). |
 | `created_at` | `DateTime` (Timestamp) | Não | - | Timestamp de registro no sistema (`now()`). |
 
 ---
 
 ### 9. Tabela: `AcademicSemester` (Períodos Oficiais dos Semestres)
-Armazena as datas de início e término das aulas de cada semestre letivo para validação de dias letivos válidos.
+Armazena as datas de início e término das aulas de cada semestre letivo para validação de dias letivos válidos e agregação de turmas e calendários.
 
 | Atributo | Tipo Prisma / PostgreSQL (Supabase) | Nulo? | Chave | Descrição / Regra de Negócio |
 | :--- | :--- | :--- | :--- | :--- |
@@ -171,13 +178,13 @@ Armazena as datas de início e término das aulas de cada semestre letivo para v
 ---
 
 ### 10. Tabela: `ClassCancellation` (Cancelamentos, Ausências e Reposições)
-Armazena solicitações de falta de professores e suspensões de aula com suporte a atestado médico e vinculação de reposição.
+Armazena solicitações de falta de professores e suspensões de aula com suporte a atestado médico e vinculação de reposição. Possui escopo flexível: quando vinculado a uma turma específica (`class_id`), professor e curso são obtidos diretamente por navegação relacional; quando de escopo geral ou institucional, pode vincular diretamente `course_id` e/ou `professor_id`.
 
 | Atributo | Tipo Prisma / PostgreSQL (Supabase) | Nulo? | Chave | Descrição / Regra de Negócio |
 | :--- | :--- | :--- | :--- | :--- |
 | `id` | `Int` (Serial / Autoincrement) | Não | **PK** | Identificador único numérico do cancelamento. |
-| `class_id` | `Int` | Sim | **FK** | Referência à turma (`Class.id`), nulo para suspensões gerais. Integridade `onDelete: Cascade`. |
-| `course_name` | `String` (Text / Varchar) | Sim | - | Nome do curso para suspensões filtradas por curso. |
+| `class_id` | `Int` | Sim | **FK** | Referência à turma (`Class.id`), nulo para suspensões por curso ou institucionais. Integridade `onDelete: Cascade`. |
+| `course_id` | `Int` | Sim | **FK** | Referência ao curso (`Course.id`) para cancelamentos em nível de curso sem turma específica. |
 | `professor_id` | `Int` | Sim | **FK** | Referência ao professor (`User.id`) solicitante ou responsável. |
 | `date` | `DateTime` (`@db.Date`) | Não | - | Data exata da ausência ou do cancelamento da aula. |
 | `reason_type` | `String` (Text / Varchar) | Não | - | Motivo: `SAUDE`, `PESSOAL`, `ACADEMICO`, `TRANSPORTE`, `MANUTENCAO`, `FERIADO_EXTRA`, `OUTROS`. |

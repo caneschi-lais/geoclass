@@ -44,16 +44,22 @@ app.listen(PORT, () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
 
   // Sincronizar matérias criadas com semestre 2026.1 para 2026.2 (Semestre Vigente)
-  prisma.class.updateMany({
-    where: { semester: '2026.1' },
-    data: { semester: '2026.2' }
-  }).then(res => {
-    if (res.count > 0) {
-      console.log(`[SYNC] ${res.count} matéria(s) com semestre 2026.1 foram migradas para 2026.2.`);
+  prisma.academicSemester.findFirst({ where: { name: '2026.2' } }).then(sem2 => {
+    if (sem2) {
+      prisma.academicSemester.findFirst({ where: { name: '2026.1' } }).then(sem1 => {
+        if (sem1) {
+          prisma.class.updateMany({
+            where: { semester_id: sem1.id },
+            data: { semester_id: sem2.id }
+          }).then(res => {
+            if (res.count > 0) {
+              console.log(`[SYNC] ${res.count} matéria(s) com semestre 2026.1 foram migradas para 2026.2.`);
+            }
+          }).catch(() => {});
+        }
+      });
     }
-  }).catch(err => {
-    console.error('[SYNC] Erro ao sincronizar semestres das matérias:', err);
-  });
+  }).catch(() => {});
   
   // Iniciar Cron Job da LGPD
   // Expressão cron '0 3 * * *' = Roda todos os dias às 03:00 da manhã

@@ -4,28 +4,34 @@ import { getCurrentAcademicSemester, incrementStudentSemester } from '../utils/a
 import { getBrazilMidnightDate, getBrazilDateString } from '../utils/dateUtils';
 import prisma from '../prisma';
 
+async function findSemesterByNameOrId(param?: string | number | null) {
+  if (!param) return null;
+  const str = String(param).trim();
+  const num = Number(str);
+  if (!isNaN(num)) {
+    const byId = await prisma.academicSemester.findUnique({ where: { id: num } });
+    if (byId) return byId;
+  }
+  return await prisma.academicSemester.findUnique({ where: { name: str } });
+}
+
 export class CoordinatorController {
   // 1. Obter semestres ativos e a média global de faltas
   async getSemesters(req: AuthRequest, res: Response) {
     try {
-      // Pega todos os semestres distintos das turmas ativas
-      const activeClasses = await prisma.class.findMany({
-        where: { active: true },
-        select: { semester: true },
-        distinct: ['semester']
+      const allSemesters = await prisma.academicSemester.findMany({
+        orderBy: { name: 'desc' }
       });
 
-      const semestersList = await Promise.all(activeClasses.map(async (cls) => {
-        const semester = cls.semester;
-        
+      const semestersList = await Promise.all(allSemesters.map(async (sem) => {
         // Buscar todas as matrículas deste semestre
         const enrollments = await prisma.enrollment.findMany({
-          where: { class: { semester, active: true } },
+          where: { class: { semester_id: sem.id, active: true } },
           include: { class: true }
         });
 
         if (enrollments.length === 0) {
-          return { id: semester, name: semester, absencePercentage: 0 };
+          return { id: sem.name, name: sem.name, absencePercentage: 0, attendancePercentage: 100 };
         }
 
         let totalExpectedClasses = 0;
@@ -44,8 +50,8 @@ export class CoordinatorController {
         const attendancePercentage = Math.max(0, 100 - absencePercentage);
 
         return {
-          id: semester,
-          name: semester,
+          id: sem.name,
+          name: sem.name,
           absencePercentage,
           attendancePercentage
         };
@@ -60,25 +66,30 @@ export class CoordinatorController {
 
   // 2. Obter alunos de um semestre e suas médias de falta
   async getStudentsBySemester(req: AuthRequest, res: Response) {
-    const { id: semester } = req.params; // ex: 2026.1
+    const { id: semester } = req.params; // ex: 2026.1 ou 2026.2
 
     try {
+      const semRecord = await findSemesterByNameOrId(semester);
+      const semesterFilter = semRecord ? { semester_id: semRecord.id } : {};
+
       // Buscar alunos com matrícula no semestre
       const students = await prisma.user.findMany({
         where: { 
           role: 'ALUNO',
           enrollments: {
-            some: { class: { semester, active: true } }
+            some: { class: { ...semesterFilter, active: true } }
           }
         },
         include: {
-          userCourses: true,
+          userCourses: {
+            include: { course: true }
+          },
           enrollments: {
-            where: { class: { semester, active: true } },
-            include: { class: true }
+            where: { class: { ...semesterFilter, active: true } },
+            include: { class: { include: { course: true } } }
           },
           attendances: {
-            where: { class: { semester, active: true }, status: 'FALTA' }
+            where: { class: { ...semesterFilter, active: true }, status: 'FALTA' }
           }
         }
       });
@@ -94,10 +105,9 @@ export class CoordinatorController {
         const attendancePercentage = Math.max(0, 100 - absencePercentage);
 
         const subjects = Array.from(new Set(student.enrollments.map(enr => enr.class.subject)));
-        const classCourses = student.enrollments.map(enr => enr.class.course_name).filter(Boolean) as string[];
-        const userCourseNames = student.userCourses?.map(uc => uc.course_name) || [];
-        const userCoursesArray = typeof student.courses === 'string' ? JSON.parse(student.courses) : (student.courses || []);
-        const courses = Array.from(new Set([...userCourseNames, ...userCoursesArray, ...classCourses]));
+        const classCourses = student.enrollments.map(enr => enr.class.course?.name).filter(Boolean) as string[];
+        const userCourseNames = student.userCourses?.map(uc => uc.course.name) || [];
+        const courses = Array.from(new Set([...userCourseNames, ...classCourses]));
 
         return {
           id: student.id,
@@ -133,12 +143,15 @@ export class CoordinatorController {
     }
 
     try {
+      const semRecord = await findSemesterByNameOrId(semester);
+      const semesterFilter = semRecord ? { semester_id: semRecord.id } : {};
+
       const enrollments = await prisma.enrollment.findMany({
         where: { 
           student_id: studentId,
-          class: { semester, active: true }
+          class: { ...semesterFilter, active: true }
         },
-        include: { class: true }
+        include: { class: { include: { room: true } } }
       });
 
       const subjectsData = await Promise.all(enrollments.map(async (enr) => {
@@ -153,7 +166,7 @@ export class CoordinatorController {
         return {
           classId: enr.class.id,
           subject: enr.class.subject,
-          room_name: enr.class.room_name,
+          room_name: enr.class.room ? enr.class.room.name : 'Sala Padrão',
           total_classes: totalAulas,
           absencePercentage,
           attendancePercentage,
@@ -177,10 +190,9 @@ export class CoordinatorController {
 
     try {
       if (level === 'semesters') {
-        const activeClasses = await prisma.class.findMany({ where: { active: true }, select: { semester: true }, distinct: ['semester'] });
-        const data = await Promise.all(activeClasses.map(async (cls) => {
-          const semester = cls.semester;
-          const enrollments = await prisma.enrollment.findMany({ where: { class: { semester, active: true } }, include: { class: true } });
+        const allSemesters = await prisma.academicSemester.findMany({ orderBy: { name: 'desc' } });
+        const data = await Promise.all(allSemesters.map(async (sem) => {
+          const enrollments = await prisma.enrollment.findMany({ where: { class: { semester_id: sem.id, active: true } }, include: { class: true } });
           
           let totalExpectedClasses = 0;
           let totalFaltas = 0;
@@ -195,10 +207,10 @@ export class CoordinatorController {
           if (includeDetails === 'true') {
              // Detalhamento de alunos do semestre
              const students = await prisma.user.findMany({
-               where: { role: 'ALUNO', enrollments: { some: { class: { semester, active: true } } } },
+               where: { role: 'ALUNO', enrollments: { some: { class: { semester_id: sem.id, active: true } } } },
                include: {
-                 enrollments: { where: { class: { semester, active: true } }, include: { class: true } },
-                 attendances: { where: { class: { semester, active: true }, status: 'FALTA' } }
+                 enrollments: { where: { class: { semester_id: sem.id, active: true } }, include: { class: true } },
+                 attendances: { where: { class: { semester_id: sem.id, active: true }, status: 'FALTA' } }
                }
              });
              details = students.map(student => {
@@ -210,7 +222,7 @@ export class CoordinatorController {
              });
           }
 
-          return { semester, absencePercentage, attendancePercentage, details };
+          return { semester: sem.name, absencePercentage, attendancePercentage, details };
         }));
         return res.json(data);
       }
@@ -218,11 +230,14 @@ export class CoordinatorController {
       if (level === 'students') {
         if (!semesterId) return res.status(400).json({ error: 'semesterId obrigatório' });
         
+        const sem = await findSemesterByNameOrId(semesterId as string);
+        const semesterFilter = sem ? { semester_id: sem.id } : {};
+
         const students = await prisma.user.findMany({
-          where: { role: 'ALUNO', enrollments: { some: { class: { semester: String(semesterId), active: true } } } },
+          where: { role: 'ALUNO', enrollments: { some: { class: { ...semesterFilter, active: true } } } },
           include: {
-            enrollments: { where: { class: { semester: String(semesterId), active: true } }, include: { class: true } },
-            attendances: { where: { class: { semester: String(semesterId), active: true }, status: 'FALTA' } }
+            enrollments: { where: { class: { ...semesterFilter, active: true } }, include: { class: { include: { room: true } } } },
+            attendances: { where: { class: { ...semesterFilter, active: true }, status: 'FALTA' } }
           }
         });
 
@@ -240,7 +255,7 @@ export class CoordinatorController {
               const cTotal = enr.class.total_classes;
               const cAbsence = cTotal === 0 ? 0 : Math.round((cFaltas / cTotal) * 100);
               const cAttendance = Math.max(0, 100 - cAbsence);
-              return { subject: enr.class.subject, room_name: enr.class.room_name, absencePercentage: cAbsence, attendancePercentage: cAttendance };
+              return { subject: enr.class.subject, room_name: enr.class.room ? enr.class.room.name : 'Sala Padrão', absencePercentage: cAbsence, attendancePercentage: cAttendance };
             }));
           }
 
@@ -310,22 +325,41 @@ export class CoordinatorController {
         }
 
         const classSemester = semester ? String(semester).trim() : getCurrentAcademicSemester();
+        let semRecord = await findSemesterByNameOrId(classSemester);
+        if (!semRecord) {
+          semRecord = await prisma.academicSemester.findFirst({ where: { active: true } });
+        }
+        if (!semRecord) {
+          semRecord = await prisma.academicSemester.create({
+            data: {
+              name: classSemester,
+              start_date: new Date('2026-08-03'),
+              end_date: new Date('2026-12-14'),
+              active: true
+            }
+          });
+        }
+
+        const courseNameClean = course_name ? String(course_name).trim() : "Análise e Desenvolvimento de Sistemas";
+        let courseRecord = await prisma.course.findUnique({ where: { name: courseNameClean } });
+        if (!courseRecord) {
+          courseRecord = await prisma.course.create({ data: { name: courseNameClean } });
+        }
 
         createdClass = await prisma.class.create({
           data: {
             subject: String(subject).trim(),
-            course_name: course_name ? String(course_name).trim() : "Análise e Desenvolvimento de Sistemas",
             schedule_time: String(schedule_time).trim(),
             week_days: week_days ? String(week_days).trim() : "segunda",
             professor_id,
-            latitude: parsedLat,
-            longitude: parsedLon,
-            room_name: trimmedName,
+            room_id: room.id,
+            course_id: courseRecord.id,
+            semester_id: semRecord.id,
             radius_meters: 50,
-            semester: classSemester,
             total_classes: 40,
             active: true
-          }
+          },
+          include: { room: true, course: true, semester: true }
         });
       }
 
@@ -386,12 +420,13 @@ export class CoordinatorController {
     const { id: semester } = req.params;
 
     try {
+      const sem = await findSemesterByNameOrId(semester);
+      const semesterFilter = sem ? { semester_id: sem.id } : {};
+
       const classes = await prisma.class.findMany({
         where: {
-          OR: [
-            { semester, active: true },
-            ...(semester === '2026.2' ? [{ semester: '2026.1', active: true }] : [])
-          ]
+          ...semesterFilter,
+          active: true
         },
         include: {
           professor: {
@@ -400,6 +435,9 @@ export class CoordinatorController {
               email: true
             }
           },
+          room: true,
+          course: true,
+          semester: true,
           enrollments: {
             select: {
               student_id: true
@@ -409,7 +447,16 @@ export class CoordinatorController {
         orderBy: { subject: 'asc' }
       });
 
-      return res.json(classes);
+      const mappedClasses = classes.map(c => ({
+        ...c,
+        room_name: c.room?.name || 'Sala Padrão',
+        latitude: c.room?.latitude || 0,
+        longitude: c.room?.longitude || 0,
+        course_name: c.course?.name || null,
+        semester: c.semester?.name || '2026.2'
+      }));
+
+      return res.json(mappedClasses);
     } catch (error) {
       console.error('Erro getClassesBySemester', error);
       return res.status(500).json({ error: 'Erro ao buscar turmas do semestre' });
@@ -426,9 +473,10 @@ export class CoordinatorController {
           name: true,
           email: true,
           ra: true,
-          courses: true,
-          student_semester: true,
           active: true,
+          userCourses: {
+            include: { course: true }
+          },
           enrollments: {
             select: {
               class_id: true
@@ -437,10 +485,19 @@ export class CoordinatorController {
         },
         orderBy: { name: 'asc' }
       });
+
       const formatted = students.map((s) => ({
-        ...s,
-        courses: typeof s.courses === 'string' ? JSON.parse(s.courses) : (s.courses || [])
+        id: s.id,
+        name: s.name,
+        email: s.email,
+        ra: s.ra,
+        active: s.active,
+        courses: s.userCourses.map(uc => uc.course.name),
+        student_semester: s.userCourses.find(uc => uc.student_term)?.student_term || null,
+        userCourses: s.userCourses,
+        enrollments: s.enrollments
       }));
+
       return res.json(formatted);
     } catch (error) {
       console.error('Erro getAllStudents', error);
@@ -545,20 +602,33 @@ export class CoordinatorController {
 
   // 11. Alternar status de conclusão de um curso do aluno (Concluído / Em Andamento)
   async toggleCourseCompletion(req: AuthRequest, res: Response) {
-    const userId = req.body.userId || req.body.studentId;
+    const userId = Number(req.body.userId || req.body.studentId);
     const course_name = req.body.course_name || req.body.courseName;
+    const course_id = req.body.course_id ? Number(req.body.course_id) : undefined;
     const is_completed = req.body.is_completed !== undefined ? req.body.is_completed : req.body.isCompleted;
 
-    if (!userId || !course_name || is_completed === undefined) {
+    if (!userId || (!course_name && !course_id) || is_completed === undefined) {
       return res.status(400).json({ error: 'userId, course_name e is_completed são obrigatórios' });
     }
 
     try {
+      let targetCourse = course_id 
+        ? await prisma.course.findUnique({ where: { id: course_id } })
+        : await prisma.course.findUnique({ where: { name: String(course_name).trim() } });
+      
+      if (!targetCourse && course_name) {
+        targetCourse = await prisma.course.create({ data: { name: String(course_name).trim() } });
+      }
+
+      if (!targetCourse) {
+        return res.status(404).json({ error: 'Curso não encontrado' });
+      }
+
       const userCourse = await prisma.userCourse.upsert({
         where: {
-          user_id_course_name: {
+          user_id_course_id: {
             user_id: userId,
-            course_name: String(course_name),
+            course_id: targetCourse.id,
           }
         },
         update: {
@@ -566,16 +636,20 @@ export class CoordinatorController {
         },
         create: {
           user_id: userId,
-          course_name: String(course_name),
+          course_id: targetCourse.id,
           is_completed: Boolean(is_completed)
-        }
+        },
+        include: { course: true }
       });
 
       const statusText = userCourse.is_completed ? 'CONCLUÍDO (Somente Leitura)' : 'EM ANDAMENTO';
 
       return res.json({
-        message: `Status do curso ${userCourse.course_name} atualizado para ${statusText}!`,
-        userCourse
+        message: `Status do curso ${userCourse.course.name} atualizado para ${statusText}!`,
+        userCourse: {
+          ...userCourse,
+          course_name: userCourse.course.name
+        }
       });
     } catch (error) {
       console.error('Erro toggleCourseCompletion', error);
@@ -590,9 +664,19 @@ export class CoordinatorController {
         where: { class: { active: true } },
         include: {
           student: {
-            include: { userCourses: true }
+            include: {
+              userCourses: {
+                include: { course: true }
+              }
+            }
           },
-          class: true
+          class: {
+            include: {
+              room: true,
+              course: true,
+              semester: true
+            }
+          }
         }
       });
 
@@ -616,8 +700,8 @@ export class CoordinatorController {
 
         // Critério de risco: frequência < 75% (ou seja, faltas > 25%)
         if (attendancePercentage < 75) {
-          const matchingCourse = student.userCourses?.find(uc => uc.course_name === cls.course_name);
-          const semesterInfo = matchingCourse?.semester || student.student_semester || cls.semester;
+          const matchingCourse = student.userCourses?.find(uc => uc.course_id === cls.course_id);
+          const semesterInfo = matchingCourse?.student_term || student.userCourses?.[0]?.student_term || cls.semester?.name || '2026.2';
 
           riskList.push({
             id: student.id,
@@ -626,7 +710,8 @@ export class CoordinatorController {
             ra: student.ra || 'N/A',
             email: student.email,
             subject: cls.subject,
-            course_name: cls.course_name || 'Geral',
+            room_name: cls.room?.name || 'Sala Padrão',
+            course_name: cls.course?.name || 'Geral',
             semester: semesterInfo,
             presences: Math.max(0, totalClasses - faltas),
             totalClasses,
@@ -676,42 +761,25 @@ export class CoordinatorController {
       let completedStudentsCount = 0;
 
       for (const student of activeStudents) {
-        let hasUpdated = false;
-        let lastNewSemester = student.student_semester;
-
         if (student.userCourses && student.userCourses.length > 0) {
           for (const uc of student.userCourses) {
             // Se o curso já não estava marcado como concluído, avança 1 semestre
             if (!uc.is_completed) {
-              const { newSemester, isCompleted } = incrementStudentSemester(uc.semester);
+              const { newSemester, isCompleted } = incrementStudentSemester(uc.student_term);
 
               await prisma.userCourse.update({
                 where: { id: uc.id },
                 data: {
-                  semester: newSemester,
+                  student_term: newSemester,
                   is_completed: isCompleted,
                 }
               });
 
-              lastNewSemester = newSemester;
-              hasUpdated = true;
               if (isCompleted) {
                 completedStudentsCount++;
               }
             }
           }
-        } else if (student.student_semester) {
-          // Fallback se não tiver userCourses gravados
-          const { newSemester } = incrementStudentSemester(student.student_semester);
-          lastNewSemester = newSemester;
-          hasUpdated = true;
-        }
-
-        if (hasUpdated) {
-          await prisma.user.update({
-            where: { id: student.id },
-            data: { student_semester: lastNewSemester }
-          });
           updatedStudentsCount++;
         }
       }
@@ -762,44 +830,65 @@ export class CoordinatorController {
       let lon = longitude ? parseFloat(String(longitude).replace(',', '.')) : -42.8795;
 
       const roomNameClean = room_name ? String(room_name).trim() : "Sala Padrão";
+      let targetRoom = await prisma.room.findUnique({ where: { name: roomNameClean } });
+      if (!targetRoom) {
+        targetRoom = await prisma.room.create({
+          data: {
+            name: roomNameClean,
+            latitude: lat,
+            longitude: lon
+          }
+        });
+      }
 
-      if (roomNameClean) {
-        let targetRoom = await prisma.room.findUnique({ where: { name: roomNameClean } });
-        if (targetRoom) {
-          lat = targetRoom.latitude;
-          lon = targetRoom.longitude;
-        } else {
-          // Cria a sala no banco se ainda não existir
-          targetRoom = await prisma.room.create({
-            data: {
-              name: roomNameClean,
-              latitude: lat,
-              longitude: lon
-            }
-          });
-        }
+      const courseNameClean = course_name ? String(course_name).trim() : "Análise e Desenvolvimento de Sistemas";
+      let targetCourse = await prisma.course.findUnique({ where: { name: courseNameClean } });
+      if (!targetCourse) {
+        targetCourse = await prisma.course.create({ data: { name: courseNameClean } });
+      }
+
+      const classSemesterStr = semester ? String(semester).trim() : getCurrentAcademicSemester();
+      let targetSemester = await findSemesterByNameOrId(classSemesterStr);
+      if (!targetSemester) {
+        targetSemester = await prisma.academicSemester.findFirst({ where: { active: true } });
+      }
+      if (!targetSemester) {
+        targetSemester = await prisma.academicSemester.create({
+          data: {
+            name: classSemesterStr,
+            start_date: new Date('2026-08-03'),
+            end_date: new Date('2026-12-14'),
+            active: true
+          }
+        });
       }
 
       const newClass = await prisma.class.create({
         data: {
           subject,
-          course_name: course_name || "Análise e Desenvolvimento de Sistemas",
           schedule_time,
           week_days: week_days || "segunda",
-          semester: semester ? String(semester).trim() : getCurrentAcademicSemester(),
-          room_name: room_name || "Sala Padrão",
-          latitude: lat,
-          longitude: lon,
+          room_id: targetRoom.id,
+          course_id: targetCourse.id,
+          semester_id: targetSemester.id,
           radius_meters: radius_meters ? parseInt(String(radius_meters), 10) : 50,
           total_classes: total_classes ? parseInt(String(total_classes), 10) : 40,
           professor_id,
           active: true
-        }
+        },
+        include: { room: true, course: true, semester: true }
       });
 
       return res.status(201).json({
         message: 'Matéria cadastrada com sucesso!',
-        class: newClass
+        class: {
+          ...newClass,
+          room_name: newClass.room.name,
+          latitude: newClass.room.latitude,
+          longitude: newClass.room.longitude,
+          course_name: newClass.course?.name || null,
+          semester: newClass.semester.name
+        }
       });
     } catch (error) {
       console.error('Erro createClass', error);
@@ -908,16 +997,25 @@ export class CoordinatorController {
 
       const targetDate = getBrazilMidnightDate(date);
 
+      const matchedSemester = await prisma.academicSemester.findFirst({
+        where: {
+          start_date: { lte: targetDate },
+          end_date: { gte: targetDate },
+        }
+      });
+
       const entry = await prisma.academicCalendar.upsert({
         where: { date: targetDate },
         update: {
           description,
           type: type || 'NAO_LETIVO',
+          semester_id: matchedSemester?.id || null,
         },
         create: {
           date: targetDate,
           description,
           type: type || 'NAO_LETIVO',
+          semester_id: matchedSemester?.id || null,
         },
       });
 
@@ -928,6 +1026,7 @@ export class CoordinatorController {
           date: getBrazilDateString(entry.date),
           description: entry.description,
           type: entry.type,
+          semester_id: entry.semester_id
         },
       });
     } catch (error) {
@@ -948,6 +1047,19 @@ export class CoordinatorController {
     } catch (error) {
       console.error('Erro deleteAcademicCalendarEntry', error);
       return res.status(500).json({ error: 'Erro ao remover evento do calendário' });
+    }
+  }
+
+  // Obter todos os cursos cadastrados
+  async getAllCourses(req: AuthRequest, res: Response) {
+    try {
+      const courses = await prisma.course.findMany({
+        orderBy: { name: 'asc' }
+      });
+      return res.json(courses);
+    } catch (error) {
+      console.error('Erro getAllCourses', error);
+      return res.status(500).json({ error: 'Erro ao buscar cursos' });
     }
   }
 }

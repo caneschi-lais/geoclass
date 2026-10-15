@@ -13,8 +13,6 @@ model User {
   password_hash             String
   role                      Role      @default(ALUNO)
   ra                        String?   @unique
-  courses                   String[]  @default([]) // Lista de cursos vinculados
-  student_semester          String?   // Ex: "6º Semestre" (legado / padrão)
   active                    Boolean   @default(true)
   privacy_terms_accepted_at DateTime?
   push_token                String?
@@ -29,34 +27,81 @@ model User {
   created_at DateTime @default(now())
 }
 
-model UserCourse {
-  id           Int     @id @default(autoincrement())
-  user_id      Int
-  user         User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  course_name  String
-  semester     String? // Ex: "6º Semestre"
-  is_completed Boolean @default(false) // Indica se o aluno ja concluiu este curso
+model Course {
+  id            Int                 @id @default(autoincrement())
+  name          String              @unique
+  code          String?             @unique
+  userCourses   UserCourse[]
+  classes       Class[]
+  cancellations ClassCancellation[]
+  created_at    DateTime            @default(now())
+}
 
-  @@unique([user_id, course_name])
+model UserCourse {
+  id           Int               @id @default(autoincrement())
+  user_id      Int
+  user         User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  course_id    Int
+  course       Course            @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  semester_id  Int?
+  semester     AcademicSemester? @relation(fields: [semester_id], references: [id])
+  student_term String?           // Ex: "6º Semestre" (semestre curricular do aluno)
+  is_completed Boolean           @default(false)
+
+  @@unique([user_id, course_id])
+}
+
+model Room {
+  id            Int                      @id @default(autoincrement())
+  name          String                   @unique
+  latitude      Float
+  longitude     Float
+  classes       Class[]
+  temporaryLocs TemporaryClassLocation[]
+}
+
+model AcademicSemester {
+  id          Int                @id @default(autoincrement())
+  name        String             @unique // Ex: "2026.1", "2026.2"
+  start_date  DateTime           @db.Date
+  end_date    DateTime           @db.Date
+  active      Boolean            @default(true)
+  classes     Class[]
+  calendars   AcademicCalendar[]
+  userCourses UserCourse[]
+  created_at  DateTime           @default(now())
+}
+
+model AcademicCalendar {
+  id          Int               @id @default(autoincrement())
+  date        DateTime          @unique @db.Date
+  description String
+  type        String            @default("NAO_LETIVO") // "FERIADO", "RECESSO", "NAO_LETIVO", "EXAME", "SPAP"
+  semester_id Int?
+  semester    AcademicSemester? @relation(fields: [semester_id], references: [id])
+  created_at  DateTime          @default(now())
 }
 
 model Class {
   id            Int     @id @default(autoincrement())
   subject       String
-  course_name   String? @default("Análise e Desenvolvimento de Sistemas") // Ex: "Análise e Desenvolvimento de Sistemas"
   schedule_time String  // Ex: "08:00"
   week_days     String? // Ex: "segunda", "terca,quarta", "quinta"
-  latitude      Float
-  longitude     Float
   radius_meters Int
   active        Boolean @default(true)
+  total_classes Int     @default(40) // Quantidade total de aulas previstas
 
-  semester      String @default("2026.1") // Ex: "2026.1"
-  room_name     String @default("Sala Padrão") // Ex: "Lab 1"
-  total_classes Int    @default(40) // Quantidade total de aulas previstas
+  room_id       Int
+  room          Room    @relation(fields: [room_id], references: [id])
 
-  professor_id Int
-  professor    User   @relation("ProfessorClasses", fields: [professor_id], references: [id])
+  course_id     Int?
+  course        Course? @relation(fields: [course_id], references: [id])
+
+  semester_id   Int
+  semester      AcademicSemester @relation(fields: [semester_id], references: [id])
+
+  professor_id  Int
+  professor     User    @relation("ProfessorClasses", fields: [professor_id], references: [id])
 
   enrollments   Enrollment[]
   attendances   Attendance[]
@@ -75,7 +120,7 @@ model Enrollment {
   class_id Int
   class    Class  @relation(fields: [class_id], references: [id], onDelete: Cascade)
 
-  is_completed Boolean @default(false) // Indica se o aluno concluiu esta matéria específica
+  is_completed Boolean @default(false)
 
   @@unique([student_id, class_id])
 }
@@ -119,24 +164,13 @@ enum Status {
   PRESENCA_PARCIAL
 }
 
-model Room {
-  id            Int                      @id @default(autoincrement())
-  name          String                   @unique
-  latitude      Float
-  longitude     Float
-  temporaryLocs TemporaryClassLocation[]
-}
-
 model TemporaryClassLocation {
-  id        Int     @id @default(autoincrement())
-  class_id  Int
-  class     Class   @relation(fields: [class_id], references: [id])
-  date      String  // Ex: "2026-05-12"
-  room_id   Int?
-  room      Room?   @relation(fields: [room_id], references: [id])
-  room_name String
-  latitude  Float
-  longitude Float
+  id       Int      @id @default(autoincrement())
+  class_id Int
+  class    Class    @relation(fields: [class_id], references: [id], onDelete: Cascade)
+  date     DateTime @db.Date
+  room_id  Int
+  room     Room     @relation(fields: [room_id], references: [id])
 
   @@unique([class_id, date])
 }
@@ -151,28 +185,12 @@ model Notification {
   created_at DateTime @default(now())
 }
 
-model AcademicCalendar {
-  id          Int      @id @default(autoincrement())
-  date        DateTime @db.Date @unique
-  description String
-  type        String   @default("NAO_LETIVO") // "FERIADO", "RECESSO", "NAO_LETIVO", "EXAME", "SPAP"
-  created_at  DateTime @default(now())
-}
-
-model AcademicSemester {
-  id         Int      @id @default(autoincrement())
-  name       String   @unique // Ex: "2026.1", "2026.2"
-  start_date DateTime @db.Date // Início das aulas (ex: 2026-02-09)
-  end_date   DateTime @db.Date // Término das aulas (ex: 2026-06-27)
-  active     Boolean  @default(true)
-  created_at DateTime @default(now())
-}
-
 model ClassCancellation {
   id                    Int       @id @default(autoincrement())
   class_id              Int?
   class                 Class?    @relation(fields: [class_id], references: [id], onDelete: Cascade)
-  course_name           String?   // Para cancelamentos por curso
+  course_id             Int?
+  course                Course?   @relation(fields: [course_id], references: [id])
   professor_id          Int?
   professor             User?     @relation("ProfessorCancellations", fields: [professor_id], references: [id])
   date                  DateTime  @db.Date

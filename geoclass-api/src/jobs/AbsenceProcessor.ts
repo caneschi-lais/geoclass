@@ -97,7 +97,7 @@ export async function processExpiredAttendanceSlots(currentDate: Date = new Date
               OR: [
                 { class_id: cls.id },
                 { scope: 'INSTITUICAO' },
-                ...(cls.course_name ? [{ scope: 'CURSO', course_name: cls.course_name }] : []),
+                ...(cls.course_id ? [{ scope: 'CURSO', course_id: cls.course_id }] : []),
               ],
             },
           });
@@ -151,8 +151,8 @@ export async function processExpiredAttendanceSlots(currentDate: Date = new Date
             const student = enrollment.student;
 
             // Se o curso do aluno foi concluído, ignorar
-            if (cls.course_name) {
-              const userCourse = student.userCourses?.find((uc) => uc.course_name === cls.course_name);
+            if (cls.course_id) {
+              const userCourse = student.userCourses?.find((uc: any) => uc.course_id === cls.course_id);
               if (userCourse?.is_completed) continue;
             }
 

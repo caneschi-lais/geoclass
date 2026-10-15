@@ -15,35 +15,64 @@ erDiagram
         string password_hash
         Role role
         string ra
-        string_array courses
-        string student_semester
         boolean active
         datetime privacy_terms_accepted_at
         string push_token
         datetime created_at
     }
 
+    COURSE {
+        int id PK
+        string name
+        string code
+        datetime created_at
+    }
+
     USER_COURSE {
         int id PK
         int user_id FK
-        string course_name
-        string semester
+        int course_id FK
+        int semester_id FK
+        string student_term
         boolean is_completed
+    }
+
+    ROOM {
+        int id PK
+        string name
+        float latitude
+        float longitude
+    }
+
+    ACADEMIC_SEMESTER {
+        int id PK
+        string name
+        date start_date
+        date end_date
+        boolean active
+        datetime created_at
+    }
+
+    ACADEMIC_CALENDAR {
+        int id PK
+        date date
+        string description
+        string type
+        int semester_id FK
+        datetime created_at
     }
 
     CLASS {
         int id PK
         string subject
-        string course_name
         string schedule_time
         string week_days
-        float latitude
-        float longitude
         int radius_meters
-        boolean active
-        string semester
-        string room_name
         int total_classes
+        boolean active
+        int room_id FK
+        int course_id FK
+        int semester_id FK
         int professor_id FK
         datetime created_at
     }
@@ -71,21 +100,11 @@ erDiagram
         datetime created_at
     }
 
-    ROOM {
-        int id PK
-        string name
-        float latitude
-        float longitude
-    }
-
     TEMPORARY_CLASS_LOCATION {
         int id PK
         int class_id FK
-        string date
+        date date
         int room_id FK
-        string room_name
-        float latitude
-        float longitude
     }
 
     NOTIFICATION {
@@ -100,7 +119,7 @@ erDiagram
     CLASS_CANCELLATION {
         int id PK
         int class_id FK
-        string course_name
+        int course_id FK
         int professor_id FK
         date date
         string reason_type
@@ -114,31 +133,21 @@ erDiagram
         datetime created_at
     }
 
-    ACADEMIC_CALENDAR {
-        int id PK
-        date date
-        string description
-        string type
-        datetime created_at
-    }
-
-    ACADEMIC_SEMESTER {
-        int id PK
-        string name
-        date start_date
-        date end_date
-        boolean active
-        datetime created_at
-    }
-
-    USER ||--o{ USER_COURSE : possui
+    COURSE ||--o{ USER_COURSE : possui
+    COURSE ||--o{ CLASS : oferece
+    COURSE ||--o{ CLASS_CANCELLATION : cancela
+    USER ||--o{ USER_COURSE : cursa
     USER ||--o{ CLASS : leciona
-    USER ||--o{ ENROLLMENT : cursa
-    CLASS ||--o{ ENROLLMENT : matricula
+    USER ||--o{ ENROLLMENT : matricula
+    CLASS ||--o{ ENROLLMENT : contem
     USER ||--o{ ATTENDANCE : registra
     CLASS ||--o{ ATTENDANCE : contabiliza
-    CLASS ||--o{ TEMPORARY_CLASS_LOCATION : recebe
-    ROOM ||--o{ TEMPORARY_CLASS_LOCATION : aloca
+    ROOM ||--o{ CLASS : aloca
+    ROOM ||--o{ TEMPORARY_CLASS_LOCATION : aloca_temporariamente
+    CLASS ||--o{ TEMPORARY_CLASS_LOCATION : sobrepoe
+    ACADEMIC_SEMESTER ||--o{ CLASS : vigora_em
+    ACADEMIC_SEMESTER ||--o{ ACADEMIC_CALENDAR : engloba
+    ACADEMIC_SEMESTER ||--o{ USER_COURSE : vincula
     USER ||--o{ NOTIFICATION : recebe
     USER ||--o{ CLASS_CANCELLATION : solicita
     CLASS ||--o{ CLASS_CANCELLATION : afeta

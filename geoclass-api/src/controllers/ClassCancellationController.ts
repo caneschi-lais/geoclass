@@ -133,7 +133,7 @@ export class ClassCancellationController {
         cancellation = await prisma.classCancellation.create({
           data: {
             class_id,
-            course_name: classData.course_name,
+            course_id: classData.course_id,
             professor_id: professorId,
             date: targetDate,
             reason_type,
@@ -510,14 +510,15 @@ export class ClassCancellationController {
           },
         },
         include: {
+          course: { select: { name: true } },
           class: {
             select: {
               id: true,
               subject: true,
-              course_name: true,
               schedule_time: true,
-              room_name: true,
               week_days: true,
+              room: { select: { name: true } },
+              course: { select: { name: true } },
             },
           },
         },
@@ -526,7 +527,17 @@ export class ClassCancellationController {
         },
       });
 
-      return res.json(absences);
+      const mapped = absences.map((a: any) => ({
+        ...a,
+        course_name: a.course?.name || a.class?.course?.name || null,
+        class: a.class ? {
+          ...a.class,
+          room_name: a.class.room?.name || 'Sala Padrão',
+          course_name: a.class.course?.name || null,
+        } : null,
+      }));
+
+      return res.json(mapped);
     } catch (error) {
       console.error('Erro ao buscar ausências do professor:', error);
       return res.status(500).json({ error: 'Erro ao buscar ausências.' });
@@ -555,13 +566,29 @@ export class ClassCancellationController {
       const formattedDate = formatDateDisplay(targetDate);
       const reasonLabel = REASON_LABELS[reason_type] || reason_type;
 
+      let targetCourseId: number | null = null;
+      if (course_name) {
+        const cName = String(course_name).trim();
+        const foundCourse = await prisma.course.findFirst({
+          where: {
+            OR: [
+              { name: { contains: cName, mode: 'insensitive' } },
+              { code: { contains: cName, mode: 'insensitive' } }
+            ]
+          }
+        });
+        if (foundCourse) {
+          targetCourseId = foundCourse.id;
+        }
+      }
+
       // Buscar turmas afetadas
       let affectedClasses: any[] = [];
       if (scope === 'TURMA') {
         if (class_id) {
           const c = await prisma.class.findUnique({
             where: { id: class_id },
-            include: { enrollments: true, professor: true },
+            include: { enrollments: true, professor: true, course: true },
           });
           if (c) affectedClasses.push(c);
         }
@@ -569,23 +596,22 @@ export class ClassCancellationController {
           const subj = String(req.body.subject_name || req.body.subject).trim();
           affectedClasses = await prisma.class.findMany({
             where: { subject: { contains: subj }, active: true },
-            include: { enrollments: true, professor: true },
+            include: { enrollments: true, professor: true, course: true },
           });
         }
         if (affectedClasses.length === 0) {
           return res.status(404).json({ error: 'Nenhuma matéria ou turma ativa encontrada com as informações fornecidas.' });
         }
-      } else if (scope === 'CURSO' && course_name) {
-        const cName = String(course_name).trim();
+      } else if (scope === 'CURSO' && targetCourseId) {
         affectedClasses = await prisma.class.findMany({
-          where: { course_name: { contains: cName }, active: true },
-          include: { enrollments: true, professor: true },
+          where: { course_id: targetCourseId, active: true },
+          include: { enrollments: true, professor: true, course: true },
         });
       } else {
         // INSTITUICAO
         affectedClasses = await prisma.class.findMany({
           where: { active: true },
-          include: { enrollments: true, professor: true },
+          include: { enrollments: true, professor: true, course: true },
         });
       }
 
@@ -602,7 +628,7 @@ export class ClassCancellationController {
           where: {
             date: targetDate,
             scope,
-            course_name: scope === 'CURSO' ? course_name : null,
+            course_id: scope === 'CURSO' ? targetCourseId : null,
             class_id: null,
           },
         });
@@ -626,7 +652,7 @@ export class ClassCancellationController {
               description: description ? description.trim() : null,
               status: 'APROVADO',
               scope,
-              course_name: scope === 'CURSO' ? course_name : null,
+              course_id: scope === 'CURSO' ? targetCourseId : null,
               class_id: null,
               created_by_role: 'COORDENADOR',
               replacement_date: replacementDateObj,
@@ -652,7 +678,7 @@ export class ClassCancellationController {
               description: description ? description.trim() : null,
               status: 'APROVADO',
               scope,
-              course_name: cls.course_name,
+              course_id: cls.course_id,
               replacement_date: replacementDateObj,
               created_by_role: 'COORDENADOR',
             },
@@ -661,7 +687,7 @@ export class ClassCancellationController {
           cancellation = await prisma.classCancellation.create({
             data: {
               class_id: cls.id,
-              course_name: cls.course_name,
+              course_id: cls.course_id,
               professor_id: cls.professor_id,
               date: targetDate,
               reason_type,

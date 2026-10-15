@@ -70,7 +70,7 @@ export async function notificationJob() {
               OR: [
                 { class_id: cls.id },
                 { scope: 'INSTITUICAO' },
-                ...(cls.course_name ? [{ scope: 'CURSO', course_name: cls.course_name }] : []),
+                ...(cls.course_id ? [{ scope: 'CURSO', course_id: cls.course_id }] : []),
               ],
             },
           });
