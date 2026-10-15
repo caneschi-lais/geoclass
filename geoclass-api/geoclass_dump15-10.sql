@@ -1,9 +1,3 @@
--- ============================================================================
--- GeoClass - Dump de Dados para Supabase (PostgreSQL)
--- Gerado com IDs inteiros autoincrementais e Chaves Estrangeiras numéricas
--- OBS: Dias cancelados por feriados/emendas NÃO possuem registros em Attendance
--- ============================================================================
-
 BEGIN;
 
 SET CONSTRAINTS ALL DEFERRED;
