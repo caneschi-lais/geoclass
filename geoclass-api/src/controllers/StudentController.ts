@@ -190,26 +190,30 @@ export class StudentController {
       const stats = await Promise.all(enrollments.map(async (e) => {
         const totalClasses = e.class.total_classes || 40; 
         
-        const presencas = await prisma.attendance.count({
+        const faltas = await prisma.attendance.count({
           where: {
             student_id: studentId,
             class_id: e.class.id,
-            status: { in: ['PRESENTE', 'PRESENCA_PARCIAL'] } as any
+            status: 'FALTA'
           }
         });
 
-        const percentage = Math.round((presencas / totalClasses) * 100);
+        // Percentual de presença decrescente a partir de 100% conforme a quantidade de ausências
+        const absencePercentage = totalClasses === 0 ? 0 : Math.round((faltas / totalClasses) * 100);
+        const attendancePercentage = Math.max(0, 100 - absencePercentage);
         
         let status = 'Aprovado';
-        if (percentage < 75 && percentage >= 60) status = 'Em Risco';
-        else if (percentage < 60) status = 'Reprovado';
+        if (attendancePercentage < 60) status = 'Reprovado';
+        else if (attendancePercentage < 75) status = 'Em Risco';
 
         return {
           id: e.class.id,
           subject: e.class.subject,
-          attendancePercentage: percentage,
+          attendancePercentage,
+          absencePercentage,
           status,
-          attendedClasses: presencas,
+          attendedClasses: Math.max(0, totalClasses - faltas),
+          absentClasses: faltas,
           totalClasses
         };
       }));

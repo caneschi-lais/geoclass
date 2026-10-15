@@ -7,6 +7,8 @@ type Props = {
 };
 
 export default function DashboardStatCard({ item }: Props) {
+  const attendance = item.attendancePercentage ?? Math.max(0, 100 - (item.absencePercentage ?? 0));
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Aprovado': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
@@ -32,13 +34,14 @@ export default function DashboardStatCard({ item }: Props) {
           </View>
           <Text className="text-xs font-semibold text-gray-500 dark:text-slate-400">
             {item.attendedClasses ?? 0}/{item.totalClasses ?? 40} aulas
+            {item.absentClasses !== undefined ? ` • ${item.absentClasses} ${item.absentClasses === 1 ? 'falta' : 'faltas'}` : ''}
           </Text>
         </View>
       </View>
       
       <View className="items-center justify-center bg-gray-50 dark:bg-slate-900 rounded-full w-20 h-20 border-4 border-gray-100 dark:border-slate-700">
-        <Text className={`text-xl font-black ${getPercentageColor(item.attendancePercentage)}`}>
-          {item.attendancePercentage}%
+        <Text className={`text-xl font-black ${getPercentageColor(attendance)}`}>
+          {attendance}%
         </Text>
       </View>
     </View>

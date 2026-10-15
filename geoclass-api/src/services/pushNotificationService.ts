@@ -14,11 +14,12 @@ interface PushPayload {
  * Funciona em celulares Android e iOS que possuam push_token registrado.
  */
 export async function sendPushNotification(
-  userIds: string | string[],
+  userIds: number | string | (number | string)[],
   payload: PushPayload
 ) {
   try {
-    const ids = Array.isArray(userIds) ? userIds : [userIds];
+    const rawIds = Array.isArray(userIds) ? userIds : [userIds];
+    const ids = rawIds.map(id => Number(id)).filter(id => !isNaN(id));
     if (ids.length === 0) return;
 
     // Buscar usuários que possuam push_token cadastrado

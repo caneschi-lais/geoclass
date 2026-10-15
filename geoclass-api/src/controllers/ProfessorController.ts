@@ -60,7 +60,7 @@ export class ProfessorController {
   }
 
   async getPresencasTurma(req: AuthRequest, res: Response) {
-    const classId = req.params.id;
+    const classId = Number(req.params.id);
     const { date, status } = req.query as { date?: string; status?: string };
 
     const targetDate = getBrazilMidnightDate(date);
@@ -104,7 +104,7 @@ export class ProfessorController {
       });
 
       // Mapear estudantes únicos a partir das matrículas e presenças
-      const studentMap = new Map<string, any>();
+      const studentMap = new Map<number, any>();
       for (const enr of classData.enrollments) {
         const s = enr.student;
         studentMap.set(s.id, {
@@ -190,7 +190,7 @@ export class ProfessorController {
   }
 
   async changeRoomTemporarily(req: AuthRequest, res: Response) {
-    const classId = req.params.id;
+    const classId = Number(req.params.id);
     const { roomId, date } = req.body; // date in YYYY-MM-DD
     
     if (!date) {
@@ -224,7 +224,8 @@ export class ProfessorController {
         return res.json({ message: 'Sala padrão restaurada com sucesso!' });
       }
       
-      const roomData = await prisma.room.findUnique({ where: { id: roomId } });
+      const numericRoomId = Number(roomId);
+      const roomData = await prisma.room.findUnique({ where: { id: numericRoomId } });
       if (!roomData) return res.status(404).json({ error: 'Sala não encontrada' });
 
       // Verificação dupla de conflito
@@ -301,7 +302,7 @@ export class ProfessorController {
 
   // Obter todos os alunos matriculados na turma
   async getEnrolledStudents(req: AuthRequest, res: Response) {
-    const classId = req.params.id;
+    const classId = Number(req.params.id);
 
     try {
       const dateQuery = req.query.date as string | undefined;
@@ -349,7 +350,7 @@ export class ProfessorController {
 
   // Registrar chamada manual (EAD)
   async registerManualAttendance(req: AuthRequest, res: Response) {
-    const classId = req.params.id;
+    const classId = Number(req.params.id);
     const { attendances, date } = req.body; // array de { studentId, slots?: Record<string, boolean>, isPresent?: boolean } e opcional date "YYYY-MM-DD"
 
     if (!attendances || !Array.isArray(attendances)) {
@@ -375,7 +376,7 @@ export class ProfessorController {
 
       // Registrar ou atualizar as presenças de cada aluno na data especificada para todos os 4 slots
       for (const record of attendances) {
-        const studentId = record.studentId || record.id;
+        const studentId = Number(record.studentId || record.id);
         if (!studentId) continue;
 
         // Limpar registros manuais antigos com slot 'MANUAL' ou nulo para evitar duplicidade ou divergência
@@ -473,7 +474,10 @@ export class ProfessorController {
       return res.status(403).json({ error: 'Acesso negado. Apenas professores ou coordenadores podem realizar esta ação.' });
     }
 
-    const { attendanceId, studentId, classId, date } = req.body;
+    const attendanceId = req.body.attendanceId ? Number(req.body.attendanceId) : undefined;
+    const studentId = req.body.studentId ? Number(req.body.studentId) : undefined;
+    const classId = req.body.classId ? Number(req.body.classId) : undefined;
+    const { date } = req.body;
 
     if (!attendanceId && (!studentId || !classId)) {
       return res.status(400).json({ error: 'Informe o attendanceId ou (studentId e classId)' });
@@ -518,7 +522,7 @@ export class ProfessorController {
   }
 
   async getDatasComChamada(req: AuthRequest, res: Response) {
-    const classId = req.params.id;
+    const classId = Number(req.params.id);
 
     try {
       const presencas = await prisma.attendance.findMany({

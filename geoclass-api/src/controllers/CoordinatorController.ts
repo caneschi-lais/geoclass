@@ -124,7 +124,8 @@ export class CoordinatorController {
 
   // 3. Obter matérias de um aluno em um semestre específico
   async getStudentSubjects(req: AuthRequest, res: Response) {
-    const { id: studentId } = req.params;
+    const { id } = req.params;
+    const studentId = Number(id);
     const { semester } = req.query as { semester: string };
 
     if (!semester) {
@@ -832,8 +833,8 @@ export class CoordinatorController {
     try {
       const enrollment = await prisma.enrollment.findFirst({
         where: {
-          student_id: String(student_id),
-          class_id: String(class_id)
+          student_id: Number(student_id),
+          class_id: Number(class_id)
         }
       });
 
@@ -940,7 +941,7 @@ export class CoordinatorController {
 
     try {
       await prisma.academicCalendar.delete({
-        where: { id },
+        where: { id: Number(id) },
       });
 
       return res.json({ message: 'Dia não-letivo removido do calendário com sucesso!' });

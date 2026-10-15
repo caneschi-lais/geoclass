@@ -310,11 +310,12 @@ export class AttendanceController {
       });
 
       // Checar se a frequência está em zona de risco (< 75%) e notificar o aluno
-      const presencesCount = await prisma.attendance.count({
-        where: { student_id: studentId, class_id: classId, status: { in: ['PRESENTE', 'ATRASADO'] } }
+      const faltasCount = await prisma.attendance.count({
+        where: { student_id: studentId, class_id: classId, status: 'FALTA' }
       });
       const totalClasses = classData.total_classes || 40;
-      const attendancePercentage = Math.round((presencesCount / totalClasses) * 100);
+      const absencePercentage = totalClasses === 0 ? 0 : Math.round((faltasCount / totalClasses) * 100);
+      const attendancePercentage = Math.max(0, 100 - absencePercentage);
 
       if (attendancePercentage < 75) {
         const riskTitle = `Alerta de Risco de Frequência: ${classData.subject}`;

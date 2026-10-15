@@ -39,7 +39,7 @@ export default function DashboardScreen() {
       {/* Cards com estatísticas de frequência */}
       <FlatList
         data={stats}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => String(item.id)}
         renderItem={({ item }) => <DashboardStatCard item={item} />}
         contentContainerStyle={{ paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}

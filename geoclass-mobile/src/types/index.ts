@@ -25,8 +25,10 @@ export interface DashboardStat {
   id: string;
   subject: string;
   attendancePercentage: number;
+  absencePercentage?: number;
   status: 'Aprovado' | 'Reprovado' | 'Em Risco';
   attendedClasses?: number;
+  absentClasses?: number;
   totalClasses?: number;
 }
 
