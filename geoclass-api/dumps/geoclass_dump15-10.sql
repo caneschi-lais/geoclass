@@ -2,6 +2,22 @@ BEGIN;
 
 SET CONSTRAINTS ALL DEFERRED;
 
+-- Limpeza preventiva de dados para evitar conflito de chave duplicada (idempotência)
+TRUNCATE TABLE 
+  "Notification",
+  "Attendance",
+  "Enrollment",
+  "TemporaryClassLocation",
+  "ClassCancellation",
+  "Class",
+  "UserCourse",
+  "Course",
+  "AcademicCalendar",
+  "AcademicSemester",
+  "Room",
+  "User"
+CASCADE;
+
 -- 1. Room
 INSERT INTO "Room" ("id", "name", "latitude", "longitude") VALUES (1, 'dcpc', -23.0817792, -47.2055808);
 INSERT INTO "Room" ("id", "name", "latitude", "longitude") VALUES (2, 'Mini 1', -23.0857549, -47.2024193);
