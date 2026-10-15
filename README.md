@@ -78,7 +78,7 @@ Antes de iniciar, garanta que seu ambiente possui as seguintes ferramentas insta
    DATABASE_URL="postgresql://usuario:senha@localhost:5432/geoclass?schema=public"
    JWT_SECRET="sua_chave_secreta_jwt_para_seguranca"
    ```
-   *Substitua `usuario` e `senha` pelas credenciais do seu banco PostgreSQL local (ou use um banco em nuvem como o Neon).*
+   *Substitua `usuario` e `senha` pelas credenciais do seu banco PostgreSQL (ou utilize a URL do Supabase).*
 
 4. **Sincronize o banco de dados e popule com dados de teste:**
    Execute os comandos do Prisma ORM para empurrar o schema ao PostgreSQL e rodar o script de seed:
@@ -213,10 +213,10 @@ flowchart TD
         RiskJob["RiskCheckerJob - Notificação Auto <75%"]:::job
     end
 
-    subgraph Persistence ["Cloud Database - Neon.tech"]
+    subgraph Persistence ["Cloud Database - Supabase"]
         direction TB
         ORM["Prisma ORM"]:::database
-        DB[("PostgreSQL Serverless - Neon.tech")]:::database
+        DB[("PostgreSQL Gerenciado - Supabase")]:::database
     end
 
     %% Keep-Alive

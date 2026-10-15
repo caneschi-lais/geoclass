@@ -1,6 +1,6 @@
 # Diagrama de Banco de Dados (MER / ERD) - GeoClass
 
-Para a monografia/TCC, a notação **Crow's Foot (Pé de Galinha)** é o padrão utilizado na engenharia de software para mapear de forma precisa as tabelas do banco de dados relacional distribuído em borda (**Cloudflare D1**), os tipos de dados, chaves primárias (PK), chaves estrangeiras (FK) e a cardinalidade dos relacionamentos construídos com o **Prisma ORM** via adaptador oficial `@prisma/adapter-d1`.
+Para a monografia/TCC, a notação **Crow's Foot (Pé de Galinha)** é o padrão utilizado na engenharia de software para mapear de forma precisa as entidades e tabelas do banco de dados relacional gerenciado na nuvem (**Supabase - PostgreSQL**), os tipos de dados, chaves primárias numéricas (PK), chaves estrangeiras com integridade referencial (FK) e a cardinalidade dos relacionamentos construídos com o **Prisma ORM**.
 
 ---
 
@@ -9,12 +9,13 @@ Para a monografia/TCC, a notação **Crow's Foot (Pé de Galinha)** é o padrão
 ```mermaid
 erDiagram
     USER {
-        string id PK
+        int id PK
         string name
         string email
         string password_hash
         Role role
         string ra
+        string_array courses
         string student_semester
         boolean active
         datetime privacy_terms_accepted_at
@@ -23,20 +24,19 @@ erDiagram
     }
 
     USER_COURSE {
-        string id PK
-        string user_id FK
+        int id PK
+        int user_id FK
         string course_name
         string semester
         boolean is_completed
-        datetime created_at
     }
 
-    TURMA {
-        string id PK
+    CLASS {
+        int id PK
         string subject
+        string course_name
         string schedule_time
         string week_days
-        string course_name
         float latitude
         float longitude
         int radius_meters
@@ -44,21 +44,21 @@ erDiagram
         string semester
         string room_name
         int total_classes
-        string professor_id FK
+        int professor_id FK
         datetime created_at
     }
 
     ENROLLMENT {
-        string id PK
-        string student_id FK
-        string class_id FK
+        int id PK
+        int student_id FK
+        int class_id FK
         boolean is_completed
     }
 
     ATTENDANCE {
-        string id PK
-        string student_id FK
-        string class_id FK
+        int id PK
+        int student_id FK
+        int class_id FK
         date date
         string slot_time
         datetime check_in_time
@@ -72,25 +72,25 @@ erDiagram
     }
 
     ROOM {
-        string id PK
+        int id PK
         string name
         float latitude
         float longitude
     }
 
     TEMPORARY_CLASS_LOCATION {
-        string id PK
-        string class_id FK
+        int id PK
+        int class_id FK
         string date
-        string room_id
+        int room_id FK
         string room_name
         float latitude
         float longitude
     }
 
     NOTIFICATION {
-        string id PK
-        string user_id FK
+        int id PK
+        int user_id FK
         string title
         string body
         boolean read
@@ -98,10 +98,10 @@ erDiagram
     }
 
     CLASS_CANCELLATION {
-        string id PK
-        string class_id FK
+        int id PK
+        int class_id FK
         string course_name
-        string professor_id FK
+        int professor_id FK
         date date
         string reason_type
         string description
@@ -115,7 +115,7 @@ erDiagram
     }
 
     ACADEMIC_CALENDAR {
-        string id PK
+        int id PK
         date date
         string description
         string type
@@ -123,7 +123,7 @@ erDiagram
     }
 
     ACADEMIC_SEMESTER {
-        string id PK
+        int id PK
         string name
         date start_date
         date end_date
@@ -131,18 +131,17 @@ erDiagram
         datetime created_at
     }
 
-    USER ||--o{ USER_COURSE : cursa
-    USER ||--o{ TURMA : leciona
-    USER ||--o{ ENROLLMENT : possui
-    TURMA ||--o{ ENROLLMENT : matricula
+    USER ||--o{ USER_COURSE : possui
+    USER ||--o{ CLASS : leciona
+    USER ||--o{ ENROLLMENT : cursa
+    CLASS ||--o{ ENROLLMENT : matricula
     USER ||--o{ ATTENDANCE : registra
-    TURMA ||--o{ ATTENDANCE : possui
-    TURMA ||--o{ TEMPORARY_CLASS_LOCATION : recebe
+    CLASS ||--o{ ATTENDANCE : contabiliza
+    CLASS ||--o{ TEMPORARY_CLASS_LOCATION : recebe
     ROOM ||--o{ TEMPORARY_CLASS_LOCATION : aloca
-    ROOM ||--o{ TURMA : referencia
     USER ||--o{ NOTIFICATION : recebe
     USER ||--o{ CLASS_CANCELLATION : solicita
-    TURMA ||--o{ CLASS_CANCELLATION : afeta
+    CLASS ||--o{ CLASS_CANCELLATION : afeta
 ```
 
 ---
@@ -151,35 +150,21 @@ erDiagram
 
 Se a banca examinadora questionar sobre a modelagem e integridade do banco de dados, destaque os seguintes pontos arquiteturais:
 
-1. **Persistência Serverless em Borda com Cloudflare D1:**
-   O banco de dados oficial do ecossistema é o **Cloudflare D1**, executando sobre o motor relacional SQLite distribuído globalmente pela Cloudflare. A conexão com a API Node.js/Express é realizada via **`@prisma/adapter-d1`**, combinando a robustez de tipos do Prisma Client com armazenamento de borda de baixíssima latência.
+1. **Persistência Relacional em Nuvem com Supabase (PostgreSQL):**
+   O banco de dados oficial do ecossistema é o **PostgreSQL** hospedado na infraestrutura gerenciada do **Supabase**. A modelagem adota chaves primárias inteiras sequenciais (`Int @id @default(autoincrement())`), garantindo indexação B-Tree de alta performance, menor consumo de memória em relação a UUIDs e suporte a chaves estrangeiras com regras estritas de integridade referencial (`ON DELETE CASCADE`).
 
 2. **Polimorfismo, Notificações Push e Status da Entidade `User`:**
-   A entidade `User` gerencia todos os perfis do sistema (Alunos, Professores e Coordenadores). A diferenciação de acesso e permissões (*Role-Based Access Control*) é feita via tipo Enumerado `Role` (`ALUNO`, `PROFESSOR`, `COORDENADOR`). O atributo booleano `active` permite a desativação/trancamento temporário de contas com bloqueio de acesso ao app. O campo `push_token` armazena o identificador único fornecido pelo serviço Expo Push Notifications no smartphone do usuário, viabilizando lembretes automáticos instantâneos.
+   A entidade `User` gerencia todos os perfis do sistema (Alunos, Professores e Coordenadores). A diferenciação de acesso e permissões (*Role-Based Access Control*) é feita via tipo Enumerado nativo `Role` (`ALUNO`, `PROFESSOR`, `COORDENADOR`). O atributo booleano `active` permite a desativação/trancamento temporário de contas com bloqueio de acesso ao app. O campo `push_token` armazena o identificador único fornecido pelo serviço Expo Push Notifications no smartphone do usuário, viabilizando lembretes automáticos instantâneos.
 
 3. **Modelagem Multi-Curso & Semestre por Curso (`UserCourse`):**
-   A tabela `UserCourse` permite que um aluno curse múltiplos cursos simultaneamente (ex: ADS e Gestão Empresarial) mantendo o semestre específico de cada curso (`semester`) e a sinalização de término de curso (`is_completed`). Possui a restrição composta `@@unique([user_id, course_name])`.
+   Alunos podem cursar múltiplas graduações simultaneamente na faculdade (ex: ADS e Gestão Empresarial) ou já ter concluído uma e continuar em outra. A tabela associativa `UserCourse` desacopla o semestre letivo e o status de conclusão (`is_completed`) por curso, impedindo que a conclusão de um curso afete indevidamente a matrícula em outro.
 
-4. **Garantia de Unicidade e Regras N:M (`Enrollment`):**
-   A relação de muitos-para-muitos entre Alunos (`User`) e Turmas (`Class`, representada como `TURMA` no diagrama para evitar colisão com a palavra reservada `class` do Mermaid) é decomposta através da entidade `Enrollment`. Para evitar matrículas duplicadas, o banco impõe a restrição composta `@@unique([student_id, class_id])`.
+4. **Auditoria de Presença, Multi-Slot e Compliance LGPD (`Attendance`):**
+   Cada aula ministrada possui sua chave única composta por `[student_id, class_id, date, slot_time]`, garantindo que turmas de 2 ou 4 aulas consecutivas por dia registrem a frequência de cada bloco (`slot_time`) de forma independente. As coordenadas de geolocalização (`student_latitude`, `student_longitude`) e o identificador do hardware (`device_id`) são retidos exclusivamente pelo período letivo e expurgados automaticamente após 6 meses via rotina programada (`LgpdWiperJob`).
 
-5. **Multi-Slot de Horários, Fuso Horário Canônico & Auditoria Antifraude (`Attendance`):**
-   Para disciplinas com múltiplos blocos/horários em um mesmo dia (ex: `19:00, 19:50`), a tabela de chamadas impõe a restrição composta `@@unique([student_id, class_id, date, slot_time])`. Todas as datas são gravadas com timestamp canônico de meia-noite (`Date.UTC(ano, mes, dia, 0, 0, 0, 0)`) alinhado com o dia civil no **Horário de Brasília (`America/Sao_Paulo`, UTC-3)**, impedindo desvios de data quando servidores rodam em UTC. Além dos estados tradicionais (`PRESENTE`, `ATRASADO`, `FALTA`), inclui o status **`PRESENCA_PARCIAL`**, atribuído automaticamente a todos os alunos quando uma aula é suspensa institucionalmente ou abonada por ausência do professor, resguardando o direito acadêmico até a realização da aula de reposição.
+5. **Gestão de Espaço Físico e Override Temporário (`Room` e `TemporaryClassLocation`):**
+   O cadastro oficial de salas físicas (`Room`) armazena centróides geográficos auditados. Caso o professor precise levar a turma para um laboratório diferente em determinado dia, a tabela `TemporaryClassLocation` cria uma sobreposição válida exclusivamente para aquela data, sem alterar o cadastro padrão da disciplina.
 
-6. **Dynamic Location Override (`TemporaryClassLocation`):**
-   A tabela possui a chave composta `@@unique([class_id, date])`. Quando o professor realiza a troca temporária de sala, a API efetua uma busca prioritária nesta tabela; se houver um registro ativo para a data, as coordenadas de Geofencing da sala temporária sobrepõem as coordenadas padrão da entidade `Class`.
-
-7. **Catálogo Independente de Infraestrutura Física (`Room`):**
-   A tabela `Room` funciona como um **catálogo/cadastro mestre de salas físicas e laboratórios do campus** (nome, latitude e longitude). Ela é desassociada de chaves estrangeiras rígidas em `Class` e `TemporaryClassLocation` para permitir o reuso e garantir a resiliência histórica: caso uma sala física seja removida ou alterada no catálogo, as turmas criadas e os históricos de chamadas anteriores não perdem suas coordenadas nem quebram por integridade referencial.
-
-8. **Entidade de Comunicação Ativa (`Notification`):**
-   Gerencia os alertas manuais e automáticos (incluindo lembretes de início de aula, fechamento de chamada para o professor, avisos de troca de sala, suspensão de aulas, solicitações de atestado, agendamento de reposição e alertas de risco `< 75%`). Possui exclusão em cascata (`onDelete: Cascade`) vinculada a `User`, garantindo integridade referencial.
-
-9. **Privacy by Design & Compliance LGPD:**
-   A entidade `User` registra o timestamp do consentimento expresso em `privacy_terms_accepted_at`. Além disso, os atributos sensíveis `student_latitude`, `student_longitude` e `device_id` na tabela `Attendance` são anuláveis (`nullable`), permitindo que a rotina automatizada `LgpdWiperJob` limpe esses geodados de presenças com mais de 6 meses sem deletar o registro histórico acadêmico do aluno.
-
-10. **Gestão de Cancelamentos, Atestados e Reposições (`ClassCancellation`):**
-    Estrutura unificada que gerencia tanto a solicitação de ausência feita pelo docente quanto a suspensão direta de aulas pela coordenação (em escopos `TURMA`, `CURSO` ou `INSTITUICAO`). Suporta anexação de atestados médicos (`certificate_url`), controle de aprovação (`status`), vinculação com data futura de reposição (`replacement_date`) e flag de conclusão (`replacement_completed`), notificando alunos e docentes em cada transição de estado.
-
-11. **Calendário Acadêmico e Períodos Letivos (`AcademicCalendar` e `AcademicSemester`):**
-    A tabela `AcademicSemester` delimita os períodos oficiais da instituição (ex: `2026.1`, `2026.2` com `start_date` e `end_date`), permitindo que o sistema identifique dinamicamente o semestre corrente e execute viradas de semestre em lote. Já a tabela `AcademicCalendar` cadastra feriados, recessos e eventos não letivos garantindo que o sistema não compute ausências indevidas.
+6. **Regras de Ausência, Faltas e Reposição (`ClassCancellation` e `AcademicCalendar`):**
+   - Dias não letivos oficiais (feriados nacionais, municipais e recessos escolares) são gerenciados na tabela `AcademicCalendar`. Nesses dias, nenhuma chamada ou falta é gerada.
+   - Cancelamentos e suspensões institucionais são registrados em `ClassCancellation`. Feriados e emendas extras (`FERIADO_EXTRA`) dispensam o registro de presença sem gerar faltas. Suspensões acadêmicas e atestados médicos de docentes atribuem provisoriamente `PRESENCA_PARCIAL` aos alunos matriculados até que a reposição vinculada (`replacement_date`) seja concluída.

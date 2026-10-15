@@ -19,7 +19,7 @@ sequenceDiagram
     actor Aluno
     participant App as Aplicativo Mobile (Expo)
     participant API as Backend API (Render.com)
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
 
     Aluno->>App: Digita E-mail e Senha e clica em "Entrar"
     App->>API: POST /api/login {email, password}
@@ -61,7 +61,7 @@ sequenceDiagram
     participant App as Aplicativo Mobile
     participant Hardware as Sensores (GPS/Device ID)
     participant API as Backend API (Render.com)
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
     participant Push as Expo Push Service
 
     Aluno->>App: Clica no botão "Confirmar Presença" no Card da Aula
@@ -102,7 +102,7 @@ sequenceDiagram
         end
         API->>DB: Insere notificação em Notification ("Presença Confirmada")
         API-)Push: Dispara Push Notification via Expo Push API
-        DB-->>API: Registro confirmado no Cloudflare D1
+        DB-->>API: Registro confirmado no Supabase (PostgreSQL)
         API-->>App: Status 201: Presença confirmada!
         App-->>Aluno: Exibe feedback visual de sucesso (Card Atualizado)
     end
@@ -120,7 +120,7 @@ sequenceDiagram
     participant App as Aplicativo Mobile (Expo)
     participant Queue as Fila Offline (AsyncStorage)
     participant API as Backend API (Render.com)
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
 
     Aluno->>App: Clica em "Confirmar Presença" (Sem Internet)
     App->>App: Captura GPS e Device ID do hardware local
@@ -167,16 +167,17 @@ sequenceDiagram
     actor Aluno
     participant App as Aplicativo Mobile
     participant API as Backend API (Render.com)
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
 
-    %% Dashboard de Frequência
+    %% Dashboard de Frequência (Cálculo Decrescente a partir de 100%)
     Aluno->>App: Acessa aba "Dashboard"
     App->>API: GET /api/aluno/dashboard
-    API->>DB: Busca matrículas e conta presenças por disciplina
-    DB-->>API: Retorna estatísticas de frequência
+    API->>DB: Busca matrículas e conta faltas registradas (status=FALTA)
+    DB-->>API: Retorna quantidade de faltas por disciplina
+    API->>API: Calcula % presença decrescente a partir de 100% (100 - % ausências)
     API->>API: Classifica status (Aprovado >= 75%, Em Risco 60-74%, Reprovado < 60%)
-    API-->>App: Retorna estatísticas calculadas por matéria
-    App-->>Aluno: Exibe gráfico de barras e Badges de status
+    API-->>App: Retorna attendancePercentage, absentClasses e status por matéria
+    App-->>Aluno: Exibe cards de frequência (100% decrescente com contador de faltas) e Badges de status
 
     %% Histórico Acadêmico
     Aluno->>App: Acessa aba "Histórico"
@@ -213,7 +214,7 @@ sequenceDiagram
     actor Professor
     participant App as Aplicativo Mobile (Expo)
     participant API as Backend API (Render.com)
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
 
     Professor->>App: Acessa aba "Minhas Turmas"
     App->>API: GET /api/professor/turmas
@@ -240,7 +241,7 @@ sequenceDiagram
     actor Professor
     participant App as Aplicativo Mobile
     participant API as Backend API (Render.com)
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
 
     Professor->>App: Seleciona turma e clica em "Trocar Sala"
     App->>API: GET /api/professor/salas-disponiveis
@@ -281,7 +282,7 @@ sequenceDiagram
     actor Professor
     participant App as Aplicativo Mobile
     participant API as Backend API (Render.com)
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
 
     Professor->>App: Seleciona a turma e clica em "Chamada Manual / EAD"
     App->>API: GET /api/professor/turma/:id/alunos
@@ -314,7 +315,7 @@ sequenceDiagram
     actor Professor
     participant App as Aplicativo Mobile
     participant API as Backend API (Render.com)
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
 
     Professor->>App: Seleciona aluno na lista de chamada e clica em "Resetar Aparelho"
     App->>API: POST /api/professor/presenca/reset-device {studentId, classId}
@@ -342,7 +343,7 @@ sequenceDiagram
     actor Professor
     participant App as Aplicativo Mobile (Expo)
     participant API as Backend API (Render.com)
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
     actor Coordenador
 
     Professor->>App: Clica em "Avisar Falta" na tela da turma
@@ -384,7 +385,7 @@ sequenceDiagram
     actor Professor
     participant App as Aplicativo Mobile
     participant API as Backend API (Render.com)
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
     actor Alunos as Alunos Matriculados
 
     Professor->>App: Acessa "Atestados" ou "Reposições" e clica em "Agendar / Alterar Data"
@@ -413,7 +414,7 @@ sequenceDiagram
     actor Professor
     participant App as Aplicativo Mobile
     participant API as Backend API (Render.com)
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
 
     Professor->>App: Clica no botão "Reposições / Chamadas" na tela Minhas Turmas
     App->>API: GET /api/professor/reposicoes-pendentes
@@ -447,7 +448,7 @@ sequenceDiagram
     actor Coordenador
     participant Web as Painel Coordenador / App
     participant API as Backend API (Render.com)
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
 
     Coordenador->>Web: Acessa "Gestão de Semestres"
     Web->>API: GET /api/coordenador/semestres
@@ -481,7 +482,7 @@ sequenceDiagram
     actor Coordenador
     participant Web as Painel Coordenador / App
     participant API as Backend API (Render.com)
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
 
     Coordenador->>Web: Preenche formulário "Cadastrar Sala" (Nome, Latitude, Longitude)
     opt Vincular Nova Turma/Matéria
@@ -516,7 +517,7 @@ sequenceDiagram
     actor Coordenador
     participant Web as Painel Coordenador / App
     participant API as Backend API (Render.com)
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
 
     Coordenador->>Web: Acessa tela "Matricular Aluno"
     Web->>API: GET /api/coordenador/alunos
@@ -551,7 +552,7 @@ sequenceDiagram
     actor Coordenador
     participant Web as Painel Coordenador / App
     participant API as Backend API (Render.com)
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
     participant Export as Motor de Exportação (PDF / XLSX)
 
     Coordenador->>Web: Clica em "Exportar Relatório Geral"
@@ -590,7 +591,7 @@ sequenceDiagram
     autonumber
     participant Cron as node-cron (Express Server)
     participant Job as lgpdWiperJob()
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
 
     note over Cron: Disparo agendado diariamente às 03:00 AM (Cron '0 3 * * *')
     Cron->>Job: Executa rotina de expurgo LGPD
@@ -614,7 +615,7 @@ sequenceDiagram
     participant Cron as node-cron (Express Server)
     participant Job as notificationJob()
     participant Absence as AbsenceProcessor
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
     participant Push as Expo Push Service
 
     note over Cron: Disparo agendado a cada minuto (Cron '* * * * *')
@@ -671,7 +672,7 @@ sequenceDiagram
     participant Web as Painel Coordenador / App
     participant API as Backend API (Render.com)
     participant Util as Utilitário AcademicSemester
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
 
     Coordenador->>Web: Carrega tela de Gestão Acadêmica
     Web->>API: GET /api/coordenador/semestre-atual
@@ -712,7 +713,7 @@ sequenceDiagram
     actor Coordenador
     participant Web as Painel Coordenador / App
     participant API as Backend API (Render.com)
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
 
     %% Alternar Status Ativo / Inativo
     Coordenador->>Web: Alterna Switch "Ativo" de um Aluno
@@ -742,7 +743,7 @@ sequenceDiagram
     actor Coordenador
     participant Web as Painel Coordenador / App
     participant API as Backend API (Render.com)
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
     actor Alunos as Alunos Matriculados
     actor Professores as Professores
 
@@ -756,19 +757,26 @@ sequenceDiagram
         note right of API: Processamento em Lote Institucional
         API->>DB: Identifica turmas afetadas pelo escopo e dia da semana
         API->>DB: Cria registro(s) em ClassCancellation (status=APROVADO)
-        loop Para cada turma afetada
-            loop Para cada aluno matriculado
-                API->>DB: UPSERT Attendance (status='PRESENCA_PARCIAL')
-                API->>DB: INSERT INTO Notification (user_id=aluno, title="Aula Suspensa: [Matéria]")
+        alt Motivo == FERIADO_EXTRA (Dia Não Letivo / Feriado)
+            note over API: Não gera presença nem falta (dia livre de chamada)
+            loop Para cada turma afetada
+                API->>DB: INSERT INTO Notification ("Feriado/Emenda: [Matéria] - Sem aula")
             end
-            API->>DB: INSERT INTO Notification (user_id=professor, title="Aula Suspensa: [Matéria]")
+        else Ausência Docente / Suspensão com Reposição
+            loop Para cada turma afetada
+                loop Para cada aluno matriculado
+                    API->>DB: UPSERT Attendance (status='PRESENCA_PARCIAL')
+                    API->>DB: INSERT INTO Notification (user_id=aluno, title="Aula Suspensa: [Matéria]")
+                end
+                API->>DB: INSERT INTO Notification (user_id=professor, title="Aula Suspensa: [Matéria]")
+            end
         end
     end
 
     DB-->>API: Transação concluída
     API-->>Web: Sucesso 200: "Suspensão registrada e alunos/professores notificados!"
     Web-->>Coordenador: Exibe confirmação com contador de turmas suspensas
-    note over Alunos, Professores: Notificação push imediata avisando da suspensão<br/>e resguardando presença parcial até reposição
+    note over Alunos, Professores: Notificação push imediata avisando da suspensão<br/>(com presença parcial em caso de reposição)
 ```
 
 ---
@@ -782,7 +790,7 @@ sequenceDiagram
     actor Coordenador
     participant Web as Painel Coordenador / App
     participant API as Backend API (Render.com)
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
     actor Professor
 
     Coordenador->>Web: Acessa aba "Solicitações de Falta"
@@ -820,13 +828,13 @@ sequenceDiagram
     autonumber
     actor Aluno
     participant API as Backend API (Render.com)
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
 
     note over API: Processado durante o registro de presença ou job
-    API->>DB: Calcula porcentagem de presença acumulada da disciplina
-    DB-->>API: Retorna presenças = 28 / total_classes = 40 (70% Presença)
+    API->>DB: Conta faltas registradas (status=FALTA) e calcula 100 - % ausências
+    DB-->>API: Retorna faltas = 12 / total_classes = 40 (30% Ausências -> 70% Presença)
 
-    alt Presença entre 70% e 74% (Faixa Crítica)
+    alt Presença abaixo de 75% (Faixa de Risco)
         API->>DB: INSERT INTO Notification (user_id, title, body) VALUES ("Atenção: Limite Crítico de Faltas (70% de presença em ADS)")
         DB-->>API: Notificação gravada
         note right of DB: Notificação enviada instantaneamente ao celular do aluno
@@ -845,7 +853,7 @@ sequenceDiagram
     participant Proc as processExpiredAttendanceSlots()
     participant Cal as CalendarService (isAcademicInstructionalDay)
     participant Time as Motor de Fuso Horário (dateUtils - BRT UTC-3)
-    participant DB as Banco Cloudflare D1 (Edge SQL)
+    participant DB as Banco Supabase (PostgreSQL)
 
     Trigger->>Proc: Executa processExpiredAttendanceSlots(now)
     Proc->>Time: getBrazilMidnightDate(now) & getBrazilParts(now)

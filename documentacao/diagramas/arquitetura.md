@@ -2,7 +2,7 @@
 
 Para apresentar a arquitetura de forma visual e profissional, você pode utilizar o **Mermaid**, que é uma linguagem de diagramação baseada em texto que gera gráficos automaticamente. O Mermaid é suportado nativamente pelo GitHub, Notion, Obsidian e várias outras plataformas.
 
-Abaixo está o código do diagrama da arquitetura completa e atualizada do GeoClass, contemplando a migração para o **Cloudflare D1**, o **Motor de Fuso Horário de Brasília (UTC-3)**, o **Serviço de Push Notifications** e a **Auto-Remediação de Faltas**.
+Abaixo está o código do diagrama da arquitetura completa e atualizada do GeoClass, contemplando o banco de dados em nuvem **Supabase (PostgreSQL)**, o **Motor de Fuso Horário de Brasília (UTC-3)**, o **Serviço de Push Notifications**, a **Auto-Remediação de Faltas** e o **Cálculo Decrescente de Frequência (100% - Faltas)**.
 
 ## Diagrama da Arquitetura
 
@@ -43,9 +43,9 @@ flowchart TD
         Auth["Auth Service - JWT & Account Status"]:::backend
         TimeEngine["Motor de Fuso Horário & Slots (dateUtils - America/Sao_Paulo UTC-3)"]:::backend
         GeoEngine["Motor Geofencing - Haversine & Validação Multi-Slot"]:::backend
-        StudentAPI["API do Aluno & Status Dinâmico por Slot"]:::backend
+        StudentAPI["API do Aluno & Frequência Decrescente (100% - Faltas)"]:::backend
         ProfAPI["API do Professor"]:::backend
-        CoordAPI["API do Coordenador & Batch Virada"]:::backend
+        CoordAPI["API do Coordenador & Gestão de Risco (<75%)"]:::backend
         CancellationAPI["API de Cancelamentos, Atestados & Reposições"]:::backend
         NotifAPI["API de Notificações Internas & Push Service"]:::backend
         SemUtil["Utilitário de Semestre Automático (YYYY.1/2)"]:::backend
@@ -58,11 +58,12 @@ flowchart TD
         RiskJob["RiskCheckerJob - Notificação Auto de Risco (<75%)"]:::job
     end
 
-    subgraph Persistence ["Edge Relational Database - Cloudflare D1"]
+    subgraph Persistence ["Cloud Relational Database - Supabase (PostgreSQL)"]
         direction TB
-        Adapter["Prisma D1 Adapter (@prisma/adapter-d1)"]:::database
         ORM["Prisma ORM Client"]:::database
-        DB[("Cloudflare D1 Database - Edge SQL Engine")]:::database
+        Pooler["Supabase Connection Pooler (Transaction - Port 6543)"]:::database
+        DirectConn["Direct PostgreSQL Connection (Port 5432)"]:::database
+        DB[("Supabase PostgreSQL Database Engine")]:::database
     end
 
     %% Keep-Alive
@@ -106,9 +107,11 @@ flowchart TD
     CancellationAPI --> ORM
     NotifAPI --> ORM
 
-    %% Camada de Persistência com Cloudflare D1
-    ORM --> Adapter
-    Adapter -->|Cloudflare API / D1 Protocol| DB
+    %% Camada de Persistência com Supabase PostgreSQL
+    ORM -->|Consultas Transacionais da API| Pooler
+    ORM -->|Migrações e db push via prisma.config.ts| DirectConn
+    Pooler --> DB
+    DirectConn --> DB
 
     %% Jobs Background & Processamento Autônomo
     CronLGPD -.->|Expurgo Diário >6 meses| ORM
@@ -128,7 +131,8 @@ flowchart TD
    - Clique em **"Save as PNG"** ou **"Save as SVG"** no canto inferior direito para baixar a imagem em alta qualidade e colocar no seu documento/apresentação.
 
 ## O que este diagrama demonstra (para explicar na sua apresentação):
-- **Infraestrutura Serverless de Borda com Cloudflare D1:** Exibe a API hospedada no **Render.com** conectada ao banco de dados relacional distribuído **Cloudflare D1** através do **`@prisma/adapter-d1`**, garantindo alta velocidade de leitura, consistência transacional e baixa latência.
+- **Infraestrutura Relacional em Nuvem com Supabase (PostgreSQL):** Exibe a API hospedada no **Render.com** conectada ao banco de dados relacional **PostgreSQL no Supabase** através do **Prisma ORM**, utilizando arquitetura híbrida de pool de conexões (porta 6543) para operações da API e conexão direta (porta 5432) para migrações e sincronização de schema.
+- **Cálculo Canônico de Frequência Decrescente (100% - Faltas):** Demonstra a regra acadêmica em que o aluno inicia o semestre com 100% de presença e a porcentagem decresce conforme as faltas (`FALTA`) acumuladas em relação ao total de aulas da disciplina (`total_classes`). Alunos só entram em risco quando a frequência calculada fica abaixo de 75% (mais de 25% de faltas).
 - **Motor de Fuso Horário e Tolerância Estrita (`dateUtils`):** Demonstra como o backend normaliza todos os horários e datas para o **Horário de Brasília (`America/Sao_Paulo`, UTC-3)**, eliminando conflitos de fuso causados por servidores em nuvem rodando em UTC e garantindo que janelas de tolerância de 15 minutos sejam avaliadas com exatidão civil.
 - **Auto-Remediação de Ausências (`AbsenceProcessor`):** Processador autônomo que fecha chamadas expiradas gerando faltas para alunos ausentes e ao mesmo tempo identifica e remove registros prematuros para slots que ainda não haviam encerrado.
 - **Serviço de Notificações Push (Expo Push API):** Integração para envio de avisos proativos nos smartphones de alunos e professores (lembretes no início do slot e relatório de presença no encerramento da tolerância de 15 minutos).

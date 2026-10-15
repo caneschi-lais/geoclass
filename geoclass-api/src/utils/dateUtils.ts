@@ -3,7 +3,7 @@
  * Fuso horário canônico: Horário de Brasília ('America/Sao_Paulo', UTC-3).
  * Garante que validações de horários de aula, tolerância de 15 minutos,
  * chamadas e registros de ausência funcionem perfeitamente independente do país/região
- * onde a API ou o Banco de Dados estejam hospedados (Render, Cloudflare, AWS, etc.).
+ * onde a API ou o Banco de Dados estejam hospedados (Render, Supabase, AWS, etc.).
  */
 
 export const BRAZIL_TIMEZONE = 'America/Sao_Paulo';
