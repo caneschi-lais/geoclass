@@ -253,49 +253,70 @@ export class ClassCancellationController {
       const reasonLabel = REASON_LABELS[cancellation.reason_type] || cancellation.reason_type;
 
       if (classData) {
-        // Gerar Presença Parcial para todos os alunos matriculados nos slots da matéria
-        const slots = classData.schedule_time.split(',').map((s: string) => s.trim());
+        if (cancellation.reason_type === 'FERIADO_EXTRA') {
+          // Feriados e emendas são dias não letivos: não deve haver registro de presença, ausência ou presença parcial
+          await prisma.attendance.deleteMany({
+            where: {
+              class_id: classData.id,
+              date: targetDate,
+            },
+          });
 
-        for (const enrollment of classData.enrollments) {
-          for (const slotStr of slots) {
-            const existingAttendance = await prisma.attendance.findFirst({
-              where: {
-                student_id: enrollment.student_id,
-                class_id: classData.id,
-                date: targetDate,
-                slot_time: slotStr,
+          // Apenas notificar alunos que não haverá aula
+          for (const enrollment of classData.enrollments) {
+            await prisma.notification.create({
+              data: {
+                user_id: enrollment.student_id,
+                title: `Aviso: Feriado / Sem Aula (${classData.subject})`,
+                body: `Não haverá aula de ${classData.subject} no dia ${formattedDate} devido a feriado/emenda (${reasonLabel}).`,
               },
             });
+          }
+        } else {
+          // Gerar Presença Parcial para cancelamentos que exigem reposição
+          const slots = classData.schedule_time.split(',').map((s: string) => s.trim());
 
-            if (existingAttendance) {
-              await prisma.attendance.update({
-                where: { id: existingAttendance.id },
-                data: {
-                  status: 'PRESENCA_PARCIAL',
-                },
-              });
-            } else {
-              await prisma.attendance.create({
-                data: {
+          for (const enrollment of classData.enrollments) {
+            for (const slotStr of slots) {
+              const existingAttendance = await prisma.attendance.findFirst({
+                where: {
                   student_id: enrollment.student_id,
                   class_id: classData.id,
                   date: targetDate,
                   slot_time: slotStr,
-                  check_in_time: new Date(),
-                  status: 'PRESENCA_PARCIAL',
                 },
               });
-            }
-          }
 
-          // Notificar Aluno
-          await prisma.notification.create({
-            data: {
-              user_id: enrollment.student_id,
-              title: `Aviso: Aula Cancelada (${classData.subject})`,
-              body: `Não haverá aula de ${classData.subject} no dia ${formattedDate}. Motivo: ${reasonLabel}. Foi atribuída presença parcial até a realização da reposição.`,
-            },
-          });
+              if (existingAttendance) {
+                await prisma.attendance.update({
+                  where: { id: existingAttendance.id },
+                  data: {
+                    status: 'PRESENCA_PARCIAL',
+                  },
+                });
+              } else {
+                await prisma.attendance.create({
+                  data: {
+                    student_id: enrollment.student_id,
+                    class_id: classData.id,
+                    date: targetDate,
+                    slot_time: slotStr,
+                    check_in_time: new Date(),
+                    status: 'PRESENCA_PARCIAL',
+                  },
+                });
+              }
+            }
+
+            // Notificar Aluno
+            await prisma.notification.create({
+              data: {
+                user_id: enrollment.student_id,
+                title: `Aviso: Aula Cancelada (${classData.subject})`,
+                body: `Não haverá aula de ${classData.subject} no dia ${formattedDate}. Motivo: ${reasonLabel}. Foi atribuída presença parcial até a realização da reposição.`,
+              },
+            });
+          }
         }
       }
 
@@ -654,51 +675,72 @@ export class ClassCancellationController {
         }
         createdCancellations.push(cancellation);
 
-        // Gerar Presença Parcial para os alunos da turma
-        const rawSchedule = cls.schedule_time || '08:00';
-        const slots = rawSchedule.split(',').map((s: string) => s.trim()).filter(Boolean);
-        const slotsToProcess = slots.length > 0 ? slots : ['08:00'];
+        if (reason_type === 'FERIADO_EXTRA') {
+          // Feriados e emendas são dias não letivos: não deve haver registro de presença, ausência ou presença parcial
+          await prisma.attendance.deleteMany({
+            where: {
+              class_id: cls.id,
+              date: targetDate,
+            },
+          });
 
-        for (const enrollment of (cls.enrollments || [])) {
-          for (const slotStr of slotsToProcess) {
-            const existingAttendance = await prisma.attendance.findFirst({
-              where: {
-                student_id: enrollment.student_id,
-                class_id: cls.id,
-                date: targetDate,
-                slot_time: slotStr,
+          // Notificar Aluno que não haverá aula por ser feriado/emenda
+          for (const enrollment of (cls.enrollments || [])) {
+            await prisma.notification.create({
+              data: {
+                user_id: enrollment.student_id,
+                title: `Aviso Institucional: Feriado / Sem Aula (${cls.subject})`,
+                body: `A coordenação informou que não haverá aula de ${cls.subject} em ${formattedDate}. Motivo: ${reasonLabel}${description ? ` (${description})` : ''}.`,
               },
             });
+          }
+        } else {
+          // Gerar Presença Parcial para os alunos da turma quando exigir reposição
+          const rawSchedule = cls.schedule_time || '08:00';
+          const slots = rawSchedule.split(',').map((s: string) => s.trim()).filter(Boolean);
+          const slotsToProcess = slots.length > 0 ? slots : ['08:00'];
 
-            if (existingAttendance) {
-              await prisma.attendance.update({
-                where: { id: existingAttendance.id },
-                data: {
-                  status: 'PRESENCA_PARCIAL',
-                },
-              });
-            } else {
-              await prisma.attendance.create({
-                data: {
+          for (const enrollment of (cls.enrollments || [])) {
+            for (const slotStr of slotsToProcess) {
+              const existingAttendance = await prisma.attendance.findFirst({
+                where: {
                   student_id: enrollment.student_id,
                   class_id: cls.id,
                   date: targetDate,
                   slot_time: slotStr,
-                  check_in_time: new Date(),
-                  status: 'PRESENCA_PARCIAL',
                 },
               });
-            }
-          }
 
-          // Notificar Aluno
-          await prisma.notification.create({
-            data: {
-              user_id: enrollment.student_id,
-              title: `Aviso Institucional: Sem Aula (${cls.subject})`,
-              body: `A coordenação informou que não haverá aula de ${cls.subject} em ${formattedDate}. Motivo: ${reasonLabel}${description ? ` (${description})` : ''}.`,
-            },
-          });
+              if (existingAttendance) {
+                await prisma.attendance.update({
+                  where: { id: existingAttendance.id },
+                  data: {
+                    status: 'PRESENCA_PARCIAL',
+                  },
+                });
+              } else {
+                await prisma.attendance.create({
+                  data: {
+                    student_id: enrollment.student_id,
+                    class_id: cls.id,
+                    date: targetDate,
+                    slot_time: slotStr,
+                    check_in_time: new Date(),
+                    status: 'PRESENCA_PARCIAL',
+                  },
+                });
+              }
+            }
+
+            // Notificar Aluno
+            await prisma.notification.create({
+              data: {
+                user_id: enrollment.student_id,
+                title: `Aviso Institucional: Sem Aula (${cls.subject})`,
+                body: `A coordenação informou que não haverá aula de ${cls.subject} em ${formattedDate}. Motivo: ${reasonLabel}${description ? ` (${description})` : ''}.`,
+              },
+            });
+          }
         }
 
         // Notificar Professor
