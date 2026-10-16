@@ -62,7 +62,7 @@ erDiagram
         datetime created_at
     }
 
-    CLASS {
+    CLASS_ENTITY["CLASS"] {
         int id PK
         string subject
         string schedule_time
@@ -134,23 +134,23 @@ erDiagram
     }
 
     COURSE ||--o{ USER_COURSE : possui
-    COURSE ||--o{ CLASS : oferece
+    COURSE ||--o{ CLASS_ENTITY : oferece
     COURSE ||--o{ CLASS_CANCELLATION : cancela
     USER ||--o{ USER_COURSE : cursa
-    USER ||--o{ CLASS : leciona
+    USER ||--o{ CLASS_ENTITY : leciona
     USER ||--o{ ENROLLMENT : matricula
-    CLASS ||--o{ ENROLLMENT : contem
+    CLASS_ENTITY ||--o{ ENROLLMENT : contem
     USER ||--o{ ATTENDANCE : registra
-    CLASS ||--o{ ATTENDANCE : contabiliza
-    ROOM ||--o{ CLASS : aloca
+    CLASS_ENTITY ||--o{ ATTENDANCE : contabiliza
+    ROOM ||--o{ CLASS_ENTITY : aloca
     ROOM ||--o{ TEMPORARY_CLASS_LOCATION : aloca_temporariamente
-    CLASS ||--o{ TEMPORARY_CLASS_LOCATION : sobrepoe
-    ACADEMIC_SEMESTER ||--o{ CLASS : vigora_em
+    CLASS_ENTITY ||--o{ TEMPORARY_CLASS_LOCATION : sobrepoe
+    ACADEMIC_SEMESTER ||--o{ CLASS_ENTITY : vigora_em
     ACADEMIC_SEMESTER ||--o{ ACADEMIC_CALENDAR : engloba
     ACADEMIC_SEMESTER ||--o{ USER_COURSE : vincula
     USER ||--o{ NOTIFICATION : recebe
     USER ||--o{ CLASS_CANCELLATION : solicita
-    CLASS ||--o{ CLASS_CANCELLATION : afeta
+    CLASS_ENTITY ||--o{ CLASS_CANCELLATION : afeta
 ```
 
 ---

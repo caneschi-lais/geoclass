@@ -10,9 +10,9 @@ Para testar as diferentes interfaces e permissões do sistema no aplicativo móv
 
 | Perfil          | E-mail de Acesso  | Senha    | Detalhes / Papel                        |
 | :----------------| :------------------| :---------| :----------------------------------------|
-| **Aluno**       | `aluno@teste.com` | `123456` | RA: `123456789` (João Silva)            |
-| **Professor**   | `prof@teste.com`  | `123456` | Professor Carlos                        |
-| **Coordenador** | `coord@teste.com` | `123456` | Acesso administrativo completo (Márcia) |
+| **Aluno**       | `aluno@teste.com` | `123456` | RA: `0` (aluno teste) ou `1050482413014` (`lais.aluno@fatec.com`) |
+| **Professor**   | `prof@teste.com`  | `123456` | Professor Teste                         |
+| **Coordenador** | `coord@teste.com` | `123456` | Acesso administrativo completo (Coord Teste) |
 
 ---
 
@@ -24,7 +24,7 @@ Para testar o aplicativo **GeoClass** diretamente em seu dispositivo móvel sem 
 
 1. **Baixar o arquivo APK:**
    - Acesse o link oficial de build na nuvem do Expo para baixar o arquivo `.apk`:
-   - 🔗 [Download APK Android (Build Expo)](https://expo.dev/accounts/caneschi-lais/projects/mobile/builds/3215e76d-c877-4c24-96b5-b1398491d0c8)
+   - 🔗 [Download APK Android (Build Expo)](https://expo.dev/accounts/caneschi-lais/projects/mobile/builds/47f55a7c-4998-4ee2-91ac-249bda3cd84d)
 2. **Instalar no Dispositivo:**
    - Abra o arquivo baixado no seu celular Android.
    - Caso a mensagem de segurança apareça, autorize a **instalação de fontes desconhecidas** no navegador ou gerenciador de arquivos.
@@ -39,24 +39,24 @@ No iOS, o acesso aos testes é disponibilizado instantaneamente via **Expo Go** 
 1. **Baixar o Expo Go (Apenas na 1ª vez):**
    - Abra a **App Store** no seu iPhone e baixe o aplicativo gratuito **Expo Go**.
 2. **Abrir o Projeto no Celular:**
-   - **Pelo Link Directo (Safari):** Acesse o link do projeto pelo iPhone:
-     🔗 [Acessar Projeto GeoClass no Expo Go](https://expo.dev/accounts/caneschi-lais/projects/mobile/updates/046571b2-d417-46fc-8d79-ee4468c43798)
-     *(Ao tocar no link, o navegador Safari abrirá e redirecionará automaticamente para o app Expo Go)*.
-   - **Pelo QR Code:** Abra a página do link acima em um computador ou outro dispositivo, abra a **câmera padrão do iPhone** e aponte para o **QR Code** exibido na página do Expo.
+   - **Pelo Link Direto com QR Code:** Acesse a página de preview oficial:
+     🔗 [Acessar e Escanear QR Code GeoClass no Expo Go](https://expo.dev/preview/update?message=Nova+atualizacao+GeoClass&updateRuntimeVersion=1.0.0&createdAt=2026-10-16T16%3A26%3A37.170Z&slug=exp&projectId=54378c0a-edbf-4031-b27c-707d9801df69&group=4d78f706-251d-4772-8834-59ebddbb9131)
+     *(Ao abrir a página acima, o QR Code já é exibido imediatamente para você escanear com a câmera padrão do iPhone ou abrir diretamente no Safari)*.
+   - **Link Direto do Expo Go:** `exp://u.expo.dev/54378c0a-edbf-4031-b27c-707d9801df69/group/4d78f706-251d-4772-8834-59ebddbb9131`
 
 ---
 
-## 🚀 Como Executar o Projeto
+## 🚀 Como Executar o Projeto Localmente
 
 O projeto é dividido em dois componentes principais: o backend (**API REST**) e o frontend (**App Mobile**).
 
 ### 💻 Requisitos do Sistema
 
 Antes de iniciar, garanta que seu ambiente possui as seguintes ferramentas instaladas:
-- **Node.js** (v18.x ou superior recomendado)
-- **npm** ou **yarn** (gerenciadores de pacotes)
-- **Banco de Dados PostgreSQL** ativo (rodando localmente ou via container Docker)
-- **Expo Go** instalado no seu dispositivo móvel (disponível na App Store / Google Play Store) para testar a interface mobile
+- **Node.js** (v18.x ou superior / v20+ recomendado)
+- **npm** ou **yarn**
+- **Instância de PostgreSQL** (hospedada no **Supabase** ou rodando localmente)
+- **Expo Go** instalado no seu dispositivo móvel (Android ou iOS) para testar a interface mobile
 
 ---
 
@@ -73,16 +73,24 @@ Antes de iniciar, garanta que seu ambiente possui as seguintes ferramentas insta
    ```
 
 3. **Configure as variáveis de ambiente:**
-   Crie um arquivo chamado `.env` na raiz do diretório `geoclass-api/` ou utilize o arquivo base `.env.example` na raiz do projeto/pasta da API como referência:
-   ```env
-   DATABASE_URL="postgresql://usuario:senha@localhost:5432/geoclass?schema=public"
-   JWT_SECRET="sua_chave_secreta_jwt_para_seguranca"
+   Copie o arquivo [.env.example](file:///home/lais/projetos/geoclass/geoclass-api/.env.example) gerando o seu `.env`:
+   ```bash
+   cp .env.example .env
    ```
-   *Substitua `usuario` e `senha` pelas credenciais do seu banco PostgreSQL (ou utilize a URL do Supabase).*
+   Abra o arquivo `.env` gerado e informe as credenciais de conexão do seu banco PostgreSQL (por exemplo, Supabase):
+   ```env
+   # Connect to Postgres via the shared transaction-mode pooler (IPv4-only)
+   DATABASE_URL="postgresql://postgres.[SEU-PROJECT-REF]:[SUA-SENHA]@aws-0-[SUA-REGIAO].pooler.supabase.com:6543/postgres?pgbouncer=true"
+
+   # Connect to Postgres via the shared session-mode pooler (used for migrations)
+   DIRECT_URL="postgresql://postgres.[SEU-PROJECT-REF]:[SUA-SENHA]@aws-0-[SUA-REGIAO].pooler.supabase.com:5432/postgres"
+   ```
+   > **Nota:** Parâmetros adicionais como `PORT` (3000), `JWT_SECRET` e `OFFLINE_SECRET` possuem valores padrão já embutidos no código da API para desenvolvimento local imediato.
 
 4. **Sincronize o banco de dados e popule com dados de teste:**
-   Execute os comandos do Prisma ORM para empurrar o schema ao PostgreSQL e rodar o script de seed:
+   Execute os comandos do Prisma para gerar os tipos, aplicar as tabelas ao banco e povoar os dados de usuários e salas:
    ```bash
+   npx prisma generate
    npx prisma db push
    npx prisma db seed
    ```
@@ -91,13 +99,13 @@ Antes de iniciar, garanta que seu ambiente possui as seguintes ferramentas insta
    ```bash
    npm run dev
    ```
-   A API estará ativa em `http://localhost:3000`.
+   A API estará ativa e ouvindo em `http://localhost:3000`.
 
 ---
 
 ### 2. Inicializando o Aplicativo Mobile
 
-1. **Navegue até a pasta do aplicativo:**
+1. **Abra outro terminal e navegue até a pasta do aplicativo:**
    ```bash
    cd geoclass-mobile
    ```
@@ -107,12 +115,13 @@ Antes de iniciar, garanta que seu ambiente possui as seguintes ferramentas insta
    npm install
    ```
 
-3. **Ajuste a URL da API (Comunicação de Rede):**
-   Abra o arquivo `src/services/api.ts` e altere a propriedade `baseURL` para utilizar o endereço de IP local da sua máquina na rede Wi-Fi (necessário para que seu dispositivo móvel consiga se comunicar com a API local).
-   *Exemplo:*
-   ```typescript
-   baseURL: 'http://192.168.1.50:3000/api'
-   ```
+3. **Comunicação com a API:**
+   - **Automático no Expo Go:** O aplicativo detecta automaticamente o IP local do seu computador conectado na mesma rede Wi-Fi ao abrir pelo Expo Go.
+   - **Configuração manual ou emuladores (opcional):** Caso precise fixar a URL manualmente, crie um arquivo `.env` dentro de `geoclass-mobile/` definindo a variável `EXPO_PUBLIC_API_URL`:
+     ```env
+     EXPO_PUBLIC_API_URL="http://SEU_IP_LOCAL:3000/api"
+     ```
+     *(Substitua `SEU_IP_LOCAL` pelo endereço IP da sua máquina na rede local, por exemplo `192.168.1.50`).*
 
 4. **Inicie o servidor do Expo:**
    ```bash
@@ -120,7 +129,8 @@ Antes de iniciar, garanta que seu ambiente possui as seguintes ferramentas insta
    ```
 
 5. **Execute no Celular:**
-   Escaneie o código QR gerado no terminal usando o aplicativo do **Expo Go** (Android) ou a câmera padrão (iOS, redirecionando para o Expo Go).
+   - No **Android**: Abra o aplicativo **Expo Go** e escaneie o código QR gerado no terminal.
+   - No **iOS**: Abra a câmera padrão do iPhone e aponte para o código QR para abrir no **Expo Go**.
 
 ---
 

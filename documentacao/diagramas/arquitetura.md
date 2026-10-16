@@ -8,7 +8,6 @@ Abaixo está o código do diagrama da arquitetura completa e atualizada do GeoCl
 
 ```mermaid
 flowchart TD
-    %% Estilização Personalizada
     classDef external fill:#ef4444,stroke:#dc2626,stroke-width:2px,color:#fff,font-weight:bold
     classDef client fill:#f59e0b,stroke:#b45309,stroke-width:2px,color:#fff,font-weight:bold
     classDef frontend fill:#3b82f6,stroke:#1d4ed8,stroke-width:2px,color:#fff,font-weight:bold
@@ -22,9 +21,7 @@ flowchart TD
     end
 
     subgraph Clients ["Dispositivos Clientes"]
-        direction LR
         Mobile["📱 App Mobile Aluno / Prof / Coord (Android/iOS)"]:::client
-        Web["💻 Navegador Web Admin / Coord"]:::client
     end
 
     subgraph Frontend ["Frontend Services - React Native / Expo"]
@@ -66,18 +63,12 @@ flowchart TD
         DB[("Supabase PostgreSQL Database Engine")]:::database
     end
 
-    %% Keep-Alive
     UptimeRobot -->|GET /health a cada 5 min| Backend
-
-    %% Push Notifications
     NotifAPI -->|Disparo via HTTP| ExpoPush
     ExpoPush -.->|Push Notification Remota| Mobile
 
-    %% Interações Usuário -> Frontend
-    Mobile -->|Interação| UI
-    Web -->|Interação| UI
+    Mobile -->|Interação Única Mobile| UI
 
-    %% Fluxos Internos do Frontend
     UI --> Device
     UI --> GPS
     UI --> OfflineQ
@@ -85,7 +76,6 @@ flowchart TD
     UI --> AbsenceModule
     UI --> PushClient
 
-    %% Comunicação Frontend -> Backend API
     UI -->|Login / Token JWT| Auth
     PushClient -->|Registra push_token do Aparelho| NotifAPI
     GPS -->|Coordenadas + Device ID + Slot| StudentAPI
@@ -95,7 +85,6 @@ flowchart TD
     AbsenceModule -->|Avisos, Atestados, Suspensões & Reposições| CancellationAPI
     UI -->|Avisos & Notificações| NotifAPI
 
-    %% Fluxos Internos do Backend
     StudentAPI -->|Normaliza Datas e Horários no Fuso BRT| TimeEngine
     StudentAPI -->|Valida Distância, Janela de 15m & IsCompleted| GeoEngine
     CoordAPI -->|Calcula YYYY.1/2 & Incrementa Semestres| SemUtil
@@ -107,13 +96,11 @@ flowchart TD
     CancellationAPI --> ORM
     NotifAPI --> ORM
 
-    %% Camada de Persistência com Supabase PostgreSQL
     ORM -->|Consultas Transacionais da API| Pooler
     ORM -->|Migrações e db push via prisma.config.ts| DirectConn
     Pooler --> DB
     DirectConn --> DB
 
-    %% Jobs Background & Processamento Autônomo
     CronLGPD -.->|Expurgo Diário >6 meses| ORM
     AbsenceProc -.->|Valida Tolerância 15m no Fuso BRT & Remove Faltas Prematuras| ORM
     CronNotif -.->|Dispara AbsenceProc e Notifica Início/Fim de Slot| ORM
