@@ -22,7 +22,7 @@ export default function StudentRiskCard({ item }: Props) {
         ) : null}
         {item.course_name ? (
           <Text className="text-slate-400 dark:text-slate-500 text-[11px]">
-            Curso: {item.course_name} {item.semester ? `(${item.semester}º Sem.)` : ''}
+            Curso: {item.course_name} {item.semester ? `(${item.semester})` : ''}
           </Text>
         ) : null}
       </View>

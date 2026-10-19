@@ -118,6 +118,14 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
     setExportModalVisible(false);
     setExporting(true);
     try {
+      // Gráfico com matérias mais críticas (menor presença) primeiro
+      const chartData = [...subjects]
+        .sort((a, b) => (a.attendancePercentage ?? Math.max(0, 100 - a.absencePercentage)) - (b.attendancePercentage ?? Math.max(0, 100 - b.absencePercentage)))
+        .map(s => ({
+          label: s.subject,
+          value: s.attendancePercentage ?? Math.max(0, 100 - s.absencePercentage)
+        }));
+
       if (format === 'excel') {
         const excelData = subjects.map(s => {
           const presence = s.attendancePercentage ?? Math.max(0, 100 - s.absencePercentage);
@@ -129,7 +137,10 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
             'Status': s.is_completed ? 'Concluída (Modo Leitura)' : 'Em Andamento'
           };
         });
-        await ExportService.exportToExcel(excelData, `Relatorio_Materias_${studentName.replace(/\s+/g, '_')}`);
+        await ExportService.exportToExcel(excelData, `Relatorio_Materias_${studentName.replace(/\s+/g, '_')}`, {
+          title: `Relatório do Aluno: ${studentName}`,
+          chartData
+        });
       } else {
         const headers = ['Matéria', 'Sala', 'Aulas Previstas', 'Presença (%)', 'Status'];
         const rows = subjects.map(s => {
@@ -138,14 +149,6 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
           const statusText = s.is_completed ? 'Concluída' : 'Em Andamento';
           return [s.subject, s.room_name, s.total_classes.toString(), percHtml, statusText];
         });
-
-        // Gráfico com matérias mais críticas (menor presença) primeiro
-        const chartData = [...subjects]
-          .sort((a, b) => (a.attendancePercentage ?? Math.max(0, 100 - a.absencePercentage)) - (b.attendancePercentage ?? Math.max(0, 100 - b.absencePercentage)))
-          .map(s => ({
-            label: s.subject,
-            value: s.attendancePercentage ?? Math.max(0, 100 - s.absencePercentage)
-          }));
 
         const html = ExportService.generateHTMLTable(`Relatório do Aluno: ${studentName}`, headers, rows, chartData);
         await ExportService.exportToPDF(html, `Relatorio_Materias_${studentName.replace(/\s+/g, '_')}`);
@@ -262,7 +265,6 @@ export default function StudentSubjectsScreen({ navigation, route }: Props) {
         visible={exportModalVisible}
         onClose={() => setExportModalVisible(false)}
         onExport={(format) => handleExport(format)}
-        showDetailsOption={false}
         title="Exportar Matérias"
       />
 

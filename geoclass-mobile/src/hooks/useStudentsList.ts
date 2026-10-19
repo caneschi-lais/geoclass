@@ -39,8 +39,25 @@ export function useStudentsList(semesterId: string) {
   const loadStudents = async () => {
     try {
       const response = await api.get(`/coordenador/semestre/${semesterId}/alunos`);
-      setStudents(response.data);
-      setFilteredStudents(response.data);
+      const normalized: StudentData[] = (response.data || []).map((s: any) => ({
+        ...s,
+        userCourses: (s.userCourses && s.userCourses.length > 0)
+          ? s.userCourses.map((uc: any) => ({
+              id: uc.id,
+              user_id: uc.user_id,
+              course_id: uc.course_id,
+              course_name: uc.course_name || uc.course?.name || uc.name || 'Curso',
+              semester: uc.semester || uc.student_term || null,
+              is_completed: Boolean(uc.is_completed)
+            }))
+          : (s.courses || []).map((cName: string) => ({
+              course_name: cName,
+              semester: null,
+              is_completed: false
+            }))
+      }));
+      setStudents(normalized);
+      setFilteredStudents(normalized);
     } catch (error) {
       console.log('Error loading students', error);
     } finally {
@@ -174,51 +191,50 @@ export function useStudentsList(semesterId: string) {
     setFilteredClasses(classes);
   };
 
-  const handleExport = async (format: 'pdf' | 'excel', includeDetails: boolean) => {
+  const handleExport = async (format: 'pdf' | 'excel') => {
     setExportModalVisible(false);
     setExporting(true);
     try {
-      const response = await api.get(`/coordenador/relatorio?level=students&semesterId=${semesterId}&includeDetails=${includeDetails}`);
+      const response = await api.get(`/coordenador/relatorio?level=students&semesterId=${semesterId}&includeDetails=true`);
       const data = response.data;
+
+      const sortedData = [...data].sort((a: any, b: any) => (a.attendancePercentage ?? Math.max(0, 100 - a.absencePercentage)) - (b.attendancePercentage ?? Math.max(0, 100 - b.absencePercentage))).slice(0, 5);
+      const chartData: { label: string, value: number }[] = sortedData.map((s: any) => ({
+        label: s.name,
+        value: s.attendancePercentage ?? Math.max(0, 100 - s.absencePercentage)
+      }));
 
       if (format === 'excel') {
         let excelData: any[] = [];
         data.forEach((s: any) => {
           const presence = s.attendancePercentage ?? Math.max(0, 100 - s.absencePercentage);
           excelData.push({ 'RA': s.ra, 'Nome': s.name, 'Presença (%)': presence, 'Matéria': '', 'Sala': '' });
-          if (includeDetails && s.details) {
+          if (s.details) {
             s.details.forEach((d: any) => {
               const dPresence = d.attendancePercentage ?? Math.max(0, 100 - d.absencePercentage);
               excelData.push({ 'RA': '', 'Nome': '', 'Presença (%)': dPresence, 'Matéria': d.subject, 'Sala': d.room_name });
             });
           }
         });
-        await ExportService.exportToExcel(excelData, `Relatorio_Alunos_${semesterId}`);
+        await ExportService.exportToExcel(excelData, `Relatorio_Alunos_${semesterId}`, {
+          title: `Relatório de Alunos - ${semesterId}`,
+          chartData
+        });
       } else {
-        const headers = includeDetails ? ['Aluno', 'RA', 'Presença (%)', 'Matérias'] : ['Aluno', 'RA', 'Presença (%)'];
+        const headers = ['Aluno', 'RA', 'Presença (%)', 'Matérias'];
         let rows: any[] = [];
         data.forEach((s: any) => {
           const presence = s.attendancePercentage ?? Math.max(0, 100 - s.absencePercentage);
           const sPercHtml = presence < 75 ? `<span class="high-absence">${presence}%</span>` : `${presence}%`;
-          if (!includeDetails) {
-            rows.push([s.name, s.ra, sPercHtml]);
-          } else {
-            rows.push([`<strong style="color:#0ea5e9">${s.name}</strong>`, s.ra, `<strong>${sPercHtml}</strong>`, '']);
-            if (s.details) {
-              s.details.forEach((d: any) => {
-                const dPresence = d.attendancePercentage ?? Math.max(0, 100 - d.absencePercentage);
-                const dPercHtml = dPresence < 75 ? `<span class="high-absence">${dPresence}%</span>` : `${dPresence}%`;
-                rows.push(['', '', dPercHtml, `${d.subject} (${d.room_name})`]);
-              });
-            }
+          rows.push([`<strong style="color:#0ea5e9">${s.name}</strong>`, s.ra, `<strong>${sPercHtml}</strong>`, '']);
+          if (s.details) {
+            s.details.forEach((d: any) => {
+              const dPresence = d.attendancePercentage ?? Math.max(0, 100 - d.absencePercentage);
+              const dPercHtml = dPresence < 75 ? `<span class="high-absence">${dPresence}%</span>` : `${dPresence}%`;
+              rows.push(['', '', dPercHtml, `${d.subject} (${d.room_name})`]);
+            });
           }
         });
-
-        const sortedData = [...data].sort((a: any, b: any) => (a.attendancePercentage ?? Math.max(0, 100 - a.absencePercentage)) - (b.attendancePercentage ?? Math.max(0, 100 - b.absencePercentage))).slice(0, 5);
-        let chartData: { label: string, value: number }[] = sortedData.map((s: any) => ({
-          label: s.name,
-          value: s.attendancePercentage ?? Math.max(0, 100 - s.absencePercentage)
-        }));
 
         const html = ExportService.generateHTMLTable(`Relatório de Alunos - ${semesterId}`, headers, rows, chartData);
         await ExportService.exportToPDF(html, `Relatorio_Alunos_${semesterId}`);

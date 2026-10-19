@@ -240,7 +240,7 @@ export default function ClassAttendanceScreen({ route, navigation }: Props) {
     const totalSlotsForStudent = slots.length;
     const isAllPresent = presentSlotsCount === totalSlotsForStudent;
     const isParcial = presentSlotsCount > 0 && presentSlotsCount < totalSlotsForStudent;
-    const semesterLabel = item.student_semester ? `${item.student_semester}º Sem.` : null;
+    const semesterLabel = item.student_semester ? `${item.student_semester}` : null;
 
     return (
       <View

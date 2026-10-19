@@ -133,11 +133,14 @@ export default function StudentsListScreen({ navigation, route }: Props) {
             </View>
           </View>
 
-          <View className="items-end pl-2">
-            <Text className="text-[10px] text-gray-400 mb-0.5">Presença</Text>
-            <Text className={`text-base font-black ${presence < 75 ? 'text-red-500' : 'text-emerald-500'}`}>
-              {presence}%
-            </Text>
+          <View className="flex-row items-center gap-1">
+            <View className="items-end pl-2">
+              <Text className="text-[10px] text-gray-400 mb-0.5">Presença</Text>
+              <Text className={`text-base font-black ${presence < 75 ? 'text-red-500' : 'text-emerald-500'}`}>
+                {presence}%
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={18} color="#94a3b8" />
           </View>
         </TouchableOpacity>
 
@@ -162,34 +165,42 @@ export default function StudentsListScreen({ navigation, route }: Props) {
           </View>
 
           {/* Badges de Cursos e Conclusão com LongPress de 1s: exibidos um em cima do outro */}
-          {item.userCourses && item.userCourses.length > 0 && (
+          {((item.userCourses && item.userCourses.length > 0) || (item.courses && item.courses.length > 0)) && (
             <View className="flex-col gap-2 w-full mt-1">
-              {item.userCourses.map(uc => (
-                <HoldButton
-                  key={uc.course_name}
-                  onHoldSuccess={() => handleOpenCourseModal(item.id, item.name, uc.course_name, !!uc.is_completed)}
-                  hintActionText={uc.is_completed ? 'reabrir o curso' : 'concluir o curso'}
-                  className={`px-3 py-2 rounded-lg flex-row items-center justify-between border w-full ${
-                    uc.is_completed
-                      ? 'bg-amber-50 border-amber-300 dark:bg-amber-950/30 dark:border-amber-800'
-                      : 'bg-sky-50 border-sky-200 dark:bg-sky-950/30 dark:border-sky-800'
-                  }`}
-                >
-                  <View className="flex-row items-center gap-1.5 flex-1 pr-2">
-                    <Feather name={uc.is_completed ? "check-circle" : "book"} size={14} color={uc.is_completed ? "#d97706" : "#0284c7"} />
-                    <Text className={`text-xs font-bold ${uc.is_completed ? 'text-amber-700 dark:text-amber-400' : 'text-sky-700 dark:text-sky-400'}`}>
-                      {uc.course_name}
-                    </Text>
-                  </View>
-                  {uc.is_completed && (
-                    <View className="bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 rounded">
-                      <Text className="text-[10px] font-bold text-amber-700 dark:text-amber-400">
-                        Concluído
+              {((item.userCourses && item.userCourses.length > 0)
+                ? item.userCourses
+                : (item.courses || []).map(c => ({ course_name: c, is_completed: false }))
+              ).map((uc: any, idx: number) => {
+                const cName = uc.course_name || uc.course?.name || uc.name || 'Curso';
+                const semText = uc.semester || uc.student_term ? ` • ${(uc.semester || uc.student_term)}` : '';
+
+                return (
+                  <HoldButton
+                    key={uc.id ? String(uc.id) : `${cName}-${idx}`}
+                    onHoldSuccess={() => handleOpenCourseModal(item.id, item.name, cName, !!uc.is_completed)}
+                    hintActionText={uc.is_completed ? 'reabrir o curso' : 'concluir o curso'}
+                    className={`px-3 py-2 rounded-lg flex-row items-center justify-between border w-full ${
+                      uc.is_completed
+                        ? 'bg-amber-50 border-amber-300 dark:bg-amber-950/30 dark:border-amber-800'
+                        : 'bg-sky-50 border-sky-200 dark:bg-sky-950/30 dark:border-sky-800'
+                    }`}
+                  >
+                    <View className="flex-row items-center gap-1.5 flex-1 pr-2">
+                      <Feather name={uc.is_completed ? "check-circle" : "book"} size={14} color={uc.is_completed ? "#d97706" : "#0284c7"} />
+                      <Text className={`text-xs font-bold ${uc.is_completed ? 'text-amber-700 dark:text-amber-400' : 'text-sky-700 dark:text-sky-400'}`}>
+                        {cName}{semText}
                       </Text>
                     </View>
-                  )}
-                </HoldButton>
-              ))}
+                    {uc.is_completed && (
+                      <View className="bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 rounded">
+                        <Text className="text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                          Concluído
+                        </Text>
+                      </View>
+                    )}
+                  </HoldButton>
+                );
+              })}
             </View>
           )}
         </View>

@@ -109,13 +109,28 @@ export class CoordinatorController {
         const userCourseNames = student.userCourses?.map(uc => uc.course.name) || [];
         const courses = Array.from(new Set([...userCourseNames, ...classCourses]));
 
+        const formattedUserCourses = (student.userCourses && student.userCourses.length > 0)
+          ? student.userCourses.map(uc => ({
+              id: uc.id,
+              user_id: uc.user_id,
+              course_id: uc.course_id,
+              course_name: uc.course?.name || 'Curso',
+              semester: uc.student_term || null,
+              is_completed: Boolean(uc.is_completed)
+            }))
+          : courses.map(cName => ({
+              course_name: cName,
+              semester: null,
+              is_completed: false
+            }));
+
         return {
           id: student.id,
           name: student.name,
           ra: student.ra || 'N/A',
           courses: courses.length > 0 ? courses : ['Análise e Desenvolvimento de Sistemas'],
           subjects,
-          userCourses: student.userCourses || [],
+          userCourses: formattedUserCourses,
           active: student.active !== false,
           absencePercentage,
           attendancePercentage
@@ -494,7 +509,14 @@ export class CoordinatorController {
         active: s.active,
         courses: s.userCourses.map(uc => uc.course.name),
         student_semester: s.userCourses.find(uc => uc.student_term)?.student_term || null,
-        userCourses: s.userCourses,
+        userCourses: s.userCourses.map(uc => ({
+          id: uc.id,
+          user_id: uc.user_id,
+          course_id: uc.course_id,
+          course_name: uc.course?.name || 'Curso',
+          semester: uc.student_term || null,
+          is_completed: Boolean(uc.is_completed)
+        })),
         enrollments: s.enrollments
       }));
 

@@ -91,49 +91,48 @@ export function useSemesters() {
     executeViradaSemestreApi();
   };
 
-  const handleExport = async (format: 'pdf' | 'excel', includeDetails: boolean) => {
+  const handleExport = async (format: 'pdf' | 'excel') => {
     setExportModalVisible(false);
     setExporting(true);
     try {
-      const response = await api.get(`/coordenador/relatorio?level=semesters&includeDetails=${includeDetails}`);
+      const response = await api.get(`/coordenador/relatorio?level=semesters&includeDetails=true`);
       const data = response.data;
+
+      const chartData: { label: string, value: number }[] = data.map((s: any) => ({
+        label: `Semestre ${s.semester}`,
+        value: s.attendancePercentage ?? Math.max(0, 100 - s.absencePercentage)
+      }));
 
       if (format === 'excel') {
         let excelData: any[] = [];
         data.forEach((s: any) => {
           const presence = s.attendancePercentage ?? Math.max(0, 100 - s.absencePercentage);
           excelData.push({ 'Semestre': s.semester, 'Presença (%)': presence, 'Detalhes': '' });
-          if (includeDetails && s.details) {
+          if (s.details) {
             s.details.forEach((d: any) => {
               const dPresence = d.attendancePercentage ?? Math.max(0, 100 - d.absencePercentage);
               excelData.push({ 'Semestre': '', 'Presença (%)': dPresence, 'Detalhes': `Aluno: ${d.name} (RA: ${d.ra})` });
             });
           }
         });
-        await ExportService.exportToExcel(excelData, 'Relatorio_Semestres');
+        await ExportService.exportToExcel(excelData, 'Relatorio_Semestres', {
+          title: 'Relatório de Semestres',
+          chartData
+        });
       } else {
-        const headers = includeDetails ? ['Semestre', 'Aluno', 'RA', 'Presença (%)'] : ['Semestre', 'Presença (%)'];
+        const headers = ['Semestre', 'Aluno', 'RA', 'Presença (%)'];
         let rows: any[] = [];
         data.forEach((s: any) => {
           const presence = s.attendancePercentage ?? Math.max(0, 100 - s.absencePercentage);
-          if (!includeDetails) {
-            rows.push([s.semester, `${presence}%`]);
-          } else {
-            rows.push([`<strong style="color:#0ea5e9">${s.semester}</strong>`, '', '', `<strong style="color:#0ea5e9">${presence}%</strong>`]);
-            if (s.details) {
-              s.details.forEach((d: any) => {
-                const dPresence = d.attendancePercentage ?? Math.max(0, 100 - d.absencePercentage);
-                const percHtml = dPresence < 75 ? `<span class="high-absence">${dPresence}%</span>` : `${dPresence}%`;
-                rows.push(['', d.name, d.ra, percHtml]);
-              });
-            }
+          rows.push([`<strong style="color:#0ea5e9">${s.semester}</strong>`, '', '', `<strong style="color:#0ea5e9">${presence}%</strong>`]);
+          if (s.details) {
+            s.details.forEach((d: any) => {
+              const dPresence = d.attendancePercentage ?? Math.max(0, 100 - d.absencePercentage);
+              const percHtml = dPresence < 75 ? `<span class="high-absence">${dPresence}%</span>` : `${dPresence}%`;
+              rows.push(['', d.name, d.ra, percHtml]);
+            });
           }
         });
-
-        let chartData: { label: string, value: number }[] = data.map((s: any) => ({
-          label: `Semestre ${s.semester}`,
-          value: s.attendancePercentage ?? Math.max(0, 100 - s.absencePercentage)
-        }));
 
         const html = ExportService.generateHTMLTable('Relatório de Semestres', headers, rows, chartData);
         await ExportService.exportToPDF(html, 'Relatorio_Semestres');
