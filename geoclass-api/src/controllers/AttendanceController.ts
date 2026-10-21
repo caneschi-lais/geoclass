@@ -56,7 +56,8 @@ export class AttendanceController {
 
       // 1. Buscar informações da sala de aula
       const classData = await prisma.class.findUnique({
-        where: { id: classId }
+        where: { id: classId },
+        include: { room: true, course: true }
       });
 
       if (!classData) {
@@ -261,19 +262,21 @@ export class AttendanceController {
       }
 
       // 2.1 Verificar se o aluno já concluiu o curso desta disciplina (Curso Concluído = Somente Leitura)
-      if ((classData as any).course_name) {
+      if (classData.course_id) {
         const userCourse = await prisma.userCourse.findUnique({
           where: {
-            user_id_course_name: {
+            user_id_course_id: {
               user_id: studentId,
-              course_name: (classData as any).course_name
+              course_id: classData.course_id
             }
-          }
+          },
+          include: { course: true }
         });
 
         if (userCourse?.is_completed) {
+          const courseName = userCourse.course?.name || classData.course?.name || 'seu curso';
           return res.status(403).json({ 
-            error: `Você já concluiu o curso de ${(classData as any).course_name}. Não é possível registrar novas presenças para disciplinas deste curso (Modo Leitura/Histórico).` 
+            error: `Você já concluiu o curso de ${courseName}. Não é possível registrar novas presenças para disciplinas deste curso (Modo Leitura/Histórico).` 
           });
         }
       }
@@ -293,18 +296,18 @@ export class AttendanceController {
 
       // 3. Validação de Localização (Haversine)
       // Checa se há uma troca de sala para a data informada
-      const checkInDateStr = getBrazilDateString(checkInTime);
       let tempRoom: any = null;
       try {
         tempRoom = await prisma.temporaryClassLocation.findUnique({
-          where: { class_id_date: { class_id: classId, date: checkInDateStr } }
+          where: { class_id_date: { class_id: classId, date: checkInDate } },
+          include: { room: true }
         });
       } catch (err) {
         // Fallback se não houver troca
       }
 
-      const targetLatitude = tempRoom ? tempRoom.latitude : classData.latitude;
-      const targetLongitude = tempRoom ? tempRoom.longitude : classData.longitude;
+      const targetLatitude = tempRoom?.room ? tempRoom.room.latitude : (classData.room ? classData.room.latitude : 0);
+      const targetLongitude = tempRoom?.room ? tempRoom.room.longitude : (classData.room ? classData.room.longitude : 0);
       const targetRadius = classData.radius_meters;
 
       const distance = getDistanceFromLatLonInMeters(lat, lon, targetLatitude, targetLongitude);

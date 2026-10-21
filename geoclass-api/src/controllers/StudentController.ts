@@ -40,8 +40,11 @@ export class StudentController {
           class: {
             include: {
               professor: { select: { name: true } },
+              room: true,
+              course: true,
               temporaryLocs: {
-                where: { date: todayStr }
+                where: { date: todayDate },
+                include: { room: true }
               }
             }
           }
@@ -141,11 +144,11 @@ export class StudentController {
           }
         });
 
-        const userCourse = (c as any).course_name ? await prisma.userCourse.findUnique({
+        const userCourse = c.course_id ? await prisma.userCourse.findUnique({
           where: {
-            user_id_course_name: {
+            user_id_course_id: {
               user_id: studentId,
-              course_name: (c as any).course_name
+              course_id: c.course_id
             }
           }
         }) : null;
@@ -154,19 +157,17 @@ export class StudentController {
 
         const lastAttendance = allAttendancesToday.length > 0 ? allAttendancesToday[allAttendancesToday.length - 1] : null;
 
-        const effectiveRoomName = tempLoc ? tempLoc.room_name : ((c as any).room_name || 'Sala Padrão');
-        const effectiveLatitude = tempLoc ? tempLoc.latitude : c.latitude;
-        const effectiveLongitude = tempLoc ? tempLoc.longitude : c.longitude;
+        const effectiveRoom = tempLoc?.room || c.room;
 
         return {
           id: c.id,
           subject: c.subject,
-          course_name: (c as any).course_name || null,
+          course_name: c.course?.name || null,
           professor: c.professor.name,
           time: formattedTime,
-          room: effectiveRoomName,
-          latitude: effectiveLatitude || 0,
-          longitude: effectiveLongitude || 0,
+          room: effectiveRoom ? effectiveRoom.name : 'Sala Padrão',
+          latitude: effectiveRoom ? effectiveRoom.latitude : 0,
+          longitude: effectiveRoom ? effectiveRoom.longitude : 0,
           radiusMeters: c.radius_meters,
           alreadyCheckedIn,
           isAbsent,
