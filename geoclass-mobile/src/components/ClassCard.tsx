@@ -78,7 +78,7 @@ export default function ClassCard({ aula, onConfirm, isLoading }: ClassCardProps
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           disabled={isLoading}
-          className={`unselectable mt-2 py-3.5 rounded-lg overflow-hidden flex-row justify-center items-center ${isLoading ? 'bg-emerald-400' : 'bg-emerald-500/80 active:bg-emerald-500'
+          className={`unselectable mt-2 py-3.5 rounded-lg overflow-hidden flex-row justify-center items-center w-full min-h-[48px] ${isLoading ? 'bg-emerald-400' : 'bg-emerald-500/80 active:bg-emerald-500'
             }`}
           style={({ pressed }) => [
             {
@@ -106,12 +106,18 @@ export default function ClassCard({ aula, onConfirm, isLoading }: ClassCardProps
             />
           )}
 
-          <View className="flex-row justify-center items-center z-10">
+          <View className="flex-row justify-center items-center z-10 w-full px-2">
             {isLoading ? (
               <ActivityIndicator color="#ffffff" className="mr-2" />
             ) : null}
-            <Text className="text-white font-bold text-base">
-              {isLoading ? 'Verificando...' : 'Registrar presença'}
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+              className="text-white font-bold text-base text-center"
+              style={{ textAlign: 'center', includeFontPadding: false, whiteSpace: 'nowrap' as any }}
+            >
+              {isLoading ? 'Verificando...' : 'Registrar\u00A0Presença'}
             </Text>
           </View>
         </Pressable>

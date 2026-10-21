@@ -8,6 +8,7 @@ import {
   getBrazilDateString,
   getBrazilParts,
   createBrazilDate,
+  evaluateSlotTime,
 } from '../utils/dateUtils';
 import crypto from 'crypto';
 import prisma from '../prisma';
@@ -55,8 +56,7 @@ export class AttendanceController {
 
       // 1. Buscar informações da sala de aula
       const classData = await prisma.class.findUnique({
-        where: { id: classId },
-        include: { room: true, course: true }
+        where: { id: classId }
       });
 
       if (!classData) {
@@ -84,28 +84,22 @@ export class AttendanceController {
         const [schedHours, schedMinutes] = slotStr.split(':').map(Number);
         if (isNaN(schedHours) || isNaN(schedMinutes)) continue;
 
-        const startTime = createBrazilDate(
-          brazilParts.year,
-          brazilParts.month,
-          brazilParts.day,
-          schedHours,
-          schedMinutes
-        );
+        const { isActive, isExpired, isFuture } = evaluateSlotTime(slotStr, checkInTime);
         const endTime = createBrazilDate(
           brazilParts.year,
           brazilParts.month,
           brazilParts.day,
           schedHours,
-          schedMinutes + 15 // Tolerância estrita de 15 minutos
+          schedMinutes + 15
         );
 
-        if (checkInTime >= startTime && checkInTime <= endTime) {
+        if (isActive) {
           activeSlot = slotStr;
           break;
-        } else if (checkInTime > endTime) {
+        } else if (isExpired) {
           expiredSlot = slotStr;
           expiredEndTime = endTime;
-        } else if (checkInTime < startTime && !nextUpcomingSlot) {
+        } else if (isFuture && !nextUpcomingSlot) {
           nextUpcomingSlot = slotStr;
         }
       }
@@ -118,38 +112,52 @@ export class AttendanceController {
           });
         }
 
-        // Se já passou do horário de tolerância de 15 minutos, registra a ausência (falta) no banco
+        // Se já passou do horário de tolerância de 15 minutos, registra ausência (falta) para todos os slots expirados
         if (expiredSlot) {
-          const existingExpiredAttendance = await prisma.attendance.findFirst({
-            where: {
-              student_id: studentId,
-              class_id: classId,
-              date: checkInDate,
-              slot_time: expiredSlot,
-            },
-          });
+          for (const slotStr of slots) {
+            const { isExpired } = evaluateSlotTime(slotStr, checkInTime);
+            if (!isExpired) continue;
 
-          if (!existingExpiredAttendance) {
-            await prisma.attendance.create({
-              data: {
+            const existingExpiredAttendance = await prisma.attendance.findFirst({
+              where: {
                 student_id: studentId,
                 class_id: classId,
                 date: checkInDate,
-                slot_time: expiredSlot,
-                check_in_time: expiredEndTime || checkInTime,
-                status: 'FALTA',
-                manual_attendance: false,
-                is_remote: false,
+                slot_time: slotStr,
               },
             });
 
-            await prisma.notification.create({
-              data: {
-                user_id: studentId,
-                title: `Falta Registrada: ${classData.subject}`,
-                body: `O limite de tolerância de 15 minutos para a chamada das ${expiredSlot} encerrou e sua ausência foi registrada.`,
-              },
-            });
+            if (!existingExpiredAttendance) {
+              const [h, m] = slotStr.split(':').map(Number);
+              const slotEnd = createBrazilDate(
+                brazilParts.year,
+                brazilParts.month,
+                brazilParts.day,
+                h,
+                m + 15
+              );
+
+              await prisma.attendance.create({
+                data: {
+                  student_id: studentId,
+                  class_id: classId,
+                  date: checkInDate,
+                  slot_time: slotStr,
+                  check_in_time: slotEnd,
+                  status: 'FALTA',
+                  manual_attendance: false,
+                  is_remote: false,
+                },
+              });
+
+              await prisma.notification.create({
+                data: {
+                  user_id: studentId,
+                  title: `Falta Registrada: ${classData.subject}`,
+                  body: `O limite de tolerância de 15 minutos para a chamada das ${slotStr} encerrou e sua ausência foi registrada.`,
+                },
+              });
+            }
           }
 
           if (nextUpcomingSlot) {
@@ -166,6 +174,54 @@ export class AttendanceController {
         return res.status(403).json({ 
           error: `Não há chamada aberta neste momento. Horários da disciplina: ${classData.schedule_time}. Cada chamada fica aberta por 15min a partir do horário.` 
         });
+      }
+
+      // Se há um slot ativo (ex: 19:50), garantir que faltas de slots anteriores que já expiraram hoje
+      // fiquem devidamente registradas para o aluno (ex: falta na aula das 19:00 caso não tenha batido presença)
+      for (const slotStr of slots) {
+        if (slotStr === activeSlot) break;
+        const { isExpired } = evaluateSlotTime(slotStr, checkInTime);
+        if (isExpired) {
+          const existingPrevAttendance = await prisma.attendance.findFirst({
+            where: {
+              student_id: studentId,
+              class_id: classId,
+              date: checkInDate,
+              slot_time: slotStr,
+            },
+          });
+
+          if (!existingPrevAttendance) {
+            const [prevH, prevM] = slotStr.split(':').map(Number);
+            const prevEndTime = createBrazilDate(
+              brazilParts.year,
+              brazilParts.month,
+              brazilParts.day,
+              prevH,
+              prevM + 15
+            );
+            await prisma.attendance.create({
+              data: {
+                student_id: studentId,
+                class_id: classId,
+                date: checkInDate,
+                slot_time: slotStr,
+                check_in_time: prevEndTime,
+                status: 'FALTA',
+                manual_attendance: false,
+                is_remote: false,
+              },
+            });
+
+            await prisma.notification.create({
+              data: {
+                user_id: studentId,
+                title: `Falta Registrada: ${classData.subject}`,
+                body: `O limite de tolerância de 15 minutos para a chamada das ${slotStr} encerrou e sua ausência foi registrada.`,
+              },
+            });
+          }
+        }
       }
 
       // Verificar se a presença para este horário específico (slot) já foi registrada hoje
@@ -205,21 +261,19 @@ export class AttendanceController {
       }
 
       // 2.1 Verificar se o aluno já concluiu o curso desta disciplina (Curso Concluído = Somente Leitura)
-      if (classData.course_id) {
+      if ((classData as any).course_name) {
         const userCourse = await prisma.userCourse.findUnique({
           where: {
-            user_id_course_id: {
+            user_id_course_name: {
               user_id: studentId,
-              course_id: classData.course_id
+              course_name: (classData as any).course_name
             }
-          },
-          include: { course: true }
+          }
         });
 
         if (userCourse?.is_completed) {
-          const courseName = userCourse.course?.name || classData.course?.name || 'seu curso';
           return res.status(403).json({ 
-            error: `Você já concluiu o curso de ${courseName}. Não é possível registrar novas presenças para disciplinas deste curso (Modo Leitura/Histórico).` 
+            error: `Você já concluiu o curso de ${(classData as any).course_name}. Não é possível registrar novas presenças para disciplinas deste curso (Modo Leitura/Histórico).` 
           });
         }
       }
@@ -239,13 +293,18 @@ export class AttendanceController {
 
       // 3. Validação de Localização (Haversine)
       // Checa se há uma troca de sala para a data informada
-      const tempRoom = await prisma.temporaryClassLocation.findUnique({
-        where: { class_id_date: { class_id: classId, date: checkInDate } },
-        include: { room: true }
-      });
+      const checkInDateStr = getBrazilDateString(checkInTime);
+      let tempRoom: any = null;
+      try {
+        tempRoom = await prisma.temporaryClassLocation.findUnique({
+          where: { class_id_date: { class_id: classId, date: checkInDateStr } }
+        });
+      } catch (err) {
+        // Fallback se não houver troca
+      }
 
-      const targetLatitude = tempRoom ? tempRoom.room.latitude : classData.room.latitude;
-      const targetLongitude = tempRoom ? tempRoom.room.longitude : classData.room.longitude;
+      const targetLatitude = tempRoom ? tempRoom.latitude : classData.latitude;
+      const targetLongitude = tempRoom ? tempRoom.longitude : classData.longitude;
       const targetRadius = classData.radius_meters;
 
       const distance = getDistanceFromLatLonInMeters(lat, lon, targetLatitude, targetLongitude);

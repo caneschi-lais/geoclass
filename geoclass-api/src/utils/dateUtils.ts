@@ -112,7 +112,9 @@ export function getBrazilMidnightDate(dateInput?: Date | string | null): Date {
 }
 
 /**
- * Cria um objeto Date com offset explícito -03:00 (Horário de Brasília).
+ * Cria um objeto Date normalizado no Horário de Brasília (UTC-3).
+ * Trata nativamente estouro de minutos (ex: 50 + 15 = 65 -> 1h e 05min),
+ * estouro de horas e dias via Date.UTC sem gerar strings ISO inválidas (NaN).
  */
 export function createBrazilDate(
   year: number,
@@ -122,13 +124,10 @@ export function createBrazilDate(
   minute: number,
   second = 0
 ): Date {
-  const y = String(year);
-  const m = String(month).padStart(2, '0');
-  const d = String(day).padStart(2, '0');
-  const h = String(hour).padStart(2, '0');
-  const min = String(minute).padStart(2, '0');
-  const s = String(second).padStart(2, '0');
-  return new Date(`${y}-${m}-${d}T${h}:${min}:${s}-03:00`);
+  // Horário de Brasília possui offset canônico de UTC-3.
+  // Em UTC, a hora correspondente é (hour + 3).
+  // Date.UTC aceita minutos > 59 e ajusta automaticamente horas e dias.
+  return new Date(Date.UTC(year, month - 1, day, hour + 3, minute, second, 0));
 }
 
 /**

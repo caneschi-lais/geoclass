@@ -40,11 +40,8 @@ export class StudentController {
           class: {
             include: {
               professor: { select: { name: true } },
-              room: true,
-              course: true,
               temporaryLocs: {
-                where: { date: todayDate },
-                include: { room: true }
+                where: { date: todayStr }
               }
             }
           }
@@ -144,11 +141,11 @@ export class StudentController {
           }
         });
 
-        const userCourse = c.course_id ? await prisma.userCourse.findUnique({
+        const userCourse = (c as any).course_name ? await prisma.userCourse.findUnique({
           where: {
-            user_id_course_id: {
+            user_id_course_name: {
               user_id: studentId,
-              course_id: c.course_id
+              course_name: (c as any).course_name
             }
           }
         }) : null;
@@ -157,17 +154,19 @@ export class StudentController {
 
         const lastAttendance = allAttendancesToday.length > 0 ? allAttendancesToday[allAttendancesToday.length - 1] : null;
 
-        const effectiveRoom = tempLoc?.room || c.room;
+        const effectiveRoomName = tempLoc ? tempLoc.room_name : ((c as any).room_name || 'Sala Padrão');
+        const effectiveLatitude = tempLoc ? tempLoc.latitude : c.latitude;
+        const effectiveLongitude = tempLoc ? tempLoc.longitude : c.longitude;
 
         return {
           id: c.id,
           subject: c.subject,
-          course_name: c.course?.name || null,
+          course_name: (c as any).course_name || null,
           professor: c.professor.name,
           time: formattedTime,
-          room: effectiveRoom ? effectiveRoom.name : 'Sala Padrão',
-          latitude: effectiveRoom ? effectiveRoom.latitude : 0,
-          longitude: effectiveRoom ? effectiveRoom.longitude : 0,
+          room: effectiveRoomName,
+          latitude: effectiveLatitude || 0,
+          longitude: effectiveLongitude || 0,
           radiusMeters: c.radius_meters,
           alreadyCheckedIn,
           isAbsent,
@@ -236,25 +235,51 @@ export class StudentController {
     try {
       const attendances = await prisma.attendance.findMany({
         where: { student_id: studentId },
-        orderBy: { date: 'desc' },
+        orderBy: [
+          { date: 'desc' },
+          { check_in_time: 'desc' },
+          { id: 'desc' }
+        ],
         include: { class: true },
         take: 50 // Limite para paginação
       });
 
       const historico = attendances.map(a => {
-        const localDateStr = a.check_in_time.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-        const localTimeStr = a.check_in_time.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
+        // a.date representa a data civil da aula (@db.Date no PostgreSQL, normalizada em UTC)
+        const dateObj = a.date instanceof Date ? a.date : (a.date ? new Date(a.date) : a.check_in_time);
+        const localDateStr = dateObj.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+        const localTimeStr = a.slot_time || a.check_in_time.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
 
         return {
           id: a.id,
           subject: a.class.subject,
           date: localDateStr,
           time: localTimeStr,
-          status: a.status
+          status: a.status,
+          _rawDate: a.date,
+          _rawCheckIn: a.check_in_time
         };
       });
 
-      return res.json(historico);
+      // Ordenar explicitamente do mais recente para o mais antigo:
+      // 1. Data da aula (mais recente primeiro)
+      // 2. Horário do check-in / slot (mais recente primeiro)
+      // 3. ID (decrescente)
+      historico.sort((a, b) => {
+        const timeA = new Date(a._rawDate).getTime();
+        const timeB = new Date(b._rawDate).getTime();
+        if (timeB !== timeA) return timeB - timeA;
+
+        const checkInA = new Date(a._rawCheckIn).getTime();
+        const checkInB = new Date(b._rawCheckIn).getTime();
+        if (checkInB !== checkInA) return checkInB - checkInA;
+
+        return Number(b.id) - Number(a.id);
+      });
+
+      const result = historico.map(({ _rawDate, _rawCheckIn, ...item }) => item);
+
+      return res.json(result);
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao buscar histórico' });

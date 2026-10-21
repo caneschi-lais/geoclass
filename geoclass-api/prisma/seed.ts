@@ -2,13 +2,29 @@ import bcrypt from 'bcryptjs';
 import prisma from '../src/prisma';
 
 async function main() {
-  console.log('🌱 Iniciando o povoamento do Banco de Dados com os dados oficiais (2026.2)...');
+  console.log('🌱 Iniciando o povoamento do Banco de Dados com os dados de teste (2026.2)...');
 
-  // Senha padrão ("123456") para todos os usuários
+  // Senha padrão ("123456") para todos os usuários de teste
   const passwordHash = await bcrypt.hash('123456', 10);
 
-  // 1. Obter Salas Físicas já cadastradas diretamente no Banco de Dados
-  console.log('🔍 Consultando salas cadastradas diretamente no banco...');
+  // 1. Obter ou inicializar Salas Físicas de teste
+  console.log('🔍 Consultando e configurando salas no banco...');
+  const defaultRoomsData = [
+    { name: 'Sala 14', latitude: -23.0856664, longitude: -47.2023632 },
+    { name: 'Lab 5', latitude: -23.0856664, longitude: -47.2023632 },
+    { name: 'Lab 6', latitude: -23.0856664, longitude: -47.2023632 },
+    { name: 'Lab 7', latitude: -23.0856664, longitude: -47.2023632 },
+    { name: 'Mini 1', latitude: -23.0856664, longitude: -47.2023632 },
+  ];
+
+  for (const r of defaultRoomsData) {
+    await prisma.room.upsert({
+      where: { name: r.name },
+      update: {},
+      create: r,
+    });
+  }
+
   const existingRooms = await prisma.room.findMany();
   console.log(`📍 Foram encontradas ${existingRooms.length} salas cadastradas no banco.`);
 
@@ -17,62 +33,24 @@ async function main() {
     roomsMap.set(r.name.trim().toLowerCase(), r);
   }
 
-  // 2. Usuários (Conforme imagem anexada: Alunos, Professores e Coordenadores)
+  // 2. Usuários de Teste (Apenas Aluno, Professor e Coordenador de Teste)
   const usersData = [
-    // ALUNOS
+    // ALUNO DE TESTE
     {
-      name: 'aluno teste',
+      name: 'Aluno Teste',
       email: 'aluno@teste.com',
       role: 'ALUNO' as const,
-      ra: '0',
+      ra: '1050482413000',
       coursesDetails: [
-        { course_name: 'Análise e Desenvolvimento de Sistemas', semester: '3º Semestre', is_completed: false },
+        { course_name: 'Análise e Desenvolvimento de Sistemas', semester: '6º Semestre', is_completed: false },
         { course_name: 'Gestão Empresarial', semester: '5º Semestre', is_completed: false },
         { course_name: 'Comércio Exterior', semester: '7º Semestre', is_completed: true },
       ],
     },
-    {
-      name: 'Laís Student',
-      email: 'lais.aluno@fatec.com',
-      role: 'ALUNO' as const,
-      ra: '1050482413014',
-      coursesDetails: [
-        { course_name: 'Análise e Desenvolvimento de Sistemas', semester: '6º Semestre', is_completed: false },
-      ],
-    },
-    {
-      name: 'Lucas student',
-      email: 'lucas.aluno@fatec.com',
-      role: 'ALUNO' as const,
-      ra: '1050482413021',
-      coursesDetails: [
-        { course_name: 'Análise e Desenvolvimento de Sistemas', semester: '6º Semestre', is_completed: false },
-      ],
-    },
 
-    // PROFESSORES
+    // PROFESSOR DE TESTE
     {
-      name: 'lais teacher',
-      email: 'lais.prof@fatec.com',
-      role: 'PROFESSOR' as const,
-      ra: null,
-      coursesDetails: [
-        { course_name: 'Análise e Desenvolvimento de Sistemas', semester: null, is_completed: false },
-        { course_name: 'Gestão Empresarial', semester: null, is_completed: false },
-      ],
-    },
-    {
-      name: 'lucas teacher',
-      email: 'lucas.prof@fatec.com',
-      role: 'PROFESSOR' as const,
-      ra: null,
-      coursesDetails: [
-        { course_name: 'Análise e Desenvolvimento de Sistemas', semester: null, is_completed: false },
-        { course_name: 'Comércio Exterior', semester: null, is_completed: false },
-      ],
-    },
-    {
-      name: 'teacher teste',
+      name: 'Professor Teste',
       email: 'prof@teste.com',
       role: 'PROFESSOR' as const,
       ra: null,
@@ -83,29 +61,9 @@ async function main() {
       ],
     },
 
-    // COORDENADORES
+    // COORDENADOR DE TESTE
     {
-      name: 'lais coord',
-      email: 'lais.coord@fatec.com',
-      role: 'COORDENADOR' as const,
-      ra: null,
-      coursesDetails: [
-        { course_name: 'Análise e Desenvolvimento de Sistemas', semester: null, is_completed: false },
-        { course_name: 'Gestão Empresarial', semester: null, is_completed: false },
-      ],
-    },
-    {
-      name: 'lucas coord',
-      email: 'lucas.coord@fatec.com',
-      role: 'COORDENADOR' as const,
-      ra: null,
-      coursesDetails: [
-        { course_name: 'Análise e Desenvolvimento de Sistemas', semester: null, is_completed: false },
-        { course_name: 'Comércio Exterior', semester: null, is_completed: false },
-      ],
-    },
-    {
-      name: 'coord teste',
+      name: 'Coordenador Teste',
       email: 'coord@teste.com',
       role: 'COORDENADOR' as const,
       ra: null,
@@ -117,7 +75,7 @@ async function main() {
     },
   ];
 
-  console.log('👤 Povoando usuários e seus vínculos de cursos...');
+  console.log('👤 Povoando usuários de teste e seus vínculos de cursos...');
   const usersByEmail = new Map<string, any>();
   const studentsList: Array<any> = [];
 
@@ -175,9 +133,8 @@ async function main() {
     }
   }
 
-  // 3. Disciplinas / Turmas (Classes) - Semestre 2026.2
-  // Cálculo exato de aulas com base no Calendário Letivo Oficial 2026.2 (03/08/2026 a 14/12/2026 - Fatec Indaiatuba):
-  // Segundas: 17 dias | Terças: 19 dias | Quartas: 19 dias | Quintas: 18 dias | Sextas: 16 dias | Sábados: 16 dias
+  // 3. Disciplinas / Turmas (Classes) - Semestre 2026.2 vinculadas ao professor de teste
+  // Cálculo de aulas com base no Calendário Letivo Oficial 2026.2 (Fatec Indaiatuba):
   const semester = '2026.2';
   const defaultRadius = 40;
 
@@ -188,8 +145,8 @@ async function main() {
       week_days: 'segunda',
       course_name: 'Análise e Desenvolvimento de Sistemas',
       room_name: 'Sala 14',
-      professorEmail: 'lais.prof@fatec.com',
-      total_classes: 34, // 17 segundas x 2 aulas
+      professorEmail: 'prof@teste.com',
+      total_classes: 34,
     },
     {
       subject: 'Empreendedorismo',
@@ -197,8 +154,8 @@ async function main() {
       week_days: 'segunda',
       course_name: 'Análise e Desenvolvimento de Sistemas',
       room_name: 'Lab 5',
-      professorEmail: 'lais.prof@fatec.com',
-      total_classes: 34, // 17 segundas x 2 aulas
+      professorEmail: 'prof@teste.com',
+      total_classes: 34,
     },
     {
       subject: 'Laboratório de engenharia de software',
@@ -206,8 +163,8 @@ async function main() {
       week_days: 'terca,quarta',
       course_name: 'Análise e Desenvolvimento de Sistemas',
       room_name: 'Lab 5',
-      professorEmail: 'lucas.prof@fatec.com',
-      total_classes: 76, // 19 terças x 2 aulas + 19 quartas x 2 aulas (carga oficial de 4 aulas semanais)
+      professorEmail: 'prof@teste.com',
+      total_classes: 76,
     },
     {
       subject: 'Inglês 6',
@@ -215,8 +172,8 @@ async function main() {
       week_days: 'quarta',
       course_name: 'Análise e Desenvolvimento de Sistemas',
       room_name: 'Mini 1',
-      professorEmail: 'lucas.prof@fatec.com',
-      total_classes: 38, // 19 terças x 2 aulas
+      professorEmail: 'prof@teste.com',
+      total_classes: 38,
     },
     {
       subject: 'Ética',
@@ -224,8 +181,8 @@ async function main() {
       week_days: 'quarta',
       course_name: 'Análise e Desenvolvimento de Sistemas',
       room_name: 'Mini 1',
-      professorEmail: 'lucas.prof@fatec.com',
-      total_classes: 38, // 19 quartas x 2 aulas
+      professorEmail: 'prof@teste.com',
+      total_classes: 38,
     },
     {
       subject: 'Redes de computadores',
@@ -234,7 +191,7 @@ async function main() {
       course_name: 'Análise e Desenvolvimento de Sistemas',
       room_name: 'Lab 7',
       professorEmail: 'prof@teste.com',
-      total_classes: 72, // 18 quintas x 4 aulas
+      total_classes: 72,
     },
     {
       subject: 'Auditoria de sistemas',
@@ -243,16 +200,16 @@ async function main() {
       course_name: 'Análise e Desenvolvimento de Sistemas',
       room_name: 'Lab 7',
       professorEmail: 'prof@teste.com',
-      total_classes: 64, // 16 sextas x 4 aulas
+      total_classes: 64,
     },
     {
       subject: 'Tópicos especificos de informática',
       schedule_time: '09:30, 10:20, 11:20, 12:10',
       week_days: 'sabado',
       course_name: 'Análise e Desenvolvimento de Sistemas',
-      room_name: 'lab 6',
+      room_name: 'Lab 6',
       professorEmail: 'prof@teste.com',
-      total_classes: 64, // 16 sábados x 4 aulas
+      total_classes: 64,
     },
   ];
 
@@ -272,8 +229,8 @@ async function main() {
       console.warn(`⚠️ Sala "${c.room_name}" não foi encontrada no banco! Utilizando coordenadas de contingência.`);
     }
 
-    const latitude = room ? room.latitude : -23.0911;
-    const longitude = room ? room.longitude : -47.2185;
+    const latitude = room ? room.latitude : -23.0856664;
+    const longitude = room ? room.longitude : -47.2023632;
     const roomName = room ? room.name : c.room_name;
 
     const existingClass = await prisma.class.findFirst({
@@ -319,8 +276,8 @@ async function main() {
     createdClasses.push(classRecord);
   }
 
-  // 4. Matrícula dos Alunos nas Disciplinas do Curso
-  console.log('📝 Matriculando alunos nas disciplinas de seus cursos...');
+  // 4. Matrícula dos Alunos de Teste nas Disciplinas do Curso
+  console.log('📝 Matriculando alunos de teste nas disciplinas de seus cursos...');
   for (const student of studentsList) {
     for (const classRec of createdClasses) {
       if (classRec.course_name && student.coursesList.includes(classRec.course_name)) {
@@ -354,9 +311,9 @@ async function main() {
     },
     {
       name: '2026.2',
-      start_date: new Date('2026-08-03T00:00:00.000Z'), // Início das aulas do 2º Semestre
-      end_date: new Date('2026-12-14T00:00:00.000Z'),   // Término das aulas do 2º Semestre
-      active: true,                                     // Semestre Vigente dos Testes
+      start_date: new Date('2026-08-03T00:00:00.000Z'),
+      end_date: new Date('2026-12-14T00:00:00.000Z'),
+      active: true,
     },
   ];
 
@@ -477,7 +434,7 @@ async function main() {
     });
   }
 
-  console.log('✅ Base de dados populada com sucesso com os dados de 2026.2!');
+  console.log('✅ Base de dados populada com sucesso com os dados de teste para o semestre 2026.2!');
 }
 
 main()
