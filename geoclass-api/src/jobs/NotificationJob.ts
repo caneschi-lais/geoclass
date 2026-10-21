@@ -9,13 +9,22 @@ import {
 import { sendPushNotification } from '../services/pushNotificationService';
 import prisma from '../prisma';
 
-// Auxiliar para adicionar 15 minutos a uma string "HH:MM"
-function add15Minutes(timeStr: string): string {
-  const [h, m] = timeStr.split(':').map(Number);
-  const totalMin = (h * 60 + m + 15) % (24 * 60);
-  const nh = Math.floor(totalMin / 60);
-  const nm = totalMin % 60;
-  return `${String(nh).padStart(2, '0')}:${String(nm).padStart(2, '0')}`;
+// Auxiliar para obter horário de término/fechamento do slot (até 15min ou início da próxima aula)
+function getSlotEndTimeStr(slotStr: string, nextSlotStr?: string | null): string {
+  const [h, m] = slotStr.split(':').map(Number);
+  const startMin = h * 60 + m;
+  let endMin = startMin + 15;
+  if (nextSlotStr) {
+    const [nh, nm] = nextSlotStr.split(':').map(Number);
+    const nextMin = nh * 60 + nm;
+    if (nextMin > startMin) {
+      endMin = Math.min(endMin, nextMin);
+    }
+  }
+  const totalMin = endMin % (24 * 60);
+  const rh = Math.floor(totalMin / 60);
+  const rm = totalMin % 60;
+  return `${String(rh).padStart(2, '0')}:${String(rm).padStart(2, '0')}`;
 }
 
 export async function notificationJob() {
@@ -86,8 +95,11 @@ export async function notificationJob() {
       const currentDayName = getBrazilDayOfWeek(now);
       const slots = getScheduleSlotsForDay(cls.schedule_time, cls.week_days, currentDayName);
 
-      // 1. Aluno (Lembrete de Início de Aula)
-      for (const slotStr of slots) {
+      // 1. Aluno (Lembrete de Início de Aula) e 2. Professor (Fechamento de Chamada)
+      for (let i = 0; i < slots.length; i++) {
+        const slotStr = slots[i];
+        const nextSlotStr = slots[i + 1] || null;
+
         if (slotStr === currentTimeStr) {
           console.log(`[NOTIFICATION JOB] Enviando lembretes de início de aula para: ${cls.subject} (${slotStr})`);
           for (const enrollment of cls.enrollments) {
@@ -122,8 +134,8 @@ export async function notificationJob() {
           }
         }
 
-        // 2. Professor (Fechamento de Chamada - 15min após início do slot)
-        const professorTriggerTime = add15Minutes(slotStr);
+        // 2. Professor (Fechamento de Chamada - no fim da tolerância do slot)
+        const professorTriggerTime = getSlotEndTimeStr(slotStr, nextSlotStr);
         if (professorTriggerTime === currentTimeStr) {
           console.log(`[NOTIFICATION JOB] Enviando relatório de chamada para professor de: ${cls.subject} (${slotStr})`);
 

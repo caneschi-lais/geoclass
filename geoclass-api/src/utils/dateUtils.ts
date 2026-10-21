@@ -140,22 +140,44 @@ export function parseSlotToMinutes(slotStr: string): number | null {
 }
 
 /**
- * Avalia o status de um slot ("HH:MM") com tolerância de 15 minutos em relação ao horário no Brasil.
+ * Avalia o status de um slot ("HH:MM") com tolerância de até 15 minutos em relação ao horário no Brasil.
+ * Se houver um próximo slot (nextSlotStr), a tolerância do slot atual nunca ultrapassa o horário de início da próxima aula.
  */
-export function evaluateSlotTime(slotStr: string, referenceDate: Date = new Date()) {
+export function evaluateSlotTime(
+  slotStr: string,
+  referenceDate: Date = new Date(),
+  nextSlotStr?: string | null
+) {
   const slotMinutes = parseSlotToMinutes(slotStr);
   if (slotMinutes === null) {
-    return { isValid: false, isActive: false, isExpired: false, isFuture: false };
+    return {
+      isValid: false,
+      isActive: false,
+      isExpired: false,
+      isFuture: false,
+      startMinutes: 0,
+      endMinutes: 0,
+      currentMinutes: 0,
+    };
   }
 
   const { hour, minute } = getBrazilParts(referenceDate);
   const currentMinutes = hour * 60 + minute;
-  const toleranceMinutes = 15;
+  const defaultToleranceMinutes = 15;
   const startMinutes = slotMinutes;
-  const endMinutes = slotMinutes + toleranceMinutes;
 
-  const isActive = currentMinutes >= startMinutes && currentMinutes <= endMinutes;
-  const isExpired = currentMinutes > endMinutes;
+  let endMinutes = slotMinutes + defaultToleranceMinutes;
+  if (nextSlotStr) {
+    const nextMinutes = parseSlotToMinutes(nextSlotStr);
+    if (nextMinutes !== null && nextMinutes > startMinutes) {
+      // A tolerância da aula atual encerra no início da próxima aula se a distância for menor que 15 min
+      endMinutes = Math.min(endMinutes, nextMinutes);
+    }
+  }
+
+  // O slot está ativo a partir do horário de início até antes de endMinutes
+  const isActive = currentMinutes >= startMinutes && currentMinutes < endMinutes;
+  const isExpired = currentMinutes >= endMinutes;
   const isFuture = currentMinutes < startMinutes;
 
   return {
@@ -168,3 +190,4 @@ export function evaluateSlotTime(slotStr: string, referenceDate: Date = new Date
     currentMinutes,
   };
 }
+

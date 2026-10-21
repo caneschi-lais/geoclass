@@ -81,17 +81,21 @@ export class AttendanceController {
       let expiredEndTime: Date | null = null;
       let nextUpcomingSlot: string | null = null;
 
-      for (const slotStr of slots) {
+      for (let i = 0; i < slots.length; i++) {
+        const slotStr = slots[i];
+        const nextSlotStr = slots[i + 1] || null;
         const [schedHours, schedMinutes] = slotStr.split(':').map(Number);
         if (isNaN(schedHours) || isNaN(schedMinutes)) continue;
 
-        const { isActive, isExpired, isFuture } = evaluateSlotTime(slotStr, checkInTime);
+        const { isActive, isExpired, isFuture, endMinutes } = evaluateSlotTime(slotStr, checkInTime, nextSlotStr);
+        const endH = Math.floor(endMinutes / 60);
+        const endM = endMinutes % 60;
         const endTime = createBrazilDate(
           brazilParts.year,
           brazilParts.month,
           brazilParts.day,
-          schedHours,
-          schedMinutes + 15
+          endH,
+          endM
         );
 
         if (isActive) {
@@ -115,8 +119,10 @@ export class AttendanceController {
 
         // Se já passou do horário de tolerância de 15 minutos, registra ausência (falta) para todos os slots expirados
         if (expiredSlot) {
-          for (const slotStr of slots) {
-            const { isExpired } = evaluateSlotTime(slotStr, checkInTime);
+          for (let i = 0; i < slots.length; i++) {
+            const slotStr = slots[i];
+            const nextSlotStr = slots[i + 1] || null;
+            const { isExpired, endMinutes } = evaluateSlotTime(slotStr, checkInTime, nextSlotStr);
             if (!isExpired) continue;
 
             const existingExpiredAttendance = await prisma.attendance.findFirst({
@@ -129,13 +135,14 @@ export class AttendanceController {
             });
 
             if (!existingExpiredAttendance) {
-              const [h, m] = slotStr.split(':').map(Number);
+              const endH = Math.floor(endMinutes / 60);
+              const endM = endMinutes % 60;
               const slotEnd = createBrazilDate(
                 brazilParts.year,
                 brazilParts.month,
                 brazilParts.day,
-                h,
-                m + 15
+                endH,
+                endM
               );
 
               await prisma.attendance.create({
@@ -179,9 +186,11 @@ export class AttendanceController {
 
       // Se há um slot ativo (ex: 19:50), garantir que faltas de slots anteriores que já expiraram hoje
       // fiquem devidamente registradas para o aluno (ex: falta na aula das 19:00 caso não tenha batido presença)
-      for (const slotStr of slots) {
+      for (let i = 0; i < slots.length; i++) {
+        const slotStr = slots[i];
         if (slotStr === activeSlot) break;
-        const { isExpired } = evaluateSlotTime(slotStr, checkInTime);
+        const nextSlotStr = slots[i + 1] || null;
+        const { isExpired, endMinutes } = evaluateSlotTime(slotStr, checkInTime, nextSlotStr);
         if (isExpired) {
           const existingPrevAttendance = await prisma.attendance.findFirst({
             where: {
@@ -193,13 +202,14 @@ export class AttendanceController {
           });
 
           if (!existingPrevAttendance) {
-            const [prevH, prevM] = slotStr.split(':').map(Number);
+            const endH = Math.floor(endMinutes / 60);
+            const endM = endMinutes % 60;
             const prevEndTime = createBrazilDate(
               brazilParts.year,
               brazilParts.month,
               brazilParts.day,
-              prevH,
-              prevM + 15
+              endH,
+              endM
             );
             await prisma.attendance.create({
               data: {
