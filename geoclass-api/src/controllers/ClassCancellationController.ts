@@ -934,7 +934,7 @@ export class ClassCancellationController {
 
   // 10. Datas com Reposição de uma Turma (Para visualização no Calendário / Filtro)
   async getReplacementDatesForClass(req: AuthRequest, res: Response) {
-    const classId = req.params.id;
+    const classId = Number(req.params.id);
 
     try {
       const cancellations = await (prisma as any).classCancellation.findMany({
