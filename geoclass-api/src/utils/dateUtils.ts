@@ -17,10 +17,30 @@ export interface BrazilDateTimeParts {
   second: number;
 }
 
+export function isMidnightUtcDate(d: Date): boolean {
+  return (
+    d.getUTCHours() === 0 &&
+    d.getUTCMinutes() === 0 &&
+    d.getUTCSeconds() === 0 &&
+    d.getUTCMilliseconds() === 0
+  );
+}
+
 /**
  * Retorna os componentes da data/hora atual no Horário de Brasília.
  */
 export function getBrazilParts(date: Date = new Date()): BrazilDateTimeParts {
+  if (isMidnightUtcDate(date)) {
+    return {
+      year: date.getUTCFullYear(),
+      month: date.getUTCMonth() + 1,
+      day: date.getUTCDate(),
+      hour: 0,
+      minute: 0,
+      second: 0,
+    };
+  }
+
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: BRAZIL_TIMEZONE,
     year: 'numeric',
@@ -55,6 +75,12 @@ export function getBrazilParts(date: Date = new Date()): BrazilDateTimeParts {
  * Retorna a data no formato "YYYY-MM-DD" correspondente ao dia civil no Brasil.
  */
 export function getBrazilDateString(date: Date = new Date()): string {
+  if (isMidnightUtcDate(date)) {
+    const y = String(date.getUTCFullYear());
+    const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(date.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
   const { year, month, day } = getBrazilParts(date);
   const y = String(year);
   const m = String(month).padStart(2, '0');
@@ -76,8 +102,8 @@ export function getBrazilDayOfWeek(dateInput?: Date | string | null): string {
   if (typeof dateInput === 'string') {
     const trimmed = dateInput.trim();
     if (trimmed.includes('-')) {
-      const parts = trimmed.split('-').map(Number);
-      if (parts.length === 3) {
+      const parts = trimmed.split('T')[0].split('-').map(Number);
+      if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
         const d = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
         return daysOfWeekMap[d.getUTCDay()];
       }
@@ -85,7 +111,16 @@ export function getBrazilDayOfWeek(dateInput?: Date | string | null): string {
     return trimmed;
   }
 
-  const { year, month, day } = getBrazilParts(dateInput);
+  if (dateInput instanceof Date) {
+    if (isMidnightUtcDate(dateInput)) {
+      return daysOfWeekMap[dateInput.getUTCDay()];
+    }
+    const { year, month, day } = getBrazilParts(dateInput);
+    const d = new Date(Date.UTC(year, month - 1, day));
+    return daysOfWeekMap[d.getUTCDay()];
+  }
+
+  const { year, month, day } = getBrazilParts(new Date());
   const d = new Date(Date.UTC(year, month - 1, day));
   return daysOfWeekMap[d.getUTCDay()];
 }
@@ -96,18 +131,30 @@ export function getBrazilDayOfWeek(dateInput?: Date | string | null): string {
  * Essencial para que consultas do Prisma no campo `date DateTime` sejam consistentes.
  */
 export function getBrazilMidnightDate(dateInput?: Date | string | null): Date {
+  if (!dateInput) {
+    const { year, month, day } = getBrazilParts(new Date());
+    return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+  }
+
   if (typeof dateInput === 'string') {
     const trimmed = dateInput.trim();
     if (trimmed.includes('-')) {
-      const parts = trimmed.split('-').map(Number);
-      if (parts.length === 3) {
+      const parts = trimmed.split('T')[0].split('-').map(Number);
+      if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
         return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0));
       }
     }
   }
 
-  const d = dateInput instanceof Date ? dateInput : new Date();
-  const { year, month, day } = getBrazilParts(d);
+  if (dateInput instanceof Date) {
+    if (isMidnightUtcDate(dateInput)) {
+      return dateInput;
+    }
+    const { year, month, day } = getBrazilParts(dateInput);
+    return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+  }
+
+  const { year, month, day } = getBrazilParts(new Date());
   return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
 }
 

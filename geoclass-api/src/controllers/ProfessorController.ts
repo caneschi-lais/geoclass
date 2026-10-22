@@ -89,7 +89,7 @@ export class ProfessorController {
       }
 
       // Determinar os horários / slots de aula para o dia específico (respeitando se a matéria tem 2 ou 4 horários no dia)
-      const classSlots = resolveClassSlots(classData.schedule_time, classData.week_days, targetDate);
+      const classSlots = resolveClassSlots(classData.schedule_time, classData.week_days, date || targetDate);
 
       // Buscar todos os registros de presença da data
       const attendances = await prisma.attendance.findMany({
@@ -386,7 +386,7 @@ export class ProfessorController {
       }
 
       // Determinar os slots de aula para a data específica (respeitando 2 ou 4 horários do dia)
-      const classSlots = resolveClassSlots(classInfo.schedule_time, classInfo.week_days, targetDate);
+      const classSlots = resolveClassSlots(classInfo.schedule_time, classInfo.week_days, date || targetDate);
 
       const formattedDate = targetDate.toLocaleDateString('pt-BR');
 
