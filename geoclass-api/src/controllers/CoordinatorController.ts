@@ -15,18 +15,30 @@ async function findSemesterByNameOrId(param?: string | number | null) {
   return await prisma.academicSemester.findUnique({ where: { name: str } });
 }
 
+async function getCoordinatorCourseIds(userId?: number | null): Promise<number[]> {
+  if (!userId) return [];
+  const coordCourses = await prisma.userCourse.findMany({
+    where: { user_id: userId },
+    select: { course_id: true }
+  });
+  return coordCourses.map(uc => uc.course_id);
+}
+
 export class CoordinatorController {
   // 1. Obter semestres ativos e a média global de faltas
   async getSemesters(req: AuthRequest, res: Response) {
     try {
+      const coordinatorCourseIds = await getCoordinatorCourseIds(req.user?.id);
+      const courseFilter = coordinatorCourseIds.length > 0 ? { course_id: { in: coordinatorCourseIds } } : {};
+
       const allSemesters = await prisma.academicSemester.findMany({
         orderBy: { name: 'desc' }
       });
 
       const semestersList = await Promise.all(allSemesters.map(async (sem) => {
-        // Buscar todas as matrículas deste semestre
+        // Buscar todas as matrículas deste semestre filtradas pelo curso do coordenador
         const enrollments = await prisma.enrollment.findMany({
-          where: { class: { semester_id: sem.id, active: true } },
+          where: { class: { semester_id: sem.id, ...courseFilter, active: true } },
           include: { class: true }
         });
 
@@ -69,15 +81,18 @@ export class CoordinatorController {
     const { id: semester } = req.params; // ex: 2026.1 ou 2026.2
 
     try {
+      const coordinatorCourseIds = await getCoordinatorCourseIds(req.user?.id);
+      const courseFilter = coordinatorCourseIds.length > 0 ? { course_id: { in: coordinatorCourseIds } } : {};
+
       const semRecord = await findSemesterByNameOrId(semester);
       const semesterFilter = semRecord ? { semester_id: semRecord.id } : {};
 
-      // Buscar alunos com matrícula no semestre
+      // Buscar alunos com matrícula no semestre e turmas do curso do coordenador
       const students = await prisma.user.findMany({
         where: { 
           role: 'ALUNO',
           enrollments: {
-            some: { class: { ...semesterFilter, active: true } }
+            some: { class: { ...semesterFilter, ...courseFilter, active: true } }
           }
         },
         include: {
@@ -85,11 +100,11 @@ export class CoordinatorController {
             include: { course: true }
           },
           enrollments: {
-            where: { class: { ...semesterFilter, active: true } },
+            where: { class: { ...semesterFilter, ...courseFilter, active: true } },
             include: { class: { include: { course: true } } }
           },
           attendances: {
-            where: { class: { ...semesterFilter, active: true }, status: 'FALTA' }
+            where: { class: { ...semesterFilter, ...courseFilter, active: true }, status: 'FALTA' }
           }
         }
       });
@@ -411,8 +426,11 @@ export class CoordinatorController {
   // 6b. Obter todas as turmas ativas
   async getAllActiveClasses(req: AuthRequest, res: Response) {
     try {
+      const coordinatorCourseIds = await getCoordinatorCourseIds(req.user?.id);
+      const courseFilter = coordinatorCourseIds.length > 0 ? { course_id: { in: coordinatorCourseIds } } : {};
+
       const classes = await prisma.class.findMany({
-        where: { active: true },
+        where: { ...courseFilter, active: true },
         include: {
           professor: {
             select: {
@@ -435,12 +453,16 @@ export class CoordinatorController {
     const { id: semester } = req.params;
 
     try {
+      const coordinatorCourseIds = await getCoordinatorCourseIds(req.user?.id);
+      const courseFilter = coordinatorCourseIds.length > 0 ? { course_id: { in: coordinatorCourseIds } } : {};
+
       const sem = await findSemesterByNameOrId(semester);
       const semesterFilter = sem ? { semester_id: sem.id } : {};
 
       const classes = await prisma.class.findMany({
         where: {
           ...semesterFilter,
+          ...courseFilter,
           active: true
         },
         include: {
@@ -682,8 +704,11 @@ export class CoordinatorController {
   // 12. Obter lista de alunos em risco de reprovação por falta (< 75% de presença)
   async getStudentsAtRisk(req: AuthRequest, res: Response) {
     try {
+      const coordinatorCourseIds = await getCoordinatorCourseIds(req.user?.id);
+      const courseFilter = coordinatorCourseIds.length > 0 ? { course_id: { in: coordinatorCourseIds } } : {};
+
       const enrollments = await prisma.enrollment.findMany({
-        where: { class: { active: true } },
+        where: { class: { ...courseFilter, active: true } },
         include: {
           student: {
             include: {
