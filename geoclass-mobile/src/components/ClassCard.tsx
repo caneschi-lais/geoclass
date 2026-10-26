@@ -115,7 +115,7 @@ export default function ClassCard({ aula, onConfirm, isLoading }: ClassCardProps
               adjustsFontSizeToFit
               minimumFontScale={0.85}
               className="text-white font-bold text-base text-center"
-              style={{ textAlign: 'center', includeFontPadding: false, whiteSpace: 'nowrap' as any }}
+              style={{ textAlign: 'center', includeFontPadding: false }}
             >
               {isLoading ? 'Verificando...' : 'Registrar\u00A0Presença'}
             </Text>

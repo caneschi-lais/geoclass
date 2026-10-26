@@ -1,144 +1,204 @@
 # 📍 GeoClass - Análise Técnica Detalhada do Projeto
 
-Esta é uma análise arquitetural, funcional e de segurança completa do projeto **GeoClass**, com base no código-fonte, configurações e documentações fornecidas.
+Esta documentação apresenta a análise arquitetural, técnica, funcional e de conformidade de segurança do ecossistema **GeoClass**, contemplando a infraestrutura completa, os módulos de software, as regras de negócio e os fluxos de integração implementados.
 
 ---
 
 ## 🏗️ 1. Arquitetura Geral do Sistema
 
-O GeoClass é estruturado em uma arquitetura cliente-servidor com separação total de responsabilidades. O ecossistema é mantido em TypeScript de ponta a ponta:
+O **GeoClass** adota uma arquitetura distribuída cliente-servidor orientada a serviços REST, utilizando **TypeScript** de ponta a ponta para garantir tipagem estrita, consistência de dados e facilidade de manutenção.
 
 ```mermaid
 graph TD
     classDef client fill:#f59e0b,stroke:#b45309,stroke-width:2px,color:#fff,font-weight:bold
-    classDef frontend fill:#3b82f6,stroke:#1d4ed8,stroke-width:2px,color:#fff,font-weight:bold
     classDef backend fill:#10b981,stroke:#047857,stroke-width:2px,color:#fff,font-weight:bold
     classDef database fill:#6366f1,stroke:#4338ca,stroke-width:2px,color:#fff,font-weight:bold
     classDef job fill:#8b5cf6,stroke:#6d28d9,stroke-width:2px,color:#fff,font-weight:bold
+    classDef ext fill:#0ea5e9,stroke:#0284c7,stroke-width:2px,color:#fff,font-weight:bold
 
-    subgraph Clientes ["Dispositivos Clientes"]
-        Mobile["📱 App Mobile (Expo/React Native)"]:::client
+    subgraph Clientes ["📱 Dispositivos Clientes"]
+        MobileApp["App Mobile (Expo / React Native)"]:::client
+        OfflineQueue["Fila Offline (SecureStore / HMAC)"]:::client
     end
 
-    subgraph Backend ["Backend (Node.js/Express)"]
-        Router["Rotas (REST API)"]:::backend
-        Auth["Serviço de Autenticação (JWT)"]:::backend
-        AttendanceCtrl["AttendanceController (Regras/Geofencing)"]:::backend
-        ProfessorCtrl["ProfessorController (Manual/Troca Sala)"]:::backend
-        CoordCtrl["CoordinatorController (Relatórios/Semestres)"]:::backend
+    subgraph Backend ["🖥️ Backend REST API (Node.js / Express / TypeScript)"]
+        Router["Roteador Central & Middlewares (Auth JWT / RBAC)"]:::backend
+        AttendanceCtrl["AttendanceController (Geofencing & Device Binding)"]:::backend
+        ProfessorCtrl["ProfessorController (Chamada / Troca de Sala / Reset)"]:::backend
+        CoordCtrl["CoordinatorController (Segregação por Curso / Matrículas)"]:::backend
+        CancelCtrl["ClassCancellationController (Ausências / Atestados / Reposição)"]:::backend
+        PushService["PushNotificationService (Expo Push API)"]:::backend
     end
 
-    subgraph Background ["Rotinas Auxiliares"]
-        Wiper["LgpdWiperJob (Cron 3h AM)"]:::job
-        NotifJob["NotificationJob (Cron por minuto)"]:::job
+    subgraph Automacoes ["⏱️ Rotinas em Segundo Plano (Cron Jobs)"]
+        WiperJob["LgpdWiperJob (Expurgo Diário às 03:00 BRT)"]:::job
+        NotifJob["NotificationJob & AbsenceProcessor (Execução Minutual)"]:::job
+        KeepAlive["Monitor Keep-Alive (UptimeRobot / Health Check)"]:::ext
     end
 
-    subgraph Persistencia ["Persistência de Dados"]
-        Prisma["Prisma ORM"]:::database
-        DB[("PostgreSQL Database")]:::database
+    subgraph Persistencia ["💾 Persistência Relacional em Nuvem"]
+        PrismaORM["Prisma ORM (Mapeador Objeto-Relacional)"]:::database
+        SupabaseDB[("PostgreSQL Database (Supabase Cloud)")]:::database
     end
 
-    Mobile -->|HTTP Requests / JWT| Router
-    Router --> Auth
+    MobileApp -->|HTTPS / JWT Bearer| Router
+    OfflineQueue -.->|Sincronização em Lote Assinada| Router
+
     Router --> AttendanceCtrl
     Router --> ProfessorCtrl
     Router --> CoordCtrl
+    Router --> CancelCtrl
 
-    AttendanceCtrl --> Prisma
-    ProfessorCtrl --> Prisma
-    CoordCtrl --> Prisma
-    Prisma --> DB
+    AttendanceCtrl --> PushService
+    ProfessorCtrl --> PushService
+    CoordCtrl --> PushService
+    CancelCtrl --> PushService
 
-    Wiper -.->|Expurgo Semestral| DB
-    NotifJob -.->|Fila de Notificações| DB
+    AttendanceCtrl --> PrismaORM
+    ProfessorCtrl --> PrismaORM
+    CoordCtrl --> PrismaORM
+    CancelCtrl --> PrismaORM
+    PrismaORM --> SupabaseDB
+
+    WiperJob -->|Anonimização LGPD > 6 meses| SupabaseDB
+    NotifJob -->|Varredura de Aulas e Faltas| SupabaseDB
+    NotifJob -->|Disparo de Notificações Remotas| PushService
+    KeepAlive -.->|GET /health| Router
 ```
+
+### Tecnologias e Camadas
+1. **Frontend Móvel Multiplataforma**: Desenvolvido em **React Native** com **Expo SDK 52** e TypeScript. Oferece suporte completo para Android e iOS a partir de código unificado, além de modo de execução e testes em navegadores Web com fallbacks automáticos para sensores.
+2. **Backend API REST**: Desenvolvido em **Node.js** com **Express** e TypeScript, modularizado em camadas de rotas, controladores, serviços utilitários de data e jobs agendados.
+3. **Persistência de Dados**: **PostgreSQL** hospedado na nuvem via **Supabase**, utilizando o **Prisma ORM** para abstração de schema, migrações e garantia de integridade relacional.
+4. **Comunicação em Tempo Real / Notificações**: Integração com a **Expo Push API** para notificações proativas nativas nos dispositivos dos estudantes e docentes.
 
 ---
 
-## 💾 2. Modelagem do Banco de Dados (Prisma Schema)
+## 💾 2. Modelagem do Banco de Dados Relacional
 
-O banco de dados relacional utiliza o PostgreSQL e possui o mapeamento gerido pelo Prisma ORM. A modelagem garante a consistência ACID e o histórico acadêmico:
+O banco de dados relacional é composto por **12 entidades** rigorosamente normalizadas com integridade referencial:
 
-### Entidades Principais
-* **`User`**: Armazena dados de Alunos, Professores e Coordenadores (definidos pela enum `Role`). Contém o `ra` (registro acadêmico) exclusivo para alunos e o timestamp `privacy_terms_accepted_at` (LGPD).
-* **`Class`**: Representa as turmas/disciplinas. Guarda a localização padrão da sala (`latitude`, `longitude`), o raio máximo de validação (`radius_meters`), o professor responsável, a grade horária (`schedule_time`) e a meta total de aulas previstas (`total_classes`).
-* **`Enrollment`**: Tabela associativa de relacionamento N:N entre `User` (Aluno) e `Class`, com chave única composta `[student_id, class_id]`.
-* **`Attendance`**: Registro diário de frequência. Contém o status (`PRESENTE`, `ATRASADO`, `FALTA`), `device_id` (vínculo de dispositivo do dia), coordenadas da batida (`student_latitude`, `student_longitude`) e flags de tipo (`is_remote`, `manual_attendance`). Possui chave única composta `[student_id, class_id, date]`.
-* **`TemporaryClassLocation`**: Permite alterar temporariamente a sala (e coordenadas geográficas) de uma disciplina em uma data específica. Útil em realocações dinâmicas pelo professor.
-* **`Room`**: Cadastro base da infraestrutura física do campus (Bloco/Sala/Laboratório) contendo nome e coordenadas geográficas estáticas.
-* **`Notification`**: Histórico de alertas gerados para o usuário.
+| Tabela | Responsabilidade Arquitetural | Chaves e Restrições Notáveis |
+| :--- | :--- | :--- |
+| **`User`** | Armazena os usuários de todos os perfis (`STUDENT`, `TEACHER`, `COORDINATOR`), credenciais criptografadas (`bcryptjs`), `ra`, `push_token` e data do aceite LGPD. | `email` único, `ra` único para estudantes. |
+| **`Course`** | Cadastra os cursos acadêmicos ofertados pela instituição (ex: Análise e Desenvolvimento de Sistemas, Comércio Exterior, Gestão Empresarial). | `code` único (ex: "ADS"). |
+| **`UserCourse`** | Entidade associativa que vincula alunos e coordenadores aos seus cursos, permitindo a segregação departamental e rastreamento de conclusão (`is_completed`). | `@@unique([user_id, course_id])`. |
+| **`Room`** | Cadastro da infraestrutura física do campus (salas e laboratórios) com coordenadas geográficas de centróide (`latitude`, `longitude`) e raio de tolerância. | `name` único. |
+| **`AcademicSemester`** | Identifica os períodos letivos da faculdade (ex: "2026.1"), contendo datas oficiais de início e término. | `code` único. |
+| **`AcademicCalendar`** | Cadastra dias não letivos, feriados, recessos acadêmicos, semanas de provas (SPAP) e exames, suspendendo a exigência de chamada nessas datas. | `date` indexada com enum `EventType`. |
+| **`Class`** | Representa as disciplinas/turmas ofertadas em determinado semestre, professor responsável, sala de aula padrão e grade horária de slots (`schedule_time`). | FKs para `User` (Professor), `Room`, `Course` e `AcademicSemester`. |
+| **`Enrollment`** | Matrícula formal do estudante na disciplina em um semestre letivo, com flag de conclusão individual da matéria (`is_completed`). | `@@unique([student_id, class_id])`. |
+| **`Attendance`** | Registros de frequência diários por aluno e slot de aula. Armazena `status` (`PRESENTE`, `ATRASADO`, `FALTA`, `PRESENCA_PARCIAL`), coordenadas GPS, `device_id` e flags de contingência (`is_remote`, `manual_attendance`). | `@@unique([student_id, class_id, date, slot_time])`. |
+| **`TemporaryClassLocation`** | Realocações temporárias de sala realizadas por professores para datas específicas, substituindo a geolocalização padrão da disciplina. | FKs para `Class` e `Room`. |
+| **`Notification`** | Histórico de notificações no aplicativo (*in-app notifications*) com títulos, mensagens e controle de leitura. | FK para `User` com indexação por destinatário. |
+| **`ClassCancellation`** | Gestão de ausências docentes, solicitações de falta com anexo de atestado comprobatório, suspensões institucionais diretas pela coordenação e agendamento de reposições de aula. | FKs para `Class`, `User` (Professor) e `User` (Coordenador aprovador). |
 
 ---
 
 ## 🔒 3. Mecanismos Centrais de Segurança e Regras de Negócio
 
-### A. Geofencing Server-Side (Fórmula de Haversine)
-Diferente de sistemas que validam a distância localmente (suscetíveis a manipulações em dispositivos com jailbreak ou fake GPS), o GeoClass processa a validação trigonométrica no backend:
-1. O app captura as coordenadas através do `expo-location` (alta precisão).
-2. O backend busca as coordenadas da sala de aula (ou da sala temporária, caso haja realocação no dia).
-3. Aplica-se a **Fórmula de Haversine** para calcular a distância física em linha reta levando em conta a esfericidade da Terra.
-4. É aplicada a compensação de margem de precisão (`distance - gpsAccuracy <= targetRadius`), prevenindo falsos negativos devido a perdas de sinal GPS.
+### A. Geofencing Server-Side com Compensação de Acurácia (Fórmula de Haversine)
+A validação de proximidade física é realizada **exclusivamente no servidor** para mitigar ataques baseados em dispositivos modificados (*root/jailbreak*) ou aplicações de simulação de coordenadas (*Fake GPS*):
+1. O aplicativo cliente solicita leitura de alta precisão ao sistema operacional (`Location.Accuracy.High`).
+2. O servidor consulta as coordenadas cadastradas para a sala da disciplina (priorizando a sala temporária de `TemporaryClassLocation` caso haja realocação no dia).
+3. A distância euclidiana esférica é calculada via Fórmula de Haversine:
+   $$d = 2R \cdot \arcsin\left(\sqrt{\sin^2\left(\frac{\Delta\phi}{2}\right) + \cos(\phi_1)\cos(\phi_2)\sin^2\left(\frac{\Delta\lambda}{2}\right)}\right)$$
+4. O servidor aplica a compensação da incerteza do sinal do sensor (`accuracy`), aceitando a presença se:
+   $$\text{distância} - \text{gpsAccuracy} \le \text{radius\_meters}$$
 
-### B. Device Binding (Combate à Fraude de Dispositivo)
-Para impedir que um aluno colete dispositivos de colegas para marcar presença por eles:
-1. O aplicativo móvel extrai uma impressão digital de hardware (`AndroidId` ou `IosIdForVendorAsync`).
-2. Ao realizar o registro de presença, o backend armazena o `device_id` no banco.
-3. Se outro usuário tentar bater ponto utilizando o mesmo `device_id` no mesmo dia, a API bloqueia a requisição com um erro de tentativa de fraude (`403 Forbidden`).
-4. Um professor ou coordenador tem permissão especial para redefinir o vínculo (`resetDeviceBinding`) caso o aluno comprove ter trocado de aparelho ou precise de liberação justificada.
+### B. Gestão Canônica de Fuso Horário e Múltiplos Slots de Aula
+- O sistema opera padronizado no **Fuso Horário Oficial de Brasília (`America/Sao_Paulo` / UTC-3)** através do utilitário `dateUtils.ts`.
+- Disciplinas com múltiplos horários em dias distintos da semana (ex: Terça das 19:00 às 20:40 e Quarta das 20:50 às 22:30) têm seus horários decompostos em **slots independentes de 50 minutos** (`scheduleHelper.ts`).
+- Para campos de data pura do PostgreSQL (`@db.Date`), o sistema utiliza a função canônica `isMidnightUtcDate` para evitar retrocessos involuntários de um dia decorrentes da subtração de 3 horas em conversões de timezone locais.
 
-### C. Assinatura Digital e Sincronização Offline
-Se o aluno estiver sem internet na sala de aula:
-1. O aplicativo executa uma verificação prévia de Geofencing localmente.
-2. Sendo válida a posição, ele cria um pacote contendo `{classId, lat, lon, timestamp, deviceId}`.
-3. Esse pacote é assinado localmente com SHA-256 usando uma chave secreta (`OFFLINE_SECRET`) compartilhada.
-4. O registro é enfileirado na memória persistente do dispositivo (`SecureStore`).
-5. Assim que a rede se restabelece, o app envia o pacote assinado à API. O backend recalcula a assinatura com base nos mesmos parâmetros e a chave do servidor, aceitando a data e hora retroativas somente se a assinatura for válida e se a batida tiver ocorrido no horário oficial da aula (respeitando a tolerância de 15 minutos).
+### C. Bloqueio Antifraude por Vínculo de Hardware (*Device Binding*)
+- No momento do check-in, o aplicativo extrai um identificador de hardware único do aparelho (`Application.getAndroidId()` ou `Application.getIosIdForVendorAsync()`).
+- O servidor valida se aquele identificador físico já foi registrado no mesmo dia para outro estudante.
+- Caso outro aluno tente registrar presença utilizando o mesmo celular, a requisição é terminada com erro `403 Forbidden` ("Dispositivo já utilizado por outro aluno nesta data").
+- O professor e o coordenador dispõem do recurso `resetDeviceBinding` para liberar o identificador em casos justificados de substituição de aparelho.
 
----
+### D. Fila Offline Resiliente com Assinatura Criptográfica HMAC SHA-256
+- Em caso de falha de conexão na sala de aula, o aplicativo valida as coordenadas localmente e gera um pacote assinado:
+  $$\text{HMAC-SHA256}(\text{timestamp} + \text{deviceId} + \text{classId}, \text{OFFLINE\_SECRET})$$
+- O pacote é armazenado com segurança local no dispositivo (`SecureStore`).
+- Ao restabelecer a conectividade de rede, o hook `useOfflineQueue.ts` submete a fila para o backend.
+- O servidor recalcula o hash criptográfico com a chave secreta compartilhada; se a assinatura for válida e a batida tiver ocorrido dentro da tolerância oficial do slot, o registro é homologado retroativamente.
 
-## ⚖️ 4. Governança e Privacidade (Compliance com LGPD)
+### E. Segregação Departamental da Coordenação por Curso
+- Coordenadores possuem seus acessos delimitados aos cursos aos quais estão vinculados (`UserCourse`).
+- Todas as consultas gerenciais (semestres, turmas ativas, lista de estudantes matriculados e alunos em risco de evasão) aplicam o filtro `course_id: { in: coordinatorCourseIds }`.
+- Impede que o coordenador de um curso (ex: ADS) visualize ou manipule informações de turmas ou estudantes de outros cursos (ex: Comércio Exterior ou Gestão Empresarial).
 
-Em estrito alinhamento com a **Lei Geral de Proteção de Dados (LGPD)**, o GeoClass implementa a política de *Privacy by Design*:
-* **Aceite de Termos**: O usuário é obrigado a revisar e aceitar os termos de consentimento e privacidade antes de usar o sistema (RF01 / `privacy_terms_accepted_at`).
-* **Anonimização Periódica (`LgpdWiperJob`)**: Um cron job é disparado diariamente às 03:00 da manhã. Ele busca no banco todos os registros de presença (`Attendance`) com data superior a 6 meses e **nula de forma definitiva** os campos de geolocalização (`student_latitude`, `student_longitude`) e assinatura de hardware (`device_id`). A presença escolar é mantida, mas o histórico de rastreamento é destruído.
-
----
-
-## 📬 5. Rotinas Automatizadas (Jobs)
-
-Além do expurgo LGPD, o backend roda um job de **processamento de notificações** a cada minuto (`NotificationJob`):
-* **Lembrete aos alunos**: Se uma turma inicia no horário corrente, notifica os alunos matriculados para realizarem a chamada nos próximos 15 minutos.
-* **Fechamento e Registro Automático de Faltas (`AbsenceProcessor`)**: 15 minutos após o início do horário de aula (slot), varre os alunos matriculados que não bateram ponto e cria automaticamente o registro de ausência (`status: FALTA`) no banco de dados (`Attendance`), notificando o aluno e gerando o sumário com presentes e faltosos para o professor.
-* **Evasão**: 
-  - Notifica o aluno se sua taxa de faltas em alguma disciplina passar de 20%.
-  - Notifica os coordenadores se a média geral de faltas de um aluno superar 25%.
-  - Notifica os coordenadores se o absenteísmo médio de uma turma superar 30%.
-  - Todas as notificações de evasão contam com um limitador (throttle) para rodar apenas uma vez a cada 7 dias por usuário.
+### F. Suspensão de Aulas, Atestados e Reposição com Presença Parcial
+- Quando uma aula é suspensa por ausência justificada do docente ou determinação da coordenação, os estudantes matriculados recebem o status provisório `PRESENCA_PARCIAL`.
+- O docente comunica a falta utilizando o botão com confirmação de pressão contínua de 1 segundo (`HoldButton`), podendo anexar atestado médico comprobatório (PDF ou Imagem base64).
+- A reposição é agendada e sinalizada no calendário acadêmico na cor âmbar. Na data da reposição, o professor realiza a chamada através de checkboxes pré-selecionados, convertendo as presenças parciais em presenças definitivas (`PRESENTE` ou `FALTA`).
 
 ---
 
-## 📂 6. Estrutura e Organização do Código
+## ⚖️ 4. Governança e Privacidade (Conformidade com a LGPD)
 
-O projeto está dividido de forma modular e clara:
+Em obediência à **Lei Geral de Proteção de Dados Pessoais (Lei nº 13.709/2018)**, o GeoClass aplica os princípios fundamentais de *Privacy by Design* e *Data Minimization*:
 
-### Backend (`geoclass-api`)
-* [schema.prisma](file:///e:/projetos/tg/geoclass/geoclass-api/prisma/schema.prisma): Definições de modelo e relacionamento.
-* [server.ts](file:///e:/projetos/tg/geoclass/geoclass-api/src/server.ts): Inicialização do Express, Middlewares de CORS, JSON e agendamentos cron.
-* [routes/index.ts](file:///e:/projetos/tg/geoclass/geoclass-api/src/routes/index.ts): Mapeamento de endpoints públicos/privados separados por perfis acadêmicos.
-* [controllers/](file:///e:/projetos/tg/geoclass/geoclass-api/src/controllers/):
-  - [AttendanceController.ts](file:///e:/projetos/tg/geoclass/geoclass-api/src/controllers/AttendanceController.ts): Core do cálculo Haversine e validação de dispositivo.
-  - [AuthController.ts](file:///e:/projetos/tg/geoclass/geoclass-api/src/controllers/AuthController.ts): Gestão de login via JWT e aceite de termos.
-  - [ProfessorController.ts](file:///e:/projetos/tg/geoclass/geoclass-api/src/controllers/ProfessorController.ts): Chamada manual, realocação de sala e reset de hardware.
-  - [CoordinatorController.ts](file:///e:/projetos/tg/geoclass/geoclass-api/src/controllers/CoordinatorController.ts): Consolidação de dados e cadastros.
-
-### Frontend (`geoclass-mobile`)
-* [App Navigator](file:///e:/projetos/tg/geoclass/geoclass-mobile/src/navigation/AppNavigator.tsx): Orquestrador de rotas nativas com base no perfil de usuário (Aluno, Professor, Coordenador).
-* [useStudentHome.ts](file:///e:/projetos/tg/geoclass/geoclass-mobile/src/hooks/useStudentHome.ts): Hook customizado que controla a solicitação de GPS nativo, validação de fake GPS (`location.mocked`) e lógica de fallback offline.
-* [useOfflineQueue.ts](file:///e:/projetos/tg/geoclass/geoclass-mobile/src/hooks/useOfflineQueue.ts): Gerencia o armazenamento persistente offline e sincronização em lote ao recuperar conexão.
+1. **Consentimento Explícito (Art. 7º, I)**: No primeiro acesso do aluno, a tela de privacidade apresenta termos detalhados sobre o tratamento das coordenadas geográficas e identificador de aparelho. O acesso às funcionalidades de presença só é liberado após o aceite explícito, registrado em banco com data e hora (`privacy_terms_accepted_at`).
+2. **Expurgo Periódico de Dados Sensíveis (`LgpdWiperJob`)**:
+   - Um serviço em segundo plano roda diariamente às 03:00 AM (horário de Brasília).
+   - Registros de presença na tabela `Attendance` com data superior a **6 meses** têm suas coordenadas geográficas (`student_latitude`, `student_longitude`) e o identificador do aparelho (`device_id`) permanentemente sobrescritos como `NULL`.
+   - O status acadêmico da presença (`PRESENTE`, `ATRASADO`, `FALTA`) é mantido de forma perpétua, garantindo o histórico escolar do estudante sem reter dados biométricos/rastreáveis além do período legal de finalidade.
 
 ---
 
-## 🛠️ 7. Observações Técnicas / Sugestões de Melhoria
+## 📬 5. Rotinas Automatizadas em Segundo Plano (Background Jobs)
 
-1. **`SecureStore` no Web**: No hook [useOfflineQueue.ts](file:///e:/projetos/tg/geoclass/geoclass-mobile/src/hooks/useOfflineQueue.ts), a função `SecureStore.getItemAsync` é chamada diretamente. Em ambiente Web (onde o projeto roda com mocks), o `expo-secure-store` pode disparar exceções por não ser suportado nativamente sem verificação. Recomenda-se aplicar um tratamento condicional usando `Platform.OS === 'web'` semelhante ao existente no `authStorage.ts`.
-2. **Total de Aulas no Dashboard**: A tela [StudentController.ts](file:///e:/projetos/tg/geoclass/geoclass-api/src/controllers/StudentController.ts) utiliza uma lógica estática de 20 aulas passadas para compor o percentual de faltas do aluno. Para evoluir do MVP, esse cálculo pode ser atrelado ao número real de registros de `Attendance` gerados para a turma no semestre letivo.
+| Job / Serviço | Frequência de Execução | Descrição Operacional |
+| :--- | :--- | :--- |
+| **`LgpdWiperJob`** | Diário às 03:00 AM (BRT) | Anonimiza coordenadas GPS e `device_id` de presenças com mais de 6 meses de antiguidade. |
+| **`NotificationJob`** | A cada 1 minuto | Varre a grade de aulas do dia corrente: dispara lembretes de início de aula aos alunos, alerta o fim da janela de tolerância de 15 minutos e envia resumo diário ao professor. |
+| **`AbsenceProcessor`** | A cada 1 minuto e on-demand | Identifica alunos sem registro de presença após os 15 minutos de tolerância e lança automaticamente o status `FALTA` no banco de dados. Executa auto-remediação removendo faltas indevidas prematuras em slots ainda não iniciados. |
+| **`PushNotificationService`**| Em tempo real / eventos | Conecta à Expo Push API para despachar alertas de suspensão de aulas, agendamento de reposição, cobrança de atestados e avisos de risco de reprovação (< 75%). |
+| **Keep-Alive Pinger** | A cada 5 minutos | Serviço externo que efetua chamadas `GET /health` impedindo que a instância do Web Service entre em hibernação (*cold-start*). |
+
+---
+
+## 📂 6. Estrutura dos Módulos do Sistema
+
+### Backend (`geoclass-api/`)
+- `prisma/schema.prisma`: Definição declarativa das 12 entidades relacionais, enums e índices.
+- `src/server.ts`: Inicialização da aplicação Express, middlewares de segurança e inicialização dos cron jobs.
+- `src/routes/index.ts`: Mapeamento centralizado de rotas públicas e protegidas por perfil (Aluno, Professor, Coordenador).
+- `src/controllers/`:
+  - `AuthController.ts`: Autenticação JWT, controle de perfis RBAC e registro de aceite dos termos LGPD.
+  - `AttendanceController.ts`: Processamento de presença via Geofencing, device binding e sincronização offline.
+  - `ProfessorController.ts`: Chamada manual, realocação de sala e gestão de presença por disciplina.
+  - `CoordinatorController.ts`: Gestão multi-curso, virada de semestre, infraestrutura de salas e acompanhamento de evasão.
+  - `ClassCancellationController.ts`: Ausências docentes, anexo de atestados, cancelamento institucional e reposições.
+- `src/services/pushNotificationService.ts`: Despacho de mensagens push via Expo Push API.
+- `src/jobs/`:
+  - `LgpdWiperJob.ts`: Rotina de expurgo de geodados legados.
+  - `NotificationJob.ts`: Orquestrador minutual de notificações e fechamento de ausências.
+  - `AbsenceProcessor.ts`: Motor de cômputo e auto-remediação de faltas escolares.
+- `src/utils/`:
+  - `dateUtils.ts`: Tratamento canônico de datas e fuso de Brasília (`America/Sao_Paulo`).
+  - `scheduleHelper.ts`: Decomposição e resolução de slots diários de aula por dia da semana.
+
+### Frontend (`geoclass-mobile/`)
+- `src/navigation/`: Navegação nativa hierárquica baseada nos perfis de Aluno, Professor e Coordenador.
+- `src/screens/`:
+  - `auth/LoginScreen.tsx` e `PrivacyScreen.tsx`: Login e aceite de privacidade.
+  - `student/HomeScreen.tsx` e `HistoryScreen.tsx`: Consulta de grade diária, check-in por GPS e histórico acadêmico.
+  - `teacher/ProfessorClassesScreen.tsx` e `ManualAttendanceScreen.tsx`: Gestão de chamadas e turmas docentes.
+  - `coordinator/CoordinatorDashboardScreen.tsx` e `SemestersScreen.tsx`: Painel de controle e monitoramento acadêmico.
+- `src/hooks/`:
+  - `useStudentHome.ts`: Orquestração de presença, permissões de GPS e validação de fake GPS.
+  - `useOfflineQueue.ts`: Enfileiramento e sincronização de pacotes criptografados offline.
+  - `useNotifications.ts`: Central de notificações e badges de alertas não lidos.
+- `src/components/`: Componentes visuais reutilizáveis, incluindo `HoldButton.tsx` para ações críticas intencionais.
+
+---
+
+## 🚀 7. Considerações Finais
+
+O projeto **GeoClass** atinge maturidade técnica alinhada com as melhores práticas de Engenharia de Software:
+- **Separação de Responsabilidades:** Camadas desacopladas com forte coesão e baixo acoplamento.
+- **Rastreabilidade Completa:** Cada regra institucional e necessidade de usuário possui cobertura direta de requisitos, casos de uso, rotas e tabelas.
+- **Segurança Pró-Ativa:** Geofencing server-side, integridade de hardware com Device Binding, criptografia em repouso e em trânsito, e conformidade rigorosa com a legislação de dados pessoais (LGPD).

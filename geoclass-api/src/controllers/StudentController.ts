@@ -40,8 +40,11 @@ export class StudentController {
           class: {
             include: {
               professor: { select: { name: true } },
+              room: true,
+              course: true,
               temporaryLocs: {
-                where: { date: todayStr }
+                where: { date: todayDate },
+                include: { room: true }
               }
             }
           }
@@ -82,8 +85,10 @@ export class StudentController {
         let anyPresentToday = false;
         let anyAbsentToday = false;
 
-        for (const slot of todaySlots) {
-          const { isActive, isExpired, isFuture } = evaluateSlotTime(slot, now);
+        for (let i = 0; i < todaySlots.length; i++) {
+          const slot = todaySlots[i];
+          const nextSlot = todaySlots[i + 1] || null;
+          const { isActive, isExpired, isFuture } = evaluateSlotTime(slot, now, nextSlot);
           const slotAtt = allAttendancesToday.find((a) => a.slot_time === slot);
           const isSlotPresent = slotAtt ? (slotAtt.status === 'PRESENTE' || slotAtt.status === 'ATRASADO') : false;
           const isSlotAbsent = slotAtt ? slotAtt.status === 'FALTA' : false;
@@ -114,9 +119,9 @@ export class StudentController {
           alreadyCheckedIn = checkedInActiveSlot;
           isAbsent = false;
         } else if (anyFutureSlot) {
-          // Ainda há chamadas por vir hoje (ex: 18:40 antes das 19:00, ou intervalo entre aulas)
-          // NUNCA trava como falta antes da aula começar
-          alreadyCheckedIn = anyPresentToday;
+          // Ainda há chamadas por vir hoje (ex: intervalo entre aulas)
+          // Não trava como falta nem como confirmado antes da aula começar
+          alreadyCheckedIn = false;
           isAbsent = false;
         } else if (allSlotsExpired) {
           // Todas as aulas do dia já terminaram
@@ -141,11 +146,11 @@ export class StudentController {
           }
         });
 
-        const userCourse = (c as any).course_name ? await prisma.userCourse.findUnique({
+        const userCourse = c.course_id ? await prisma.userCourse.findUnique({
           where: {
-            user_id_course_name: {
+            user_id_course_id: {
               user_id: studentId,
-              course_name: (c as any).course_name
+              course_id: c.course_id
             }
           }
         }) : null;
@@ -154,19 +159,17 @@ export class StudentController {
 
         const lastAttendance = allAttendancesToday.length > 0 ? allAttendancesToday[allAttendancesToday.length - 1] : null;
 
-        const effectiveRoomName = tempLoc ? tempLoc.room_name : ((c as any).room_name || 'Sala Padrão');
-        const effectiveLatitude = tempLoc ? tempLoc.latitude : c.latitude;
-        const effectiveLongitude = tempLoc ? tempLoc.longitude : c.longitude;
+        const effectiveRoom = tempLoc?.room || c.room;
 
         return {
           id: c.id,
           subject: c.subject,
-          course_name: (c as any).course_name || null,
+          course_name: c.course?.name || null,
           professor: c.professor.name,
           time: formattedTime,
-          room: effectiveRoomName,
-          latitude: effectiveLatitude || 0,
-          longitude: effectiveLongitude || 0,
+          room: effectiveRoom ? effectiveRoom.name : 'Sala Padrão',
+          latitude: effectiveRoom ? effectiveRoom.latitude : 0,
+          longitude: effectiveRoom ? effectiveRoom.longitude : 0,
           radiusMeters: c.radius_meters,
           alreadyCheckedIn,
           isAbsent,
@@ -185,7 +188,15 @@ export class StudentController {
   async getDashboard(req: AuthRequest, res: Response) {
     const studentId = req.user?.id;
 
+    if (!studentId) {
+      return res.status(401).json({ error: 'Não autorizado' });
+    }
+
     try {
+      const now = new Date();
+      // Garantir que faltas de horários que já expiraram hoje estejam consolidadas
+      await processExpiredAttendanceSlots(now);
+
       const enrollments = await prisma.enrollment.findMany({
         where: { student_id: studentId },
         include: { class: true }
@@ -232,7 +243,15 @@ export class StudentController {
   async getHistorico(req: AuthRequest, res: Response) {
     const studentId = req.user?.id;
 
+    if (!studentId) {
+      return res.status(401).json({ error: 'Não autorizado' });
+    }
+
     try {
+      const now = new Date();
+      // Garantir que slots que já expiraram hoje tenham suas faltas processadas antes de listar o histórico
+      await processExpiredAttendanceSlots(now);
+
       const attendances = await prisma.attendance.findMany({
         where: { student_id: studentId },
         orderBy: [
@@ -257,18 +276,28 @@ export class StudentController {
           time: localTimeStr,
           status: a.status,
           _rawDate: a.date,
-          _rawCheckIn: a.check_in_time
+          _rawCheckIn: a.check_in_time,
+          _slotTime: a.slot_time
         };
       });
 
       // Ordenar explicitamente do mais recente para o mais antigo:
       // 1. Data da aula (mais recente primeiro)
-      // 2. Horário do check-in / slot (mais recente primeiro)
+      // 2. Horário do slot/check-in (mais recente primeiro)
       // 3. ID (decrescente)
       historico.sort((a, b) => {
         const timeA = new Date(a._rawDate).getTime();
         const timeB = new Date(b._rawDate).getTime();
         if (timeB !== timeA) return timeB - timeA;
+
+        // Se ambos têm slot_time ("HH:MM"), comparar por minutos do slot
+        if (a._slotTime && b._slotTime) {
+          const [ha, ma] = a._slotTime.split(':').map(Number);
+          const [hb, mb] = b._slotTime.split(':').map(Number);
+          const minA = ha * 60 + ma;
+          const minB = hb * 60 + mb;
+          if (minB !== minA) return minB - minA;
+        }
 
         const checkInA = new Date(a._rawCheckIn).getTime();
         const checkInB = new Date(b._rawCheckIn).getTime();

@@ -112,8 +112,10 @@ export async function processExpiredAttendanceSlots(currentDate: Date = new Date
       const slots = getScheduleSlotsForDay(cls.schedule_time, cls.week_days, currentDayName);
 
       // Auto-remediação: se existirem faltas automáticas gravadas prematuramente para slots que ainda NÃO expiraram hoje, remove
-      for (const slotStr of slots) {
-        const { isExpired } = evaluateSlotTime(slotStr, currentDate);
+      for (let i = 0; i < slots.length; i++) {
+        const slotStr = slots[i];
+        const nextSlotStr = slots[i + 1] || null;
+        const { isExpired } = evaluateSlotTime(slotStr, currentDate, nextSlotStr);
         if (!isExpired) {
           try {
             await prisma.attendance.deleteMany({
@@ -131,20 +133,24 @@ export async function processExpiredAttendanceSlots(currentDate: Date = new Date
         }
       }
 
-      for (const slotStr of slots) {
+      for (let i = 0; i < slots.length; i++) {
+        const slotStr = slots[i];
+        const nextSlotStr = slots[i + 1] || null;
         const [schedHours, schedMinutes] = slotStr.split(':').map(Number);
         if (isNaN(schedHours) || isNaN(schedMinutes)) continue;
 
-        const { isExpired } = evaluateSlotTime(slotStr, currentDate);
+        const { isExpired, endMinutes } = evaluateSlotTime(slotStr, currentDate, nextSlotStr);
 
-        // A tolerância de 15 minutos já passou hoje no Horário de Brasília?
+        // A tolerância já passou hoje no Horário de Brasília?
         if (isExpired) {
+          const endH = Math.floor(endMinutes / 60);
+          const endM = endMinutes % 60;
           const slotEndTime = createBrazilDate(
             brazilParts.year,
             brazilParts.month,
             brazilParts.day,
-            schedHours,
-            schedMinutes + 15
+            endH,
+            endM
           );
 
           for (const enrollment of cls.enrollments) {

@@ -56,7 +56,8 @@ export class AttendanceController {
 
       // 1. Buscar informações da sala de aula
       const classData = await prisma.class.findUnique({
-        where: { id: classId }
+        where: { id: classId },
+        include: { room: true, course: true }
       });
 
       if (!classData) {
@@ -80,17 +81,21 @@ export class AttendanceController {
       let expiredEndTime: Date | null = null;
       let nextUpcomingSlot: string | null = null;
 
-      for (const slotStr of slots) {
+      for (let i = 0; i < slots.length; i++) {
+        const slotStr = slots[i];
+        const nextSlotStr = slots[i + 1] || null;
         const [schedHours, schedMinutes] = slotStr.split(':').map(Number);
         if (isNaN(schedHours) || isNaN(schedMinutes)) continue;
 
-        const { isActive, isExpired, isFuture } = evaluateSlotTime(slotStr, checkInTime);
+        const { isActive, isExpired, isFuture, endMinutes } = evaluateSlotTime(slotStr, checkInTime, nextSlotStr);
+        const endH = Math.floor(endMinutes / 60);
+        const endM = endMinutes % 60;
         const endTime = createBrazilDate(
           brazilParts.year,
           brazilParts.month,
           brazilParts.day,
-          schedHours,
-          schedMinutes + 15
+          endH,
+          endM
         );
 
         if (isActive) {
@@ -114,8 +119,10 @@ export class AttendanceController {
 
         // Se já passou do horário de tolerância de 15 minutos, registra ausência (falta) para todos os slots expirados
         if (expiredSlot) {
-          for (const slotStr of slots) {
-            const { isExpired } = evaluateSlotTime(slotStr, checkInTime);
+          for (let i = 0; i < slots.length; i++) {
+            const slotStr = slots[i];
+            const nextSlotStr = slots[i + 1] || null;
+            const { isExpired, endMinutes } = evaluateSlotTime(slotStr, checkInTime, nextSlotStr);
             if (!isExpired) continue;
 
             const existingExpiredAttendance = await prisma.attendance.findFirst({
@@ -128,13 +135,14 @@ export class AttendanceController {
             });
 
             if (!existingExpiredAttendance) {
-              const [h, m] = slotStr.split(':').map(Number);
+              const endH = Math.floor(endMinutes / 60);
+              const endM = endMinutes % 60;
               const slotEnd = createBrazilDate(
                 brazilParts.year,
                 brazilParts.month,
                 brazilParts.day,
-                h,
-                m + 15
+                endH,
+                endM
               );
 
               await prisma.attendance.create({
@@ -178,9 +186,11 @@ export class AttendanceController {
 
       // Se há um slot ativo (ex: 19:50), garantir que faltas de slots anteriores que já expiraram hoje
       // fiquem devidamente registradas para o aluno (ex: falta na aula das 19:00 caso não tenha batido presença)
-      for (const slotStr of slots) {
+      for (let i = 0; i < slots.length; i++) {
+        const slotStr = slots[i];
         if (slotStr === activeSlot) break;
-        const { isExpired } = evaluateSlotTime(slotStr, checkInTime);
+        const nextSlotStr = slots[i + 1] || null;
+        const { isExpired, endMinutes } = evaluateSlotTime(slotStr, checkInTime, nextSlotStr);
         if (isExpired) {
           const existingPrevAttendance = await prisma.attendance.findFirst({
             where: {
@@ -192,13 +202,14 @@ export class AttendanceController {
           });
 
           if (!existingPrevAttendance) {
-            const [prevH, prevM] = slotStr.split(':').map(Number);
+            const endH = Math.floor(endMinutes / 60);
+            const endM = endMinutes % 60;
             const prevEndTime = createBrazilDate(
               brazilParts.year,
               brazilParts.month,
               brazilParts.day,
-              prevH,
-              prevM + 15
+              endH,
+              endM
             );
             await prisma.attendance.create({
               data: {
@@ -261,19 +272,21 @@ export class AttendanceController {
       }
 
       // 2.1 Verificar se o aluno já concluiu o curso desta disciplina (Curso Concluído = Somente Leitura)
-      if ((classData as any).course_name) {
+      if (classData.course_id) {
         const userCourse = await prisma.userCourse.findUnique({
           where: {
-            user_id_course_name: {
+            user_id_course_id: {
               user_id: studentId,
-              course_name: (classData as any).course_name
+              course_id: classData.course_id
             }
-          }
+          },
+          include: { course: true }
         });
 
         if (userCourse?.is_completed) {
+          const courseName = userCourse.course?.name || classData.course?.name || 'seu curso';
           return res.status(403).json({ 
-            error: `Você já concluiu o curso de ${(classData as any).course_name}. Não é possível registrar novas presenças para disciplinas deste curso (Modo Leitura/Histórico).` 
+            error: `Você já concluiu o curso de ${courseName}. Não é possível registrar novas presenças para disciplinas deste curso (Modo Leitura/Histórico).` 
           });
         }
       }
@@ -293,18 +306,18 @@ export class AttendanceController {
 
       // 3. Validação de Localização (Haversine)
       // Checa se há uma troca de sala para a data informada
-      const checkInDateStr = getBrazilDateString(checkInTime);
       let tempRoom: any = null;
       try {
         tempRoom = await prisma.temporaryClassLocation.findUnique({
-          where: { class_id_date: { class_id: classId, date: checkInDateStr } }
+          where: { class_id_date: { class_id: classId, date: checkInDate } },
+          include: { room: true }
         });
       } catch (err) {
         // Fallback se não houver troca
       }
 
-      const targetLatitude = tempRoom ? tempRoom.latitude : classData.latitude;
-      const targetLongitude = tempRoom ? tempRoom.longitude : classData.longitude;
+      const targetLatitude = tempRoom?.room ? tempRoom.room.latitude : (classData.room ? classData.room.latitude : 0);
+      const targetLongitude = tempRoom?.room ? tempRoom.room.longitude : (classData.room ? classData.room.longitude : 0);
       const targetRadius = classData.radius_meters;
 
       const distance = getDistanceFromLatLonInMeters(lat, lon, targetLatitude, targetLongitude);

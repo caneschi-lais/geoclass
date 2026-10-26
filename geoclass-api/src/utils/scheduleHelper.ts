@@ -16,10 +16,7 @@ export function getScheduleSlotsForDay(
   const cleanSchedule = scheduleTime.trim();
 
   // Obter o dayName se targetDateOrDayName for Date ou string (fuso de Brasília)
-  let dayName: string | undefined;
-  if (targetDateOrDayName) {
-    dayName = getBrazilDayOfWeek(targetDateOrDayName);
-  }
+  const dayName = targetDateOrDayName ? getBrazilDayOfWeek(targetDateOrDayName) : getBrazilDayOfWeek();
 
   // 1. Suporte a formato explícito por dia:
   // Exemplo: "terca: 19:00, 19:50 | quarta: 20:50, 21:40" ou com ponto-e-vírgula ";"
