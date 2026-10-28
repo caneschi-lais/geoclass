@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Props = {
   visible: boolean;
@@ -11,12 +12,25 @@ type Props = {
 };
 
 export default function ExportModal({ visible, onClose, onExport, title = "Exportar Relatório" }: Props) {
+  const insets = useSafeAreaInsets();
+
   if (!visible) return null;
+
+  // Garante padding seguro para a barra de navegação do Android (||| [] <) e Home Indicator do iOS
+  const bottomInset = Math.max(insets.bottom, Platform.OS === 'android' ? 36 : 20) + 12;
 
   return (
     <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
-        <View className="bg-white dark:bg-slate-800 rounded-t-3xl p-6">
+        <TouchableOpacity 
+          style={{ flex: 1 }} 
+          activeOpacity={1} 
+          onPress={onClose} 
+        />
+        <View 
+          style={{ paddingBottom: bottomInset }} 
+          className="bg-white dark:bg-slate-800 rounded-t-3xl p-6"
+        >
           <View className="flex-row justify-between items-center mb-6">
             <Text className="text-xl font-bold text-gray-800 dark:text-slate-100">{title}</Text>
             <TouchableOpacity onPress={onClose} className="p-2 bg-gray-100 dark:bg-slate-700 rounded-full">
@@ -28,7 +42,7 @@ export default function ExportModal({ visible, onClose, onExport, title = "Expor
             Escolha o formato do relatório
           </Text>
           
-          <View className="flex-row gap-4 mb-4">
+          <View className="flex-row gap-4 mb-2">
             <TouchableOpacity 
               className="flex-1 bg-red-50 dark:bg-red-950/30 p-4 rounded-xl items-center border border-red-100 dark:border-red-900/50"
               onPress={() => onExport('pdf')}
@@ -45,7 +59,6 @@ export default function ExportModal({ visible, onClose, onExport, title = "Expor
               <Text className="text-emerald-600 dark:text-emerald-400 font-bold mt-2">Planilha Excel</Text>
             </TouchableOpacity>
           </View>
-
         </View>
       </View>
     </Modal>

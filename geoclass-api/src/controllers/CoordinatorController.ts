@@ -479,19 +479,35 @@ export class CoordinatorController {
             select: {
               student_id: true
             }
+          },
+          attendances: {
+            where: { status: 'FALTA' },
+            select: { id: true }
           }
         },
         orderBy: { subject: 'asc' }
       });
 
-      const mappedClasses = classes.map(c => ({
-        ...c,
-        room_name: c.room?.name || 'Sala Padrão',
-        latitude: c.room?.latitude || 0,
-        longitude: c.room?.longitude || 0,
-        course_name: c.course?.name || null,
-        semester: c.semester?.name || '2026.2'
-      }));
+      const mappedClasses = classes.map(c => {
+        const studentCount = c.enrollments.length;
+        const totalExpected = studentCount * c.total_classes;
+        const totalFaltas = c.attendances.length;
+        const absencePercentage = totalExpected === 0 ? 0 : Math.round((totalFaltas / totalExpected) * 100);
+        const attendancePercentage = Math.max(0, 100 - absencePercentage);
+
+        return {
+          ...c,
+          room_name: c.room?.name || 'Sala Padrão',
+          latitude: c.room?.latitude || 0,
+          longitude: c.room?.longitude || 0,
+          course_name: c.course?.name || null,
+          semester: c.semester?.name || '2026.2',
+          student_count: studentCount,
+          total_faltas: totalFaltas,
+          absencePercentage,
+          attendancePercentage
+        };
+      });
 
       return res.json(mappedClasses);
     } catch (error) {

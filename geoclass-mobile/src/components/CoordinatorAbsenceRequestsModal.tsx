@@ -346,8 +346,10 @@ export default function CoordinatorAbsenceRequestsModal({
             shadowOffset: { width: 0, height: 4 },
             shadowOpacity: 0.15,
             shadowRadius: 16,
+            height: '85%',
+            maxHeight: '90%',
           }}
-          className="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-lg max-h-[90%] border border-gray-200 dark:border-slate-700"
+          className="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-lg border border-gray-200 dark:border-slate-700"
         >
           {/* Header */}
           <View className="flex-row justify-between items-center pb-3 border-b border-gray-100 dark:border-slate-700">
@@ -418,7 +420,7 @@ export default function CoordinatorAbsenceRequestsModal({
                 <View className="flex-row gap-1.5 mb-3">
                   <TouchableOpacity
                     onPress={() => setRequestFilter('PENDENTES')}
-                    className={`flex-1 py-1.5 px-1 rounded-xl items-center border ${
+                    className={`flex-1 py-2 px-1 rounded-xl items-center justify-center min-h-[34px] border ${
                       requestFilter === 'PENDENTES'
                         ? 'bg-amber-500 border-amber-600'
                         : 'bg-gray-100 dark:bg-slate-800 border-gray-200 dark:border-slate-700'
@@ -436,7 +438,7 @@ export default function CoordinatorAbsenceRequestsModal({
 
                   <TouchableOpacity
                     onPress={() => setRequestFilter('APROVADOS')}
-                    className={`flex-1 py-1.5 px-1 rounded-xl items-center border ${
+                    className={`flex-1 py-2 px-1 rounded-xl items-center justify-center min-h-[34px] border ${
                       requestFilter === 'APROVADOS'
                         ? 'bg-emerald-600 border-emerald-700'
                         : 'bg-gray-100 dark:bg-slate-800 border-gray-200 dark:border-slate-700'
@@ -454,7 +456,7 @@ export default function CoordinatorAbsenceRequestsModal({
 
                   <TouchableOpacity
                     onPress={() => setRequestFilter('REPROVADOS')}
-                    className={`flex-1 py-1.5 px-1 rounded-xl items-center border ${
+                    className={`flex-1 py-2 px-1 rounded-xl items-center justify-center min-h-[34px] border ${
                       requestFilter === 'REPROVADOS'
                         ? 'bg-rose-600 border-rose-700'
                         : 'bg-gray-100 dark:bg-slate-800 border-gray-200 dark:border-slate-700'
@@ -472,7 +474,7 @@ export default function CoordinatorAbsenceRequestsModal({
 
                   <TouchableOpacity
                     onPress={() => setRequestFilter('ATESTADOS')}
-                    className={`flex-1 py-1.5 px-1 rounded-xl items-center border ${
+                    className={`flex-1 py-2 px-1 rounded-xl items-center justify-center min-h-[34px] border ${
                       requestFilter === 'ATESTADOS'
                         ? 'bg-sky-500 border-sky-600'
                         : 'bg-gray-100 dark:bg-slate-800 border-gray-200 dark:border-slate-700'
@@ -489,7 +491,11 @@ export default function CoordinatorAbsenceRequestsModal({
                   </TouchableOpacity>
                 </View>
 
-                <ScrollView showsVerticalScrollIndicator={false} className="max-h-[460px]">
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  className="flex-1"
+                  contentContainerStyle={{ paddingBottom: 24 }}
+                >
                   {loading ? (
                     <View className="py-12 items-center justify-center">
                       <ActivityIndicator size="large" color="#0ea5e9" />
@@ -725,7 +731,11 @@ export default function CoordinatorAbsenceRequestsModal({
 
           {/* Conteúdo da Aba 2: Cancelamento Direto Institucional */}
           {activeTab === 'DIRECT' && (
-            <ScrollView showsVerticalScrollIndicator={false} className="max-h-[500px]">
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              className="flex-1"
+              contentContainerStyle={{ paddingBottom: 24 }}
+            >
               <Text className="text-xs font-bold text-gray-600 dark:text-slate-300 uppercase mb-1">
                 Escopo da Suspensão:
               </Text>

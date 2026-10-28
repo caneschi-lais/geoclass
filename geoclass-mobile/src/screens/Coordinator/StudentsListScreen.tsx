@@ -208,31 +208,60 @@ export default function StudentsListScreen({ navigation, route }: Props) {
     );
   };
 
-  const renderClassItem = ({ item }: { item: any }) => (
-    <View className="bg-white dark:bg-slate-800 p-4 rounded-xl mb-3 shadow-sm border border-gray-100 dark:border-slate-700 flex-row items-center justify-between">
-      <View className="flex-row items-center flex-1">
-        <View className="p-3 rounded-full mr-4 bg-sky-100 dark:bg-sky-900/30">
-          <Feather name="book-open" size={24} color="#0284c7" />
+  const renderClassItem = ({ item }: { item: any }) => {
+    const presence = item.attendancePercentage ?? 100;
+    const isAtRisk = presence < 75;
+
+    return (
+      <View className="bg-white dark:bg-slate-800 p-4 rounded-xl mb-3 shadow-sm border border-gray-100 dark:border-slate-700 flex-row items-center justify-between">
+        <View className="flex-row items-center flex-1">
+          <View className={`p-3 rounded-full mr-3.5 ${isAtRisk ? 'bg-red-100 dark:bg-red-950/40' : presence < 85 ? 'bg-amber-100 dark:bg-amber-950/40' : 'bg-sky-100 dark:bg-sky-900/30'}`}>
+            <Feather
+              name="book-open"
+              size={22}
+              color={isAtRisk ? '#ef4444' : presence < 85 ? '#d97706' : '#0284c7'}
+            />
+          </View>
+          <View className="flex-1 pr-2">
+            <View className="flex-row items-center gap-1.5 flex-wrap">
+              <Text className="text-md font-bold text-gray-800 dark:text-slate-100" numberOfLines={1}>
+                {item.subject}
+              </Text>
+              {isAtRisk && (
+                <View className="bg-red-100 dark:bg-red-950/40 px-2 py-0.5 rounded">
+                  <Text className="text-red-700 dark:text-red-400 font-bold text-[10px]">Baixa Presença</Text>
+                </View>
+              )}
+            </View>
+            <Text className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              Prof. {item.professor.name}
+            </Text>
+            <Text className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              {item.room_name} • Horário: {item.schedule_time}
+            </Text>
+          </View>
         </View>
-        <View className="flex-1 pr-2">
-          <Text className="text-md font-bold text-gray-800 dark:text-slate-100" numberOfLines={1}>
-            {item.subject}
-          </Text>
-          <Text className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Prof. {item.professor.name}
-          </Text>
-          <Text className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            {item.room_name} • Horário: {item.schedule_time}
-          </Text>
+
+        <View className="items-end pl-2">
+          <View className="items-end mb-1">
+            <Text className="text-[10px] text-gray-400 mb-0.5">Freq. Turma</Text>
+            <Text
+              className={`text-base font-black ${
+                isAtRisk ? 'text-red-500' : presence < 85 ? 'text-amber-500' : 'text-emerald-500'
+              }`}
+            >
+              {presence}%
+            </Text>
+          </View>
+          <View className="bg-gray-50 dark:bg-slate-900 px-2.5 py-0.5 rounded border border-gray-100 dark:border-slate-700/50">
+            <Text className="text-[10px] text-gray-500 dark:text-slate-400 font-bold uppercase">
+              {item.total_classes} Aulas
+            </Text>
+          </View>
         </View>
       </View>
-      <View className="bg-gray-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-gray-100 dark:border-slate-700/50">
-        <Text className="text-xs text-gray-500 dark:text-slate-400 font-bold uppercase">
-          {item.total_classes} Aulas
-        </Text>
-      </View>
-    </View>
-  );
+    );
+  };
 
   const renderRiskItem = ({ item }: { item: StudentRisk }) => (
     <StudentRiskCard item={item} />

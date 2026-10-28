@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Modal, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, FlatList, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Notification } from '../types';
 
 type Props = {
@@ -24,9 +25,11 @@ function formatNotificationDate(dateStr: string) {
 }
 
 export default function NotificationsModal({ visible, notifications, onClose, onMarkAsRead }: Props) {
+  const insets = useSafeAreaInsets();
   if (!visible) return null;
 
   const hasUnread = notifications.some((n) => !n.read);
+  const bottomInset = Math.max(insets.bottom, Platform.OS === 'android' ? 36 : 20) + 12;
 
   return (
     <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
@@ -37,6 +40,7 @@ export default function NotificationsModal({ visible, notifications, onClose, on
           backgroundColor: 'rgba(0, 0, 0, 0.55)',
         }}
       >
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
         <View
           style={{
             elevation: 8,
@@ -44,6 +48,7 @@ export default function NotificationsModal({ visible, notifications, onClose, on
             shadowOffset: { width: 0, height: -3 },
             shadowOpacity: 0.15,
             shadowRadius: 12,
+            paddingBottom: bottomInset,
           }}
           className="bg-white dark:bg-slate-800 rounded-t-3xl p-6 min-h-[50%] max-h-[85%]"
         >
