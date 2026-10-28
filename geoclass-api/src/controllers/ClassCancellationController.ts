@@ -223,11 +223,14 @@ export class ClassCancellationController {
 
   // 3. Coordenador aprova a falta do professor
   async approveAbsence(req: AuthRequest, res: Response) {
-    const { id } = req.params;
+    const cancellationId = Number(req.params.id);
+    if (!cancellationId || isNaN(cancellationId)) {
+      return res.status(400).json({ error: 'ID de solicitação inválido.' });
+    }
 
     try {
       const cancellation = await (prisma as any).classCancellation.findUnique({
-        where: { id },
+        where: { id: cancellationId },
         include: {
           class: {
             include: {
@@ -243,7 +246,7 @@ export class ClassCancellationController {
       }
 
       const updated = await (prisma as any).classCancellation.update({
-        where: { id },
+        where: { id: cancellationId },
         data: { status: 'APROVADO' },
       });
 
@@ -359,12 +362,15 @@ export class ClassCancellationController {
 
   // 4. Coordenador rejeita a falta
   async rejectAbsence(req: AuthRequest, res: Response) {
-    const { id } = req.params;
+    const cancellationId = Number(req.params.id);
+    if (!cancellationId || isNaN(cancellationId)) {
+      return res.status(400).json({ error: 'ID de solicitação inválido.' });
+    }
     const { justification } = req.body;
 
     try {
       const cancellation = await (prisma as any).classCancellation.findUnique({
-        where: { id },
+        where: { id: cancellationId },
         include: { class: true },
       });
 
@@ -373,7 +379,7 @@ export class ClassCancellationController {
       }
 
       const updated = await (prisma as any).classCancellation.update({
-        where: { id },
+        where: { id: cancellationId },
         data: { status: 'REJEITADO' },
       });
 
@@ -397,11 +403,14 @@ export class ClassCancellationController {
 
   // 5. Coordenador solicita envio do atestado ao professor
   async requestCertificate(req: AuthRequest, res: Response) {
-    const { id } = req.params;
+    const cancellationId = Number(req.params.id);
+    if (!cancellationId || isNaN(cancellationId)) {
+      return res.status(400).json({ error: 'ID de solicitação inválido.' });
+    }
 
     try {
       const cancellation = await (prisma as any).classCancellation.findUnique({
-        where: { id },
+        where: { id: cancellationId },
         include: { class: true },
       });
 
@@ -431,7 +440,10 @@ export class ClassCancellationController {
 
   // 6. Professor anexa/envia atestado médico
   async uploadCertificate(req: AuthRequest, res: Response) {
-    const { id } = req.params;
+    const cancellationId = Number(req.params.id);
+    if (!cancellationId || isNaN(cancellationId)) {
+      return res.status(400).json({ error: 'ID de solicitação inválido.' });
+    }
     const { certificate_base64, certificate_filename } = req.body;
 
     if (!certificate_base64) {
@@ -440,7 +452,7 @@ export class ClassCancellationController {
 
     try {
       const cancellation = await (prisma as any).classCancellation.findUnique({
-        where: { id },
+        where: { id: cancellationId },
         include: { class: true, professor: { select: { name: true } } },
       });
 
@@ -454,7 +466,7 @@ export class ClassCancellationController {
       }
 
       const updated = await (prisma as any).classCancellation.update({
-        where: { id },
+        where: { id: cancellationId },
         data: { certificate_url: certificateUrl },
       });
 
@@ -812,7 +824,10 @@ export class ClassCancellationController {
 
   // 8. Agendar ou Alterar Data de Reposição
   async scheduleReplacement(req: AuthRequest, res: Response) {
-    const { id } = req.params;
+    const cancellationId = Number(req.params.id);
+    if (!cancellationId || isNaN(cancellationId)) {
+      return res.status(400).json({ error: 'ID de solicitação inválido.' });
+    }
     const { replacement_date } = req.body;
 
     if (!replacement_date) {
@@ -821,7 +836,7 @@ export class ClassCancellationController {
 
     try {
       const cancellation = await (prisma as any).classCancellation.findUnique({
-        where: { id },
+        where: { id: cancellationId },
         include: {
           class: {
             include: { enrollments: true, professor: true },
@@ -835,7 +850,7 @@ export class ClassCancellationController {
 
       const repDateObj = parseDateOnly(replacement_date);
       const updated = await (prisma as any).classCancellation.update({
-        where: { id },
+        where: { id: cancellationId },
         data: { replacement_date: repDateObj },
       });
 
@@ -967,7 +982,10 @@ export class ClassCancellationController {
 
   // 11. Finalizar Reposição com Checkboxes (Presença Parcial -> Presente ou Falta)
   async submitReplacementAttendance(req: AuthRequest, res: Response) {
-    const { id } = req.params;
+    const cancellationId = Number(req.params.id);
+    if (!cancellationId || isNaN(cancellationId)) {
+      return res.status(400).json({ error: 'ID de solicitação inválido.' });
+    }
     const { attended_student_ids } = req.body; // Array com IDs dos alunos que estiveram presentes
 
     if (!Array.isArray(attended_student_ids)) {
@@ -976,7 +994,7 @@ export class ClassCancellationController {
 
     try {
       const cancellation = await (prisma as any).classCancellation.findUnique({
-        where: { id },
+        where: { id: cancellationId },
         include: {
           class: {
             include: { enrollments: true },
@@ -1014,7 +1032,7 @@ export class ClassCancellationController {
 
       // Marcar reposição como concluída
       const updated = await (prisma as any).classCancellation.update({
-        where: { id },
+        where: { id: cancellationId },
         data: { replacement_completed: true },
       });
 
