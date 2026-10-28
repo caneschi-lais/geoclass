@@ -24,15 +24,15 @@ Para testar o aplicativo **GeoClass** diretamente em seu dispositivo móvel sem 
 
 1. **Baixar o arquivo APK:**
    - Acesse o link oficial de build na nuvem do Expo para baixar o arquivo `.apk`:
-   - 🔗 [Download APK Android (Build Expo)](https://expo.dev/accounts/caneschi-lais/projects/mobile/builds/37cdc8ac-0f49-4a2a-9188-004b5cbf64bc)
+   - 🔗 [Download APK Android (Build Expo)](https://expo.dev/accounts/caneschi-lais/projects/mobile/builds/4efffd4d-3d90-4b8b-9e76-e755672ee66b)
 2. **Instalar no Dispositivo:**
    - Abra o arquivo baixado no seu celular Android.
-   - Caso a mensagem de segurança apareça, autorize a **instalação de fontes desconhecidas** no navegador ou gerenciador de arquivos.
+   - Caso a mensagem de segurança apareça, autorize a **instalação de fontes desconhecidas** no navegador ou gerenciador de arquivos (em *Mais detalhes* ➔ *Instalar assim mesmo*).
    - Conclua a instalação e abra o aplicativo **GeoClass**.
 
 ---
 
-### 🍎 iOS / iPhone (Acesso via Expo Go & Cloud Update)
+### 🍎 iOS / iPhone (Acesso via Expo Go)
 
 No iOS, o acesso aos testes é disponibilizado instantaneamente via **Expo Go** e **EAS Update**:
 
@@ -40,9 +40,9 @@ No iOS, o acesso aos testes é disponibilizado instantaneamente via **Expo Go** 
    - Abra a **App Store** no seu iPhone e baixe o aplicativo gratuito **Expo Go**.
 2. **Abrir o Projeto no Celular:**
    - **Pelo Link Direto com QR Code:** Acesse a página de preview oficial:
-     🔗 [Acessar e Escanear QR Code GeoClass no Expo Go](https://expo.dev/preview/update/expo-go?message=Nova+atualizacao+GeoClass&updateRuntimeVersion=1.0.0&createdAt=2026-10-21T15%3A11%3A19.467Z&slug=exp&projectId=54378c0a-edbf-4031-b27c-707d9801df69&group=5965b0b7-3306-4801-99ed-3e8fa0916a56)
+     🔗 [Acessar e Escanear QR Code GeoClass no Expo Go](https://expo.dev/preview/update/expo-go?message=Ajustes+de+ausencias%2C+relatorios+e+frequencia&updateRuntimeVersion=1.0.0&createdAt=2026-10-28T17%3A17%3A49.338Z&slug=exp&projectId=54378c0a-edbf-4031-b27c-707d9801df69&group=6029f84f-066d-43d6-aa06-325eaa3e974e)
      *(Ao abrir a página acima, o QR Code já é exibido imediatamente para você escanear com a câmera padrão do iPhone ou abrir diretamente no Safari)*.
-   - **Link Direto do Expo Go:** `exp://u.expo.dev/54378c0a-edbf-4031-b27c-707d9801df69/group/f23f3393-9d02-4b2a-b5b9-2d1fb0cfda37`
+   - **Link Direto do Expo Go:** `exp://u.expo.dev/54378c0a-edbf-4031-b27c-707d9801df69/group/6029f84f-066d-43d6-aa06-325eaa3e974e`
 
 ---
 
