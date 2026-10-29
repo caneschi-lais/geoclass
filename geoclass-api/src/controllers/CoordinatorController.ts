@@ -385,7 +385,7 @@ export class CoordinatorController {
             room_id: room.id,
             course_id: courseRecord.id,
             semester_id: semRecord.id,
-            radius_meters: 50,
+            radius_meters: 15,
             total_classes: 40,
             active: true
           },
@@ -934,7 +934,7 @@ export class CoordinatorController {
           room_id: targetRoom.id,
           course_id: targetCourse.id,
           semester_id: targetSemester.id,
-          radius_meters: radius_meters ? parseInt(String(radius_meters), 10) : 50,
+          radius_meters: radius_meters ? parseInt(String(radius_meters), 10) : 15,
           total_classes: total_classes ? parseInt(String(total_classes), 10) : 40,
           professor_id,
           active: true

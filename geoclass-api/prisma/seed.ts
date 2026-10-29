@@ -136,7 +136,7 @@ async function main() {
   // 3. Disciplinas / Turmas (Classes) - Semestre 2026.2 vinculadas ao professor de teste
   // Cálculo de aulas com base no Calendário Letivo Oficial 2026.2 (Fatec Indaiatuba):
   const semester = '2026.2';
-  const defaultRadius = 40;
+  const defaultRadius = 15;
 
   const classesData = [
     {

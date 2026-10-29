@@ -97,20 +97,20 @@ Registra as datas em que não ocorrem aulas devido a feriados, emendas, recessos
 ### 7. Tabela: `Class` (Disciplinas / Turmas)
 Armazena a estrutura de cada disciplina ofertada no campus: professor responsável, sala padrão, curso de origem, horário, dias da semana e raio de geofencing.
 
-| Atributo | Tipo Prisma / PostgreSQL | Nulo? | Chave | Descrição / Regra de Negócio |
-| :--- | :--- | :--- | :--- | :--- |
-| `id` | `Int` (Serial / Integer) | Não | **PK** | Identificador único numérico da turma/disciplina. |
-| `subject` | `String` (Text / Varchar) | Não | - | Nome da disciplina (ex: "Laboratório de Engenharia de Software I"). |
-| `schedule_time` | `String` (Text / Varchar) | Não | - | Horários dos slots de início de aula (ex: "19:00, 19:50" ou "19:00, 19:50, 20:50, 21:40"). |
-| `week_days` | `String` (Text / Varchar) | Sim | - | Dias da semana em que as aulas ocorrem (ex: "segunda", "terca,quarta", "quinta"). |
-| `radius_meters` | `Int` | Não | - | Raio de tolerância circular de Geofencing em metros para a sala de aula (padrão: 40m). |
-| `active` | `Boolean` | Não | - | Flag indicando se a turma está ativa (`true`) ou arquivada (`false`). Default: `true`. |
-| `total_classes` | `Int` | Não | - | Quantidade total de aulas previstas no semestre letivo (default: 40). |
-| `room_id` | `Int` | Não | **FK** | Referência à sala física padrão (`Room.id`), de onde derivam centróide e nome. |
-| `course_id` | `Int` | Sim | **FK** | Referência ao curso da disciplina (`Course.id`). Permite a segregação por coordenador. |
-| `semester_id` | `Int` | Não | **FK** | Referência ao período letivo oficial vigente (`AcademicSemester.id`). |
-| `professor_id` | `Int` | Não | **FK** | Referência ao professor responsável pela matéria (`User.id`). |
-| `created_at` | `DateTime` (Timestamp) | Não | - | Timestamp de cadastro da disciplina (`now()`). |
+| Atributo | Tipo Prisma / PostgreSQL | Nulo? | Chave | Descrição / Regra de Negócio |     |
+| :--- | :--- | :--- | :--- | :--- | --- |
+| `id` | `Int` (Serial / Integer) | Não | **PK** | Identificador único numérico da turma/disciplina. |     |
+| `subject` | `String` (Text / Varchar) | Não | - | Nome da disciplina (ex: "Laboratório de Engenharia de Software I"). |     |
+| `schedule_time` | `String` (Text / Varchar) | Não | - | Horários dos slots de início de aula (ex: "19:00, 19:50" ou "19:00, 19:50, 20:50, 21:40"). |     |
+| `week_days` | `String` (Text / Varchar) | Sim | - | Dias da semana em que as aulas ocorrem (ex: "segunda", "terca,quarta", "quinta"). |     |
+| `radius_meters` | `Int` | Não | - | Raio de tolerância circular de Geofencing em metros para a sala de aula (padrão: 15m). |     |
+| `active` | `Boolean` | Não | - | Flag indicando se a turma está ativa (`true`) ou arquivada (`false`). Default: `true`. |     |
+| `total_classes` | `Int` | Não | - | Quantidade total de aulas previstas no semestre letivo (default: 40). |     |
+| `room_id` | `Int` | Não | **FK** | Referência à sala física padrão (`Room.id`), de onde derivam centróide e nome. |     |
+| `course_id` | `Int` | Sim | **FK** | Referência ao curso da disciplina (`Course.id`). Permite a segregação por coordenador. |     |
+| `semester_id` | `Int` | Não | **FK** | Referência ao período letivo oficial vigente (`AcademicSemester.id`). |     |
+| `professor_id` | `Int` | Não | **FK** | Referência ao professor responsável pela matéria (`User.id`). |     |
+| `created_at` | `DateTime` (Timestamp) | Não | - | Timestamp de cadastro da disciplina (`now()`). |     |
 
 ---
 

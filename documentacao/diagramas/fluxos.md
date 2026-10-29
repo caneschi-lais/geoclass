@@ -498,7 +498,7 @@ sequenceDiagram
     else Nome Livre
         API->>DB: Insere registro na tabela Room
         opt assignClass == true
-            API->>DB: Insere registro na tabela Class (com raio 50m e total_classes 40)
+            API->>DB: Insere registro na tabela Class (com raio 15m e total_classes 40)
         end
         DB-->>API: Registros criados com sucesso
         API-->>Web: Status 201: "Sala cadastrada com sucesso!"

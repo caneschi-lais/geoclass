@@ -153,7 +153,7 @@ export function useStudentHome() {
       if (isNetworkError) {
         // Fallback: Modo Offline com validação de Geofencing local e assinatura criptográfica
         const distance = getDistanceFromLatLonInMeters(lat, lon, aula.latitude, aula.longitude);
-        const radiusLimit = aula.radiusMeters || 50;
+        const radiusLimit = aula.radiusMeters || 15;
         const localAccuracy = accuracy || 0;
 
         if (distance - localAccuracy > radiusLimit) {
