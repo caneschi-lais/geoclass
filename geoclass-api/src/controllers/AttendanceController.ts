@@ -154,7 +154,6 @@ export class AttendanceController {
                   check_in_time: slotEnd,
                   status: 'FALTA',
                   manual_attendance: false,
-                  is_remote: false,
                 },
               });
 
@@ -220,7 +219,6 @@ export class AttendanceController {
                 check_in_time: prevEndTime,
                 status: 'FALTA',
                 manual_attendance: false,
-                is_remote: false,
               },
             });
 
@@ -355,7 +353,6 @@ export class AttendanceController {
             student_latitude: lat,
             student_longitude: lon,
             manual_attendance: false,
-            is_remote: false,
           }
         });
       } else {

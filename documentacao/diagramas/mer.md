@@ -95,7 +95,6 @@ erDiagram
         Status status
         float student_latitude
         float student_longitude
-        boolean is_remote
         boolean manual_attendance
         datetime created_at
     }

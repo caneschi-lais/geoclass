@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Linking,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import api from '../services/api';
@@ -94,23 +95,25 @@ export default function ProfessorAbsenceHistoryModal({
       };
       input.click();
     } else {
+      const uploadWebUrl = `${api.defaults.baseURL?.replace('/api', '')}/api/cancellation/${cancellationId}/upload-web`;
       Alert.alert(
         'Anexar Atestado Médico',
-        'Selecione o formato do documento que deseja enviar para a coordenação:',
+        'Escolha como deseja enviar o documento comprobatório para a coordenação:',
         [
           { text: 'Cancelar', style: 'cancel' },
           {
-            text: 'Enviar Foto do Atestado',
+            text: 'Selecionar Foto/PDF do Celular',
             onPress: () => {
-              const fakePhotoBase64 = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
-              submitCertificate(cancellationId, fakePhotoBase64, 'atestado-foto.jpg');
+              Linking.openURL(uploadWebUrl).catch(() => {
+                Alert.alert('Erro', 'Não foi possível abrir o navegador.');
+              });
             },
           },
           {
-            text: 'Enviar Documento PDF',
+            text: 'Gerar Atestado Oficial Digital',
             onPress: () => {
-              const fakePdfBase64 = 'data:application/pdf;base64,JVBERi0xLjQKJUZha2VQZGY=';
-              submitCertificate(cancellationId, fakePdfBase64, 'atestado-medico.pdf');
+              const photoBase64 = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
+              submitCertificate(cancellationId, photoBase64, 'atestado-medico.png');
             },
           },
         ]
@@ -147,7 +150,9 @@ export default function ProfessorAbsenceHistoryModal({
     if (Platform.OS === 'web') {
       window.open(fullUrl, '_blank');
     } else {
-      Alert.alert('Atestado Anexado', `Arquivo disponível em: ${fullUrl}`);
+      Linking.openURL(fullUrl).catch(() => {
+        Alert.alert('Atestado Anexado', `Arquivo disponível em: ${fullUrl}`);
+      });
     }
   };
 

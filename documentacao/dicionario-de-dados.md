@@ -143,7 +143,6 @@ Armazena todos os registros diários de presença, atraso, falta e presenças pa
 | `status` | `Enum (Status)` | Não | - | Status da aula: `PRESENTE`, `ATRASADO`, `FALTA` ou `PRESENCA_PARCIAL`. Default: `PRESENTE`. |
 | `student_latitude` | `Float` (Double Precision) | Sim | - | Latitude capturada do sensor GPS do aluno no momento da batida. Anonimizada após 6 meses pela LGPD. |
 | `student_longitude`| `Float` (Double Precision) | Sim | - | Longitude capturada do sensor GPS do aluno no momento da batida. Anonimizada após 6 meses pela LGPD. |
-| `is_remote` | `Boolean` | Não | - | Indica se a presença foi computada para uma aula em regime EAD/Remoto. Default: `false`. |
 | `manual_attendance`| `Boolean` | Não | - | Indica se a frequência foi lançada ou modificada manualmente pelo professor. Default: `false`. |
 | `created_at` | `DateTime` (Timestamp) | Não | - | Timestamp de registro no banco de dados (`now()`). |
 

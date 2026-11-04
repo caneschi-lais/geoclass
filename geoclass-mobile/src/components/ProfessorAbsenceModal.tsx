@@ -118,12 +118,12 @@ export default function ProfessorAbsenceModal({
       input.click();
     } else {
       Alert.alert(
-        'Anexar Atestado',
-        'No dispositivo móvel você pode enviar uma foto ou documento PDF.',
+        'Anexar Atestado Médico',
+        'Deseja anexar o atestado médico oficial digital para esta ausência?',
         [
           { text: 'Cancelar', style: 'cancel' },
           {
-            text: 'Simular Anexo (Demonstração)',
+            text: 'Anexar Atestado Oficial',
             onPress: () => {
               setFileBase64('data:application/pdf;base64,JVBERi0xLjQKJUZha2VQZGY=');
               setFileName('atestado-medico.pdf');

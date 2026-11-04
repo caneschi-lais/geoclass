@@ -21,6 +21,8 @@ const cancellationController = new ClassCancellationController();
 
 // Rotas Públicas
 router.post('/login', authController.login);
+router.get('/cancellation/:id/upload-web', cancellationController.renderWebUploadPage);
+router.post('/cancellation/:id/upload-web', cancellationController.handleWebUpload);
 
 // Rotas Privadas (Protegidas por JWT)
 router.use(authMiddleware);

@@ -184,7 +184,6 @@ export async function processExpiredAttendanceSlots(currentDate: Date = new Date
                     check_in_time: slotEndTime,
                     status: 'FALTA',
                     manual_attendance: false,
-                    is_remote: false,
                   },
                 });
 

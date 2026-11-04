@@ -62,7 +62,6 @@ sequenceDiagram
     participant Hardware as Sensores (GPS/Device ID)
     participant API as Backend API (Render.com)
     participant DB as Banco Supabase (PostgreSQL)
-    participant Push as Expo Push Service
 
     Aluno->>App: Clica no botão "Confirmar Presença" no Card da Aula
     App->>Hardware: Solicita Permissão e Coordenadas GPS (Alta Precisão)
@@ -101,7 +100,6 @@ sequenceDiagram
             API->>DB: Insere registro na tabela Attendance (status=PRESENTE)
         end
         API->>DB: Insere notificação em Notification ("Presença Confirmada")
-        API-)Push: Dispara Push Notification via Expo Push API
         DB-->>API: Registro confirmado no Supabase (PostgreSQL)
         API-->>App: Status 201: Presença confirmada!
         App-->>Aluno: Exibe feedback visual de sucesso (Card Atualizado)
@@ -295,7 +293,7 @@ sequenceDiagram
 
     rect rgb(241, 245, 249)
         note right of API: Processamento em Lote
-        API->>DB: Executa Upsert na tabela Attendance (is_remote=true, manual_attendance=true)
+        API->>DB: Executa Upsert na tabela Attendance (manual_attendance=true)
         API->>DB: Dispara notificações individuais para os alunos confirmados
     end
 
@@ -636,7 +634,7 @@ sequenceDiagram
             Job->>DB: Conta presentes e faltas daquele slot
             DB-->>Job: Retorna total presentes e ausentes
             Job->>DB: INSERT INTO Notification (user_id=professor, title="Fechamento de Chamada")
-            Job-)Push: sendPushNotification(professorId, "A tolerância de 15 min encerrou. Resultado: X presentes, Y faltas")
+            Note over Job,DB: Fechamento de chamada notifica o professor no aplicativo (in-app, sem push)
         end
     end
     Job->>Job: Imprime Log: "[NOTIFICATION JOB] Processamento concluído."
@@ -821,7 +819,7 @@ sequenceDiagram
 ---
 
 ### 4.4 Disparo Automático de Alerta por Risco de Reprovação (<75% Presença)
-Varre a frequência dos estudantes a cada check-in e envia notificação push automática ao atingir a faixa crítica de faltas.
+Varre a frequência dos estudantes a cada check-in e grava notificação no aplicativo (in-app, sem disparo push) ao atingir a faixa crítica de faltas.
 
 ```mermaid
 sequenceDiagram
@@ -837,7 +835,7 @@ sequenceDiagram
     alt Presença abaixo de 75% (Faixa de Risco)
         API->>DB: INSERT INTO Notification (user_id, title, body) VALUES ("Atenção: Limite Crítico de Faltas (70% de presença em ADS)")
         DB-->>API: Notificação gravada
-        note right of DB: Notificação enviada instantaneamente ao celular do aluno
+        note right of DB: Notificação gravada e exibida na central de mensagens do aplicativo (in-app, sem push)
     end
 ```
 

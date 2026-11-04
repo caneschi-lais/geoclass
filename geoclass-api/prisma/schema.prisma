@@ -143,7 +143,6 @@ model Attendance {
   student_latitude  Float?
   student_longitude Float?
 
-  is_remote         Boolean @default(false)
   manual_attendance Boolean @default(false)
 
   created_at DateTime @default(now())
