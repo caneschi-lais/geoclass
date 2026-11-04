@@ -141,9 +141,37 @@ function normalizeAscii(str: string): string {
 export function isSimulatedBase64(base64Data: string): boolean {
   if (!base64Data) return true;
   const clean = base64Data.replace(/^data:.*?;base64,/, '').trim();
-  if (clean.length < 250) return true;
-  if (clean.includes('JVBERi0xLjQKJUZha2VQZGY')) return true; // FakePdf
-  if (clean.startsWith('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////')) return true;
+
+  // Tokens explícitos de submissão automática / demonstração
+  if (
+    clean === 'GENERATE_DIGITAL' ||
+    clean === 'GENERATE_OFFICIAL' ||
+    clean === 'DEMO' ||
+    clean.toUpperCase().includes('DEMONSTRACAO')
+  ) {
+    return true;
+  }
+
+  // Placeholder PDF de demonstração antigo do app
+  if (clean.includes('JVBERi0xLjQKJUZha2VQZGY')) {
+    return true;
+  }
+
+  // Placeholder JPEG monocromático de demonstração antigo do app
+  if (
+    clean.startsWith(
+      '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////'
+    )
+  ) {
+    return true;
+  }
+
+  // Strings muito curtas que não representam um arquivo PDF ou imagem real
+  if (clean.length < 100) {
+    return true;
+  }
+
+  // Arquivo probatório real e autêntico selecionado pelo professor do aparelho (PDF ou Foto)
   return false;
 }
 

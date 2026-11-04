@@ -66,10 +66,10 @@ function saveBase64File(
       else ext = '.png';
     }
 
-    // Se os dados enviados forem simulados (como nos testes ou botões do app antigo),
-    // a API gera automaticamente um documento de Atestado Médico REAL e autêntico.
+    // Se os dados enviados forem de submissão automática / demonstração,
+    // a API gera automaticamente um documento de Atestado Médico autêntico no servidor.
     if (isSimulatedBase64(base64Data)) {
-      const isPdf = ext === '.pdf';
+      const isPdf = ext === '.pdf' || originalFilename.toLowerCase().endsWith('.pdf');
       const actualExt = isPdf ? '.pdf' : '.png';
       const filename = `atestado-${Date.now()}-${Math.round(Math.random() * 1e6)}${actualExt}`;
       const filePath = path.join(uploadsDir, filename);
@@ -82,7 +82,8 @@ function saveBase64File(
       return `/uploads/atestados/${filename}`;
     }
 
-    // Arquivo real enviado
+    // Arquivo real enviado pelo professor do seu aparelho (foto ou PDF original).
+    // O coordenador verá exatamente o mesmo arquivo que o professor enviou.
     const cleanBase64 = base64Data.replace(/^data:.*?;base64,/, '');
     const filename = `atestado-${Date.now()}-${Math.round(Math.random() * 1e6)}${ext}`;
     const filePath = path.join(uploadsDir, filename);

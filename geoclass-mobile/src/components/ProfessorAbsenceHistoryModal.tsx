@@ -11,6 +11,8 @@ import {
   Linking,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { File } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import api from '../services/api';
 import ScheduleReplacementModal from './ScheduleReplacementModal';
 
@@ -102,18 +104,39 @@ export default function ProfessorAbsenceHistoryModal({
         [
           { text: 'Cancelar', style: 'cancel' },
           {
-            text: 'Selecionar Foto/PDF do Celular',
-            onPress: () => {
+            text: 'Selecionar do Aparelho (Foto/PDF)',
+            onPress: async () => {
+              try {
+                const result = await File.pickFileAsync({
+                  multipleFiles: false,
+                  mimeTypes: ['image/*', 'application/pdf'],
+                });
+                if (!result.canceled && result.result) {
+                  const picked = result.result;
+                  const content = await FileSystem.readAsStringAsync(picked.uri, {
+                    encoding: FileSystem.EncodingType.Base64,
+                  });
+                  const isPdf = (picked.name || '').toLowerCase().endsWith('.pdf');
+                  const mime = isPdf ? 'application/pdf' : 'image/jpeg';
+                  await submitCertificate(
+                    cancellationId,
+                    `data:${mime};base64,${content}`,
+                    picked.name || (isPdf ? 'atestado.pdf' : 'atestado.jpg')
+                  );
+                  return;
+                }
+              } catch (e) {
+                console.warn('Fallback para uploader web:', e);
+              }
               Linking.openURL(uploadWebUrl).catch(() => {
                 Alert.alert('Erro', 'Não foi possível abrir o navegador.');
               });
             },
           },
           {
-            text: 'Gerar Atestado Oficial Digital',
+            text: 'Gerar Digitalmente (Demonstração)',
             onPress: () => {
-              const photoBase64 = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
-              submitCertificate(cancellationId, photoBase64, 'atestado-medico.png');
+              submitCertificate(cancellationId, 'GENERATE_DIGITAL', 'atestado-digital.pdf');
             },
           },
         ]

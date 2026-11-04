@@ -11,6 +11,8 @@ import {
   Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { File } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import api from '../services/api';
 import CalendarModal from './CalendarModal';
 
@@ -99,7 +101,7 @@ export default function ProfessorAbsenceModal({
     setFileName(null);
   };
 
-  const handlePickFile = () => {
+  const handlePickFromDevice = async () => {
     if (Platform.OS === 'web') {
       const input = document.createElement('input');
       input.type = 'file';
@@ -117,17 +119,60 @@ export default function ProfessorAbsenceModal({
       };
       input.click();
     } else {
+      try {
+        const result = await File.pickFileAsync({
+          multipleFiles: false,
+          mimeTypes: ['image/*', 'application/pdf'],
+        });
+
+        if (!result.canceled && result.result) {
+          const picked = result.result;
+          const content = await FileSystem.readAsStringAsync(picked.uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          const isPdf = (picked.name || '').toLowerCase().endsWith('.pdf');
+          const mime = isPdf ? 'application/pdf' : 'image/jpeg';
+          setFileBase64(`data:${mime};base64,${content}`);
+          setFileName(picked.name || (isPdf ? 'atestado.pdf' : 'atestado.jpg'));
+        }
+      } catch (err: any) {
+        console.warn('Erro ao abrir seletor nativo:', err);
+        Alert.alert(
+          'Seletor do Aparelho',
+          'Não foi possível acessar o seletor nativo de arquivos neste dispositivo. Você pode utilizar a opção "Gerar Digitalmente (Demonstração)".'
+        );
+      }
+    }
+  };
+
+  const handleGenerateDigital = () => {
+    setFileBase64('GENERATE_DIGITAL');
+    setFileName('atestado-digital.pdf');
+  };
+
+  const handlePickFile = () => {
+    if (Platform.OS === 'web') {
+      const choice = window.confirm(
+        'Deseja selecionar um arquivo (Foto ou PDF) do seu aparelho/computador?\n\n[OK] Selecionar do Aparelho\n[Cancelar] Gerar Digitalmente (Demonstração)'
+      );
+      if (choice) {
+        handlePickFromDevice();
+      } else {
+        handleGenerateDigital();
+      }
+    } else {
       Alert.alert(
-        'Anexar Atestado Médico',
-        'Deseja anexar o atestado médico oficial digital para esta ausência?',
+        'Documento Médico Probatório',
+        'Selecione um arquivo probatório do seu próprio aparelho ou gere digitalmente:',
         [
           { text: 'Cancelar', style: 'cancel' },
           {
-            text: 'Anexar Atestado Oficial',
-            onPress: () => {
-              setFileBase64('data:application/pdf;base64,JVBERi0xLjQKJUZha2VQZGY=');
-              setFileName('atestado-medico.pdf');
-            },
+            text: 'Selecionar do Aparelho (Foto/PDF)',
+            onPress: handlePickFromDevice,
+          },
+          {
+            text: 'Gerar Digitalmente (Demonstração)',
+            onPress: handleGenerateDigital,
           },
         ]
       );
@@ -306,49 +351,61 @@ export default function ProfessorAbsenceModal({
               className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-3 text-sm text-gray-800 dark:text-slate-100 mb-4"
             />
 
-            {/* Atestado Médico (quando saúde) */}
-            {selectedReason === 'SAUDE' && (
-              <View className="mb-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 p-3 rounded-xl">
-                <Text className="text-xs font-bold text-amber-800 dark:text-amber-400 mb-2">
-                  Atestado Médico (PDF ou Imagem):
+            {/* Anexo Probatório / Atestado Médico (Opcional) */}
+            <View className="mb-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 p-3 rounded-xl">
+              <View className="flex-row items-center justify-between mb-2">
+                <Text className="text-xs font-bold text-amber-800 dark:text-amber-400">
+                  {selectedReason === 'SAUDE'
+                    ? 'Atestado Médico (Opcional):'
+                    : 'Documento Probatório (Opcional):'}
                 </Text>
-                {fileName ? (
-                  <View className="flex-row items-center justify-between bg-white dark:bg-slate-800 p-2.5 rounded-lg border border-amber-300 dark:border-amber-700">
-                    <View className="flex-row items-center flex-1 mr-2">
-                      <Feather name="file-text" size={16} color="#0ea5e9" style={{ marginRight: 8 }} />
+                <Text className="text-[10px] text-amber-600 dark:text-amber-400">
+                  PDF ou Fotografia
+                </Text>
+              </View>
+              {fileName ? (
+                <View className="flex-row items-center justify-between bg-white dark:bg-slate-800 p-2.5 rounded-lg border border-amber-300 dark:border-amber-700">
+                  <View className="flex-row items-center flex-1 mr-2">
+                    <Feather name="file-text" size={16} color="#0ea5e9" style={{ marginRight: 8 }} />
+                    <View className="flex-1">
                       <Text
-                        className="text-xs font-semibold text-gray-800 dark:text-slate-200 ml-1.5"
+                        className="text-xs font-semibold text-gray-800 dark:text-slate-200"
                         numberOfLines={1}
                       >
                         {fileName}
                       </Text>
+                      <Text className="text-[10px] text-sky-600 dark:text-sky-400">
+                        {fileBase64 === 'GENERATE_DIGITAL'
+                          ? 'Gerado digitalmente pelo servidor'
+                          : 'Arquivo anexado do aparelho'}
+                      </Text>
                     </View>
-                    <TouchableOpacity
-                      onPress={() => {
-                        setFileBase64(null);
-                        setFileName(null);
-                      }}
-                      className="p-1"
-                    >
-                      <Feather name="trash-2" size={16} color="#ef4444" />
-                    </TouchableOpacity>
                   </View>
-                ) : (
                   <TouchableOpacity
-                    onPress={handlePickFile}
-                    className="flex-row items-center justify-center bg-white dark:bg-slate-800 border border-dashed border-amber-400 dark:border-amber-600 p-3 rounded-lg"
+                    onPress={() => {
+                      setFileBase64(null);
+                      setFileName(null);
+                    }}
+                    className="p-1"
                   >
-                    <Feather name="upload-cloud" size={18} color="#d97706" />
-                    <Text className="text-xs font-bold text-amber-700 dark:text-amber-400 ml-2">
-                      Anexar Atestado (PDF ou Foto)
-                    </Text>
+                    <Feather name="trash-2" size={16} color="#ef4444" />
                   </TouchableOpacity>
-                )}
-                <Text className="text-[10px] text-amber-600 dark:text-amber-500 mt-1.5">
-                  Caso não possua o atestado no momento, você poderá enviá-lo posteriormente pela solicitação da coordenação.
-                </Text>
-              </View>
-            )}
+                </View>
+              ) : (
+                <TouchableOpacity
+                  onPress={handlePickFile}
+                  className="flex-row items-center justify-center bg-white dark:bg-slate-800 border border-dashed border-amber-400 dark:border-amber-600 p-3 rounded-lg"
+                >
+                  <Feather name="upload-cloud" size={18} color="#d97706" />
+                  <Text className="text-xs font-bold text-amber-700 dark:text-amber-400 ml-2">
+                    Anexar Documento (Aparelho ou Digital)
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <Text className="text-[10px] text-amber-600 dark:text-amber-500 mt-1.5">
+                Você pode selecionar uma foto ou PDF do seu aparelho, ou gerar digitalmente com validação de CRM e CID-10.
+              </Text>
+            </View>
 
             {/* Data de Reposição (Opcional agora) */}
             <Text className="text-xs font-bold text-gray-600 dark:text-slate-300 uppercase mb-1">
