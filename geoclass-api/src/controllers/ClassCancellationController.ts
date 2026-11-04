@@ -419,12 +419,20 @@ export class ClassCancellationController {
 
       if (cancellation.professor_id) {
         const formattedDate = formatDateDisplay(cancellation.date);
+        const notifTitle = 'Ausência Recusada pela Coordenação';
+        const notifBody = `Sua solicitação de ausência para ${cancellation.class?.subject} em ${formattedDate} foi recusada.${justification ? ` Motivo da coordenação: ${justification}` : ''}`;
         await prisma.notification.create({
           data: {
             user_id: cancellation.professor_id,
-            title: 'Ausência Recusada pela Coordenação',
-            body: `Sua solicitação de ausência para ${cancellation.class?.subject} em ${formattedDate} foi recusada.${justification ? ` Motivo da coordenação: ${justification}` : ''}`,
+            title: notifTitle,
+            body: notifBody,
           },
+        });
+
+        sendPushNotification(cancellation.professor_id, {
+          title: notifTitle,
+          body: notifBody,
+          data: { type: 'AUSENCIA_RECUSADA', cancellationId: cancellation.id },
         });
       }
 
@@ -457,12 +465,20 @@ export class ClassCancellationController {
       }
 
       const formattedDate = formatDateDisplay(cancellation.date);
+      const notifTitle = 'Solicitação de Atestado Médico';
+      const notifBody = `A coordenação solicita o envio do atestado médico para a aula de ${cancellation.class?.subject || ''} do dia ${formattedDate}. Por favor, anexe o documento pelo aplicativo.`;
       await prisma.notification.create({
         data: {
           user_id: cancellation.professor_id,
-          title: 'Solicitação de Atestado Médico',
-          body: `A coordenação solicita o envio do atestado médico para a aula de ${cancellation.class?.subject || ''} do dia ${formattedDate}. Por favor, anexe o documento pelo aplicativo.`,
+          title: notifTitle,
+          body: notifBody,
         },
+      });
+
+      sendPushNotification(cancellation.professor_id, {
+        title: notifTitle,
+        body: notifBody,
+        data: { type: 'SOLICITACAO_ATESTADO', cancellationId: cancellation.id },
       });
 
       return res.json({ message: 'Notificação enviada ao professor solicitando o atestado.' });

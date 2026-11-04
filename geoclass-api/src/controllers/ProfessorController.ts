@@ -465,12 +465,20 @@ export class ProfessorController {
           });
 
           if (!alreadyNotified) {
+            const notifTitle = `Presença Confirmada: ${classInfo.subject}`;
+            const notifBody = `Sua presença na aula de ${classInfo.subject} em ${formattedDate} foi registrada pelo professor.`;
             await prisma.notification.create({
               data: {
                 user_id: studentId,
-                title: `Presença Confirmada: ${classInfo.subject}`,
-                body: `Sua presença na aula de ${classInfo.subject} em ${formattedDate} foi registrada pelo professor.`
+                title: notifTitle,
+                body: notifBody,
               }
+            });
+
+            sendPushNotification(studentId, {
+              title: notifTitle,
+              body: notifBody,
+              data: { type: 'PRESENCA_MANUAL', classId },
             });
           }
         }

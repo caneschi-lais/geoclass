@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middlewares/authMiddleware';
+import { sendPushNotification } from '../services/pushNotificationService';
 import { isAcademicInstructionalDay } from '../services/CalendarService';
 import { getScheduleSlotsForDay } from '../utils/scheduleHelper';
 import {
@@ -400,12 +401,19 @@ export class AttendanceController {
         });
 
         if (!alreadyAlertedToday) {
+          const riskBody = `Atenção: Você atingiu o limite crítico de faltas em ${classData.subject} (${attendancePercentage}% de presença). Mantenha sua frequência acima de 75% para não reprovar por falta.`;
           await prisma.notification.create({
             data: {
               user_id: studentId,
               title: riskTitle,
-              body: `Atenção: Você atingiu o limite crítico de faltas em ${classData.subject} (${attendancePercentage}% de presença). Mantenha sua frequência acima de 75% para não reprovar por falta.`
+              body: riskBody,
             }
+          });
+
+          sendPushNotification(studentId, {
+            title: riskTitle,
+            body: riskBody,
+            data: { type: 'RISCO_FALTAS', classId },
           });
         }
       }

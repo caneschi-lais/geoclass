@@ -27,6 +27,24 @@ function getSlotEndTimeStr(slotStr: string, nextSlotStr?: string | null): string
   return `${String(rh).padStart(2, '0')}:${String(rm).padStart(2, '0')}`;
 }
 
+// Auxiliar para obter horário de alerta prévio de tolerância (5 minutos antes do término)
+function getSlotExpiringTimeStr(slotStr: string, nextSlotStr?: string | null): string {
+  const [h, m] = slotStr.split(':').map(Number);
+  const startMin = h * 60 + m;
+  let endMin = startMin + 15;
+  if (nextSlotStr) {
+    const [nh, nm] = nextSlotStr.split(':').map(Number);
+    const nextMin = nh * 60 + nm;
+    if (nextMin > startMin) {
+      endMin = Math.min(endMin, nextMin);
+    }
+  }
+  const expMin = (endMin - 5 + 24 * 60) % (24 * 60);
+  const rh = Math.floor(expMin / 60);
+  const rm = expMin % 60;
+  return `${String(rh).padStart(2, '0')}:${String(rm).padStart(2, '0')}`;
+}
+
 export async function notificationJob() {
   const now = new Date();
   const todayDate = getBrazilMidnightDate(now);
@@ -134,6 +152,57 @@ export async function notificationJob() {
           }
         }
 
+        // 1.1 Aluno (Tolerância Expirando - 5 minutos antes do fim da tolerância)
+        const expiringTriggerTime = getSlotExpiringTimeStr(slotStr, nextSlotStr);
+        if (expiringTriggerTime === currentTimeStr) {
+          console.log(`[NOTIFICATION JOB] Enviando alerta de tolerância expirando (5 min) para: ${cls.subject} (${slotStr})`);
+
+          for (const enrollment of cls.enrollments) {
+            const student = enrollment.student;
+
+            // Verificar se o aluno já registrou presença neste slot hoje
+            const hasAttendance = await prisma.attendance.findFirst({
+              where: {
+                student_id: student.id,
+                class_id: cls.id,
+                date: todayDate,
+                slot_time: slotStr,
+                status: { in: ['PRESENTE', 'ATRASADO'] },
+              },
+            });
+
+            if (!hasAttendance) {
+              const expTitle = `Tolerância Expirando: ${cls.subject}`;
+              const alreadyNotifiedExp = await prisma.notification.findFirst({
+                where: {
+                  user_id: student.id,
+                  title: expTitle,
+                  created_at: {
+                    gte: todayDate,
+                  },
+                },
+              });
+
+              if (!alreadyNotifiedExp) {
+                const expBody = `Restam apenas 5 minutos para registrar presença na aula das ${slotStr} de ${cls.subject}! Abra o aplicativo para validar seu check-in.`;
+                await prisma.notification.create({
+                  data: {
+                    user_id: student.id,
+                    title: expTitle,
+                    body: expBody,
+                  },
+                });
+
+                sendPushNotification(student.id, {
+                  title: expTitle,
+                  body: expBody,
+                  data: { type: 'TOLERANCIA_EXPIRANDO', classId: cls.id, slot: slotStr },
+                });
+              }
+            }
+          }
+        }
+
         // 2. Professor (Fechamento de Chamada - no fim da tolerância do slot)
         const professorTriggerTime = getSlotEndTimeStr(slotStr, nextSlotStr);
         if (professorTriggerTime === currentTimeStr) {
@@ -171,12 +240,19 @@ export async function notificationJob() {
           });
 
           if (!alreadyNotified) {
+            const reportBody = `A tolerância de 15 minutos para o horário das ${slotStr} de ${cls.subject} encerrou. Resultado: ${checkedInCount} presentes, ${absentCount} faltas registradas (${totalStudents} matriculados).`;
             await prisma.notification.create({
               data: {
                 user_id: cls.professor_id,
                 title,
-                body: `A tolerância de 15 minutos para o horário das ${slotStr} de ${cls.subject} encerrou. Resultado: ${checkedInCount} presentes, ${absentCount} faltas registradas (${totalStudents} matriculados).`,
+                body: reportBody,
               },
+            });
+
+            sendPushNotification(cls.professor_id, {
+              title,
+              body: reportBody,
+              data: { type: 'FECHAMENTO_CHAMADA', classId: cls.id, slot: slotStr },
             });
           }
         }
@@ -241,12 +317,19 @@ export async function notificationJob() {
             });
 
             if (!studentAlreadyAlerted) {
+              const riskBody = `Seu índice de faltas em ${cls.subject} atingiu ${absenceRate}%. Mantenha sua frequência acima de 75% para não reprovar por faltas!`;
               await prisma.notification.create({
                 data: {
                   user_id: student.id,
                   title: studentTitle,
-                  body: `Seu índice de faltas em ${cls.subject} atingiu ${absenceRate}%. Fique atento para não ultrapassar o limite de faltas!`,
+                  body: riskBody,
                 },
+              });
+
+              sendPushNotification(student.id, {
+                title: studentTitle,
+                body: riskBody,
+                data: { type: 'RISCO_REPROVACAO', classId: cls.id },
               });
             }
           }
