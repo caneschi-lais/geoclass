@@ -7,6 +7,7 @@ Abaixo está o código do diagrama da arquitetura completa e atualizada do GeoCl
 ## Diagrama da Arquitetura
 
 ```mermaid
+%%{init: {"themeVariables": {"fontSize": "21px", "nodeSpacing": 55, "rankSpacing": 70}, "flowchart": {"htmlLabels": true, "curve": "basis"}}}%%
 flowchart TD
     classDef external fill:#ef4444,stroke:#dc2626,stroke-width:2px,color:#fff,font-weight:bold
     classDef client fill:#f59e0b,stroke:#b45309,stroke-width:2px,color:#fff,font-weight:bold
@@ -45,14 +46,15 @@ flowchart TD
         CoordAPI["API do Coordenador & Gestão de Risco (<75%)"]:::backend
         CancellationAPI["API de Cancelamentos, Atestados & Reposições"]:::backend
         NotifAPI["API de Notificações Internas & Push Service"]:::backend
+        PushService["PushNotificationService - Envio em Lotes (100) via Expo Push API"]:::backend
+        MedCert["MedicalCertificateService - Atestado Médico PDF/PNG"]:::backend
         SemUtil["Utilitário de Semestre Automático (YYYY.1/2)"]:::backend
     end
 
     subgraph Background ["Jobs Agendados - node-cron & Processadores"]
         CronLGPD["LgpdWiperJob - 03:00 AM (Expurgo Diário)"]:::job
         AbsenceProc["AbsenceProcessor - Fechamento 15m & Auto-Remediação"]:::job
-        CronNotif["NotificationJob - Início de Aula & Fechamento Professor"]:::job
-        RiskJob["RiskCheckerJob - Notificação Auto de Risco (<75%)"]:::job
+        CronNotif["NotificationJob - Lembrete de Aula, Tolerância Expirando, Fechamento de Chamada & Alertas de Risco"]:::job
     end
 
     subgraph Persistence ["Cloud Relational Database - Supabase (PostgreSQL)"]
@@ -64,7 +66,8 @@ flowchart TD
     end
 
     UptimeRobot -->|GET /health a cada 5 min| Backend
-    NotifAPI -->|Disparo via HTTP| ExpoPush
+    NotifAPI --> PushService
+    PushService -->|Disparo via HTTP| ExpoPush
     ExpoPush -.->|Push Notification Remota| Mobile
 
     Mobile -->|Interação Única Mobile| UI
@@ -89,6 +92,7 @@ flowchart TD
     StudentAPI -->|Valida Distância, Janela de 15m & IsCompleted| GeoEngine
     CoordAPI -->|Calcula YYYY.1/2 & Incrementa Semestres| SemUtil
     CancellationAPI -->|Dispara Alertas de Cancelamento/Reposição| NotifAPI
+    CancellationAPI -->|Valida o Anexo e Gera o Atestado| MedCert
     Auth --> ORM
     StudentAPI --> ORM
     ProfAPI --> ORM
@@ -104,7 +108,6 @@ flowchart TD
     CronLGPD -.->|Expurgo Diário >6 meses| ORM
     AbsenceProc -.->|Valida Tolerância 15m no Fuso BRT & Remove Faltas Prematuras| ORM
     CronNotif -.->|Dispara AbsenceProc e Notifica Início/Fim de Slot| ORM
-    RiskJob -.->|Monitora Frequência <75%| ORM
 ```
 
 ---

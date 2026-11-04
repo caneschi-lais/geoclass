@@ -155,7 +155,7 @@ flowchart LR
 
 ### CDU-23: Disparar Alerta Automático de Risco de Reprovação (<75%)
 * **Ator Principal:** Sistema (Backend API)
-* **Descrição:** Monitora a frequência do aluno e grava automaticamente uma notificação no aplicativo (in-app, sem disparo push) assim que a taxa de presença atinge a faixa crítica (entre 70% e 75%).
+* **Descrição:** Monitora a frequência do aluno e dispara automaticamente o alerta de risco, gravando a notificação no aplicativo (in-app) e enviando-a também por push ao celular do estudante, assim que a taxa de presença atinge a faixa crítica (entre 70% e 75%).
 
 ### CDU-24: Detectar Semestre Letivo Atual Automático (YYYY.1 / YYYY.2)
 * **Ator Principal:** Sistema (Backend API)
