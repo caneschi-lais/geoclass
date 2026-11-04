@@ -327,13 +327,14 @@ export class AttendanceController {
         });
       }
 
-      // 4. Checagem de Fraude de Dispositivo (Opcional)
+      // 4. Checagem de Fraude de Dispositivo
       if (deviceId) {
         const deviceUsedByOther = await prisma.attendance.findFirst({
           where: {
             device_id: deviceId,
             date: checkInDate,
-            student_id: { not: studentId }
+            student_id: { not: studentId },
+            status: { in: ['PRESENTE', 'ATRASADO'] },
           }
         });
 

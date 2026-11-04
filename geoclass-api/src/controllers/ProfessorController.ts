@@ -508,39 +508,96 @@ export class ProfessorController {
     }
 
     try {
-      let attendance;
-
+      // 1. Identificar o registro base de referência
+      let baseAttendance = null;
       if (attendanceId) {
-        attendance = await prisma.attendance.findUnique({
+        baseAttendance = await prisma.attendance.findUnique({
           where: { id: attendanceId }
         });
-      } else {
-        const targetDate = getBrazilMidnightDate(date);
+      }
 
-        attendance = await prisma.attendance.findFirst({
+      const targetStudentId = studentId || baseAttendance?.student_id;
+      const targetClassId = classId || baseAttendance?.class_id;
+      const targetDate = date ? getBrazilMidnightDate(date) : (baseAttendance?.date || getBrazilMidnightDate(new Date()));
+
+      if (!targetStudentId) {
+        return res.status(400).json({ error: 'Não foi possível identificar o aluno para a liberação de dispositivo.' });
+      }
+
+      // 2. Localizar todas as presenças desse aluno na data (em todos os slots da aula/dia)
+      const studentAttendances = await prisma.attendance.findMany({
+        where: {
+          student_id: targetStudentId,
+          date: targetDate,
+        }
+      });
+
+      if (studentAttendances.length === 0 && !baseAttendance) {
+        return res.status(404).json({ error: 'Nenhum registro de presença encontrado para esta data.' });
+      }
+
+      // Identificar todos os device_ids que estavam vinculados a esse aluno nesta data
+      const capturedDeviceIds = Array.from(
+        new Set(
+          [
+            baseAttendance?.device_id,
+            ...studentAttendances.map(a => a.device_id)
+          ].filter((d): d is string => Boolean(d && d.trim() !== ''))
+        )
+      );
+
+      // 3. Limpar o device_id de TODAS as linhas desse aluno nesta data
+      // Isso impede que outros slots do mesmo dia mantenham o device_id e acionem falsos positivos no antifraude
+      const updatedStudents = await prisma.attendance.updateMany({
+        where: {
+          student_id: targetStudentId,
+          date: targetDate,
+        },
+        data: {
+          device_id: null
+        }
+      });
+
+      // 4. Se havia aparelhos identificados, também libera registros na mesma turma/data com esse device_id
+      // para permitir que outro aluno autorizado consiga registrar presença utilizando o aparelho liberado
+      if (capturedDeviceIds.length > 0 && targetClassId) {
+        await prisma.attendance.updateMany({
           where: {
-            student_id: studentId,
-            class_id: classId,
-            date: targetDate
+            class_id: targetClassId,
+            date: targetDate,
+            device_id: { in: capturedDeviceIds }
+          },
+          data: {
+            device_id: null
           }
         });
       }
 
-      if (!attendance) {
-        return res.status(404).json({ error: 'Registro de presença não encontrado.' });
-      }
+      // 5. Notificar o aluno sobre a liberação de aparelho
+      const notifTitle = 'Dispositivo Desvinculado';
+      const notifBody = 'O professor liberou o vínculo de aparelho para o seu registro de presença. Você já pode registrar presença com um novo aparelho.';
 
-      const updated = await prisma.attendance.update({
-        where: { id: attendance.id },
-        data: { device_id: null }
+      await prisma.notification.create({
+        data: {
+          user_id: targetStudentId,
+          title: notifTitle,
+          body: notifBody,
+        }
+      });
+
+      sendPushNotification(targetStudentId, {
+        title: notifTitle,
+        body: notifBody,
+        data: { type: 'DEVICE_RESET', studentId: targetStudentId }
       });
 
       return res.json({
-        message: 'Vínculo de dispositivo liberado com sucesso!',
-        attendance: updated
+        message: 'Vínculo de dispositivo liberado com sucesso em todos os registros do dia!',
+        affected_rows: updatedStudents.count,
+        devices_released: capturedDeviceIds
       });
     } catch (error) {
-      console.error(error);
+      console.error('Erro ao resetar vínculo de dispositivo:', error);
       return res.status(500).json({ error: 'Erro ao resetar vínculo de dispositivo.' });
     }
   }

@@ -7,7 +7,7 @@ async function main() {
   await prisma.attendance.deleteMany();
   console.log('✔ Tabela Attendance limpa.');
 
-  await (prisma as any).classCancellation.deleteMany();
+  await prisma.classCancellation.deleteMany();
   console.log('✔ Tabela ClassCancellation limpa.');
 
   await prisma.temporaryClassLocation.deleteMany();
@@ -24,6 +24,9 @@ async function main() {
 
   await prisma.userCourse.deleteMany();
   console.log('✔ Tabela UserCourse limpa.');
+
+  await prisma.course.deleteMany();
+  console.log('✔ Tabela Course limpa.');
 
   await prisma.user.deleteMany();
   console.log('✔ Tabela User limpa.');

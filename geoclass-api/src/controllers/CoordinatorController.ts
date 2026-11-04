@@ -219,36 +219,99 @@ export class CoordinatorController {
     const { level, semesterId, studentId, includeDetails } = req.query;
 
     try {
+      const coordinatorCourseIds = await getCoordinatorCourseIds(req.user?.id);
+      const courseFilter = coordinatorCourseIds.length > 0 ? { course_id: { in: coordinatorCourseIds } } : {};
+
       if (level === 'semesters') {
         const allSemesters = await prisma.academicSemester.findMany({ orderBy: { name: 'desc' } });
         const data = await Promise.all(allSemesters.map(async (sem) => {
-          const enrollments = await prisma.enrollment.findMany({ where: { class: { semester_id: sem.id, active: true } }, include: { class: true } });
+          const enrollments = await prisma.enrollment.findMany({
+            where: {
+              class: {
+                semester_id: sem.id,
+                active: true,
+                ...courseFilter,
+              }
+            },
+            include: { class: true }
+          });
           
+          if (enrollments.length === 0) {
+            return {
+              semester: sem.name,
+              absencePercentage: 0,
+              attendancePercentage: 100,
+              details: includeDetails === 'true' ? [] : null
+            };
+          }
+
           let totalExpectedClasses = 0;
           let totalFaltas = 0;
           for (const enr of enrollments) {
             totalExpectedClasses += enr.class.total_classes;
-            totalFaltas += await prisma.attendance.count({ where: { class_id: enr.class_id, student_id: enr.student_id, status: 'FALTA' } });
+            totalFaltas += await prisma.attendance.count({
+              where: {
+                class_id: enr.class_id,
+                student_id: enr.student_id,
+                status: 'FALTA'
+              }
+            });
           }
           const absencePercentage = totalExpectedClasses === 0 ? 0 : Math.round((totalFaltas / totalExpectedClasses) * 100);
           const attendancePercentage = Math.max(0, 100 - absencePercentage);
 
           let details: any = null;
           if (includeDetails === 'true') {
-             // Detalhamento de alunos do semestre
+             // Detalhamento de alunos do semestre filtrados pelo curso do coordenador
              const students = await prisma.user.findMany({
-               where: { role: 'ALUNO', enrollments: { some: { class: { semester_id: sem.id, active: true } } } },
+               where: {
+                 role: 'ALUNO',
+                 enrollments: {
+                   some: {
+                     class: {
+                       semester_id: sem.id,
+                       active: true,
+                       ...courseFilter,
+                     }
+                   }
+                 }
+               },
                include: {
-                 enrollments: { where: { class: { semester_id: sem.id, active: true } }, include: { class: true } },
-                 attendances: { where: { class: { semester_id: sem.id, active: true }, status: 'FALTA' } }
+                 enrollments: {
+                   where: {
+                     class: {
+                       semester_id: sem.id,
+                       active: true,
+                       ...courseFilter,
+                     }
+                   },
+                   include: { class: true }
+                 },
+                 attendances: {
+                   where: {
+                     class: {
+                       semester_id: sem.id,
+                       active: true,
+                       ...courseFilter,
+                     },
+                     status: 'FALTA'
+                   }
+                 }
                }
              });
+
              details = students.map(student => {
                let sTotal = 0;
                student.enrollments.forEach(e => sTotal += e.class.total_classes);
                const sAbsence = sTotal === 0 ? 0 : Math.round((student.attendances.length / sTotal) * 100);
                const sAttendance = Math.max(0, 100 - sAbsence);
-               return { id: student.id, name: student.name, ra: student.ra, absencePercentage: sAbsence, attendancePercentage: sAttendance };
+               return {
+                 id: student.id,
+                 name: student.name,
+                 ra: student.ra,
+                 absencePercentage: sAbsence,
+                 attendancePercentage: sAttendance
+               };
              });
           }
 
@@ -264,10 +327,39 @@ export class CoordinatorController {
         const semesterFilter = sem ? { semester_id: sem.id } : {};
 
         const students = await prisma.user.findMany({
-          where: { role: 'ALUNO', enrollments: { some: { class: { ...semesterFilter, active: true } } } },
+          where: {
+            role: 'ALUNO',
+            enrollments: {
+              some: {
+                class: {
+                  ...semesterFilter,
+                  active: true,
+                  ...courseFilter,
+                }
+              }
+            }
+          },
           include: {
-            enrollments: { where: { class: { ...semesterFilter, active: true } }, include: { class: { include: { room: true } } } },
-            attendances: { where: { class: { ...semesterFilter, active: true }, status: 'FALTA' } }
+            enrollments: {
+              where: {
+                class: {
+                  ...semesterFilter,
+                  active: true,
+                  ...courseFilter,
+                }
+              },
+              include: { class: { include: { room: true } } }
+            },
+            attendances: {
+              where: {
+                class: {
+                  ...semesterFilter,
+                  active: true,
+                  ...courseFilter,
+                },
+                status: 'FALTA'
+              }
+            }
           }
         });
 
@@ -281,17 +373,112 @@ export class CoordinatorController {
           let details: any = null;
           if (includeDetails === 'true') {
             details = await Promise.all(student.enrollments.map(async (enr) => {
-              const cFaltas = await prisma.attendance.count({ where: { student_id: student.id, class_id: enr.class_id, status: 'FALTA' } });
+              const cFaltas = await prisma.attendance.count({
+                where: {
+                  student_id: student.id,
+                  class_id: enr.class_id,
+                  status: 'FALTA'
+                }
+              });
               const cTotal = enr.class.total_classes;
               const cAbsence = cTotal === 0 ? 0 : Math.round((cFaltas / cTotal) * 100);
               const cAttendance = Math.max(0, 100 - cAbsence);
-              return { subject: enr.class.subject, room_name: enr.class.room ? enr.class.room.name : 'Sala Padrão', absencePercentage: cAbsence, attendancePercentage: cAttendance };
+              return {
+                subject: enr.class.subject,
+                room_name: enr.class.room ? enr.class.room.name : 'Sala Padrão',
+                absencePercentage: cAbsence,
+                attendancePercentage: cAttendance
+              };
             }));
           }
 
           return { id: student.id, name: student.name, ra: student.ra, absencePercentage, attendancePercentage, details };
         }));
+
+        data.sort((a, b) => a.attendancePercentage - b.attendancePercentage);
         return res.json(data);
+      }
+
+      if (level === 'student') {
+        const sId = Number(studentId);
+        if (!sId || isNaN(sId)) {
+          return res.status(400).json({ error: 'studentId obrigatório' });
+        }
+
+        const sem = semesterId ? await findSemesterByNameOrId(semesterId as string) : null;
+        const semesterFilter = sem ? { semester_id: sem.id } : {};
+
+        const student = await prisma.user.findFirst({
+          where: {
+            id: sId,
+            role: 'ALUNO',
+            enrollments: {
+              some: {
+                class: {
+                  ...semesterFilter,
+                  active: true,
+                  ...courseFilter,
+                }
+              }
+            }
+          },
+          include: {
+            enrollments: {
+              where: {
+                class: {
+                  ...semesterFilter,
+                  active: true,
+                  ...courseFilter,
+                }
+              },
+              include: { class: { include: { room: true } } }
+            },
+            attendances: {
+              where: {
+                class: {
+                  ...semesterFilter,
+                  active: true,
+                  ...courseFilter,
+                },
+                status: 'FALTA'
+              }
+            }
+          }
+        });
+
+        if (!student) {
+          return res.status(404).json({ error: 'Aluno não encontrado ou não pertence a turmas do seu curso.' });
+        }
+
+        let totalExpectedClasses = 0;
+        student.enrollments.forEach(enr => { totalExpectedClasses += enr.class.total_classes; });
+        const totalFaltas = student.attendances.length;
+        const absencePercentage = totalExpectedClasses === 0 ? 0 : Math.round((totalFaltas / totalExpectedClasses) * 100);
+        const attendancePercentage = Math.max(0, 100 - absencePercentage);
+
+        const details = await Promise.all(student.enrollments.map(async (enr) => {
+          const cFaltas = await prisma.attendance.count({
+            where: { student_id: student.id, class_id: enr.class_id, status: 'FALTA' }
+          });
+          const cTotal = enr.class.total_classes;
+          const cAbsence = cTotal === 0 ? 0 : Math.round((cFaltas / cTotal) * 100);
+          const cAttendance = Math.max(0, 100 - cAbsence);
+          return {
+            subject: enr.class.subject,
+            room_name: enr.class.room ? enr.class.room.name : 'Sala Padrão',
+            absencePercentage: cAbsence,
+            attendancePercentage: cAttendance
+          };
+        }));
+
+        return res.json({
+          id: student.id,
+          name: student.name,
+          ra: student.ra,
+          absencePercentage,
+          attendancePercentage,
+          details
+        });
       }
 
       return res.status(400).json({ error: 'Nível de relatório inválido' });
