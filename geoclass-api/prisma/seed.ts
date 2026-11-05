@@ -1,6 +1,5 @@
 import bcrypt from 'bcryptjs';
 import prisma from '../src/prisma';
-import { generateMedicalCertificatePng } from '../src/services/medicalCertificateService';
 import fs from 'fs';
 import path from 'path';
 
@@ -365,13 +364,11 @@ async function main() {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
 
-  const certPngBuffer = generateMedicalCertificatePng({
-    patientName: profUser.name,
-    subject: firstClass.subject,
-    dateStr: testDate.toLocaleDateString('pt-BR'),
-    reasonType: 'SAUDE',
-    cid: 'CID 10: J11.1 - Influenza com sintomas respiratorios',
-  });
+  // Exemplo de anexo probatório neutro (PNG 1x1 pixel)
+  const certPngBuffer = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+    'base64'
+  );
 
   const certFilename = `atestado-demo-seed.png`;
   const certPath = path.join(uploadsDir, certFilename);

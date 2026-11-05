@@ -2,12 +2,6 @@ import { Request, Response } from 'express';
 import { AuthRequest } from '../middlewares/authMiddleware';
 import { sendPushNotification } from '../services/pushNotificationService';
 import { getBrazilMidnightDate, getBrazilDayOfWeek } from '../utils/dateUtils';
-import {
-  isSimulatedBase64,
-  generateMedicalCertificatePdf,
-  generateMedicalCertificatePng,
-  MedicalCertificateOptions,
-} from '../services/medicalCertificateService';
 import fs from 'fs';
 import path from 'path';
 import prisma from '../prisma';
@@ -48,50 +42,44 @@ function isClassScheduledOnDate(weekDays?: string | null, dateInput?: Date | str
 }
 
 function saveBase64File(
-  base64Data: string,
-  originalFilename = 'atestado.png',
-  contextOpts?: MedicalCertificateOptions
+  base64Data?: string | null,
+  originalFilename = 'atestado.png'
 ): string | null {
   try {
+    if (!base64Data || typeof base64Data !== 'string' || !base64Data.trim()) {
+      return null;
+    }
+
+    const trimmed = base64Data.trim();
+    // Tokens legados de simulação do app antigo: não cria arquivo falso
+    if (trimmed === 'GENERATE_DIGITAL' || trimmed === 'GENERATE_OFFICIAL') {
+      return null;
+    }
+
     const uploadsDir = path.join(__dirname, '../../uploads/atestados');
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
 
-    let ext = path.extname(originalFilename).toLowerCase();
+    let ext = path.extname(originalFilename || '').toLowerCase();
     if (!ext || ext === '.') {
-      if (base64Data.startsWith('data:image/jpeg') || base64Data.startsWith('data:image/jpg')) ext = '.jpg';
-      else if (base64Data.startsWith('data:image/png')) ext = '.png';
-      else if (base64Data.startsWith('data:application/pdf')) ext = '.pdf';
+      if (trimmed.startsWith('data:image/jpeg') || trimmed.startsWith('data:image/jpg')) ext = '.jpg';
+      else if (trimmed.startsWith('data:image/png')) ext = '.png';
+      else if (trimmed.startsWith('data:application/pdf')) ext = '.pdf';
       else ext = '.png';
     }
 
-    // Se os dados enviados forem de submissão automática / demonstração,
-    // a API gera automaticamente um documento de Atestado Médico autêntico no servidor.
-    if (isSimulatedBase64(base64Data)) {
-      const isPdf = ext === '.pdf' || originalFilename.toLowerCase().endsWith('.pdf');
-      const actualExt = isPdf ? '.pdf' : '.png';
-      const filename = `atestado-${Date.now()}-${Math.round(Math.random() * 1e6)}${actualExt}`;
-      const filePath = path.join(uploadsDir, filename);
+    // Salva exatamente o anexo genuíno enviado pelo professor (sem simulação nem dados fictícios)
+    const cleanBase64 = trimmed.replace(/^data:.*?;base64,/, '').trim();
+    if (!cleanBase64) return null;
 
-      const buffer = isPdf
-        ? generateMedicalCertificatePdf(contextOpts || {})
-        : generateMedicalCertificatePng(contextOpts || {});
-
-      fs.writeFileSync(filePath, buffer);
-      return `/uploads/atestados/${filename}`;
-    }
-
-    // Arquivo real enviado pelo professor do seu aparelho (foto ou PDF original).
-    // O coordenador verá exatamente o mesmo arquivo que o professor enviou.
-    const cleanBase64 = base64Data.replace(/^data:.*?;base64,/, '');
     const filename = `atestado-${Date.now()}-${Math.round(Math.random() * 1e6)}${ext}`;
     const filePath = path.join(uploadsDir, filename);
 
     fs.writeFileSync(filePath, Buffer.from(cleanBase64, 'base64'));
     return `/uploads/atestados/${filename}`;
   } catch (error) {
-    console.error('Erro ao salvar arquivo base64:', error);
+    console.error('Erro ao salvar anexo do professor:', error);
     return null;
   }
 }
@@ -142,12 +130,7 @@ export class ClassCancellationController {
 
       let certificateUrl: string | null = null;
       if (certificate_base64) {
-        certificateUrl = saveBase64File(certificate_base64, certificate_filename, {
-          patientName: professorName,
-          subject: classData.subject,
-          dateStr: formattedDate,
-          reasonType: reason_type,
-        });
+        certificateUrl = saveBase64File(certificate_base64, certificate_filename);
       }
 
       const existing = await prisma.classCancellation.findFirst({
@@ -514,14 +497,9 @@ export class ClassCancellationController {
       const formattedDate = formatDateDisplay(cancellation.date);
       const professorName = cancellation.professor?.name || req.user?.name || 'Professor';
 
-      const certificateUrl = saveBase64File(certificate_base64, certificate_filename, {
-        patientName: professorName,
-        subject: cancellation.class?.subject,
-        dateStr: formattedDate,
-        reasonType: cancellation.reason_type,
-      });
+      const certificateUrl = saveBase64File(certificate_base64, certificate_filename);
       if (!certificateUrl) {
-        return res.status(500).json({ error: 'Falha ao processar o arquivo enviado.' });
+        return res.status(400).json({ error: 'Nenhum anexo válido foi processado.' });
       }
 
       const updated = await (prisma as any).classCancellation.update({
@@ -1194,7 +1172,6 @@ export class ClassCancellationController {
         <input type="file" id="fileInput" class="file-input" accept="image/*,application/pdf" capture="environment" onchange="handleFileSelected(event)" />
 
         <button type="submit" id="submitBtn" class="btn" disabled>Confirmar Envio do Atestado</button>
-        <button type="button" class="btn btn-secondary" onclick="generateOfficial()">Gerar Atestado Médico Digital Oficial</button>
       </form>
 
       <div class="footer">O documento será analisado e arquivado pela Coordenação de Curso.</div>
@@ -1213,12 +1190,6 @@ export class ClassCancellationController {
         document.getElementById('submitBtn').disabled = false;
       };
       reader.readAsDataURL(file);
-    }
-
-    function generateOfficial() {
-      document.getElementById('certificate_base64').value = 'GENERATE_OFFICIAL';
-      document.getElementById('certificate_filename').value = 'atestado-medico-oficial.pdf';
-      document.getElementById('uploadForm').submit();
     }
   </script>
 </body>
@@ -1257,20 +1228,11 @@ export class ClassCancellationController {
       const formattedDate = formatDateDisplay(cancellation.date);
       const professorName = cancellation.professor?.name || 'Professor(a)';
 
-      // Salva arquivo real ou gera atestado
-      const payload = certificate_base64 === 'GENERATE_OFFICIAL'
-        ? 'data:application/pdf;base64,JVBERi0xLjQKJUZha2VQZGY='
-        : certificate_base64;
-
-      const certificateUrl = saveBase64File(payload, certificate_filename || 'atestado.pdf', {
-        patientName: professorName,
-        subject: cancellation.class?.subject,
-        dateStr: formattedDate,
-        reasonType: cancellation.reason_type,
-      });
+      // Salva exclusivamente o anexo enviado pelo professor
+      const certificateUrl = saveBase64File(certificate_base64, certificate_filename || 'atestado.pdf');
 
       if (!certificateUrl) {
-        return res.status(500).send('<h3>Falha ao processar arquivo.</h3>');
+        return res.status(400).send('<h3>Falha ao processar arquivo enviado. Certifique-se de que é uma imagem ou PDF válido.</h3>');
       }
 
       await (prisma as any).classCancellation.update({

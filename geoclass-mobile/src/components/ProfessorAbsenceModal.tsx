@@ -101,7 +101,7 @@ export default function ProfessorAbsenceModal({
     setFileName(null);
   };
 
-  const handlePickFromDevice = async () => {
+  const handlePickFile = async () => {
     if (Platform.OS === 'web') {
       const input = document.createElement('input');
       input.type = 'file';
@@ -139,43 +139,9 @@ export default function ProfessorAbsenceModal({
         console.warn('Erro ao abrir seletor nativo:', err);
         Alert.alert(
           'Seletor do Aparelho',
-          'Não foi possível acessar o seletor nativo de arquivos neste dispositivo. Você pode utilizar a opção "Gerar Digitalmente (Demonstração)".'
+          'Não foi possível acessar os arquivos do dispositivo. Verifique as permissões de acesso.'
         );
       }
-    }
-  };
-
-  const handleGenerateDigital = () => {
-    setFileBase64('GENERATE_DIGITAL');
-    setFileName('atestado-digital.pdf');
-  };
-
-  const handlePickFile = () => {
-    if (Platform.OS === 'web') {
-      const choice = window.confirm(
-        'Deseja selecionar um arquivo (Foto ou PDF) do seu aparelho/computador?\n\n[OK] Selecionar do Aparelho\n[Cancelar] Gerar Digitalmente (Demonstração)'
-      );
-      if (choice) {
-        handlePickFromDevice();
-      } else {
-        handleGenerateDigital();
-      }
-    } else {
-      Alert.alert(
-        'Documento Médico Probatório',
-        'Selecione um arquivo probatório do seu próprio aparelho ou gere digitalmente:',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          {
-            text: 'Selecionar do Aparelho (Foto/PDF)',
-            onPress: handlePickFromDevice,
-          },
-          {
-            text: 'Gerar Digitalmente (Demonstração)',
-            onPress: handleGenerateDigital,
-          },
-        ]
-      );
     }
   };
 
@@ -374,10 +340,8 @@ export default function ProfessorAbsenceModal({
                       >
                         {fileName}
                       </Text>
-                      <Text className="text-[10px] text-sky-600 dark:text-sky-400">
-                        {fileBase64 === 'GENERATE_DIGITAL'
-                          ? 'Gerado digitalmente pelo servidor'
-                          : 'Arquivo anexado do aparelho'}
+                      <Text className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                        Documento probatório do professor
                       </Text>
                     </View>
                   </View>
@@ -398,12 +362,12 @@ export default function ProfessorAbsenceModal({
                 >
                   <Feather name="upload-cloud" size={18} color="#d97706" />
                   <Text className="text-xs font-bold text-amber-700 dark:text-amber-400 ml-2">
-                    Anexar Documento (Aparelho ou Digital)
+                    Anexar Documento (Foto ou PDF)
                   </Text>
                 </TouchableOpacity>
               )}
               <Text className="text-[10px] text-amber-600 dark:text-amber-500 mt-1.5">
-                Você pode selecionar uma foto ou PDF do seu aparelho, ou gerar digitalmente com validação de CRM e CID-10.
+                Selecione uma fotografia ou arquivo PDF comprobatório diretamente do seu dispositivo.
               </Text>
             </View>
 

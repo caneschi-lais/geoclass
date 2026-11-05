@@ -79,7 +79,7 @@ export default function ProfessorAbsenceHistoryModal({
     }
   };
 
-  const handlePickAndUploadCertificate = (cancellationId: string) => {
+  const handlePickAndUploadCertificate = async (cancellationId: string) => {
     if (Platform.OS === 'web') {
       const input = document.createElement('input');
       input.type = 'file';
@@ -98,49 +98,31 @@ export default function ProfessorAbsenceHistoryModal({
       input.click();
     } else {
       const uploadWebUrl = `${api.defaults.baseURL?.replace('/api', '')}/api/cancellation/${cancellationId}/upload-web`;
-      Alert.alert(
-        'Anexar Atestado Médico',
-        'Escolha como deseja enviar o documento comprobatório para a coordenação:',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          {
-            text: 'Selecionar do Aparelho (Foto/PDF)',
-            onPress: async () => {
-              try {
-                const result = await File.pickFileAsync({
-                  multipleFiles: false,
-                  mimeTypes: ['image/*', 'application/pdf'],
-                });
-                if (!result.canceled && result.result) {
-                  const picked = result.result;
-                  const content = await FileSystem.readAsStringAsync(picked.uri, {
-                    encoding: FileSystem.EncodingType.Base64,
-                  });
-                  const isPdf = (picked.name || '').toLowerCase().endsWith('.pdf');
-                  const mime = isPdf ? 'application/pdf' : 'image/jpeg';
-                  await submitCertificate(
-                    cancellationId,
-                    `data:${mime};base64,${content}`,
-                    picked.name || (isPdf ? 'atestado.pdf' : 'atestado.jpg')
-                  );
-                  return;
-                }
-              } catch (e) {
-                console.warn('Fallback para uploader web:', e);
-              }
-              Linking.openURL(uploadWebUrl).catch(() => {
-                Alert.alert('Erro', 'Não foi possível abrir o navegador.');
-              });
-            },
-          },
-          {
-            text: 'Gerar Digitalmente (Demonstração)',
-            onPress: () => {
-              submitCertificate(cancellationId, 'GENERATE_DIGITAL', 'atestado-digital.pdf');
-            },
-          },
-        ]
-      );
+      try {
+        const result = await File.pickFileAsync({
+          multipleFiles: false,
+          mimeTypes: ['image/*', 'application/pdf'],
+        });
+        if (!result.canceled && result.result) {
+          const picked = result.result;
+          const content = await FileSystem.readAsStringAsync(picked.uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          const isPdf = (picked.name || '').toLowerCase().endsWith('.pdf');
+          const mime = isPdf ? 'application/pdf' : 'image/jpeg';
+          await submitCertificate(
+            cancellationId,
+            `data:${mime};base64,${content}`,
+            picked.name || (isPdf ? 'atestado.pdf' : 'atestado.jpg')
+          );
+          return;
+        }
+      } catch (e) {
+        console.warn('Fallback para uploader web:', e);
+        Linking.openURL(uploadWebUrl).catch(() => {
+          Alert.alert('Erro', 'Não foi possível abrir o seletor nem o navegador.');
+        });
+      }
     }
   };
 
