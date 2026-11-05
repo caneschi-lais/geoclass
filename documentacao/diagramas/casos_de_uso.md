@@ -9,66 +9,46 @@ O diagrama a seguir utiliza a notação **Mermaid**, categorizando os atores (Al
 ## 1. Diagrama de Casos de Uso (Mermaid UML)
 
 ```mermaid
----
-config:
-  layout: fixed
----
 flowchart LR
-    Aluno["Aluno"] --- Login(["Autenticar no App"]) & AceitarLGPD(["Aceitar Termos de Privacidade LGPD"]) & ViewTurmas(["Consultar Aulas do Dia & Modo Leitura"]) & RegistrarPonto(["Marcar Presença via GPS / Multi-Slot"]) & ViewHistorico(["Consultar Histórico Acadêmico"]) & ViewNotif(["Visualizar Notificações & Alertas de Risco"])
-    Prof["Professor"] --- Login & ViewTurmas & ViewAlunosTurma(["Consultar Alunos da Turma & Semestre"]) & RealocarSala(["Realocar Sala Temporariamente"]) & ChamadaManual(["Realizar Chamada Manual / EAD"]) & ResetDevice(["Resetar Device Binding de Aluno"]) & AvisarFalta(["Avisar Falta / Solicitar Ausência"]) & AnexarAtestado(["Anexar Atestado Médico"]) & AgendarReposicao(["Agendar Data de Reposição"]) & ChamadaReposicao(["Realizar Chamada de Reposição"])
-    Coord["Coordenador"] --- Login & CadastrarSala(["Cadastrar Sala/Infraestrutura"]) & MatricularAluno(["Matricular Aluno em Disciplina"]) & ViewDashboardRisk(["Monitorar Evasão e Alunos em Risco (<75%)"]) & GerarRelatorio(["Exportar Relatórios PDF/XLSX"]) & ToggleStatus(["Alternar Status Ativo/Trancamento"]) & ToggleConclusao(["Gerenciar Conclusão de Curso"]) & ViradaSemestre(["Executar Virada de Semestre em Lote"]) & SuspenderAula(["Suspender Aula Direta"]) & GerenciarFaltas(["Aprovar/Recusar Falta & Solicitar Atestado"]) & AgendarReposicaoCoord(["Agendar / Alterar Reposição"])
-    Sistema["Sistema (Job / Nuvem)"] --- Expurgo(["Expurgar Geodados e Device ID - LGPD"]) & KeepAlive(["Manter API Ativa via Keep-Alive"]) & NotifJob(["Processar Notificações Automáticas"]) & RiskNotification(["Disparar Alerta Auto de Risco (<75%)"]) & DetectSemestre(["Detectar Semestre Atual Automático YYYY.1/2"]) & AbsenceProcessorCase(["Processar Fechamento de Faltas 15m & Auto-Remediação - Fuso BRT"]) & PushNotificationsCase(["Disparar Push Notifications Proativas - Expo Push API"])
-    RegistrarPonto -. &lt;&gt; .-> ValidarAntiFraude(["Validar Geofencing, Janela 15m no Fuso BRT, Device ID & Slot"])
-    RegistrarOffline(["Registrar Presença Offline SHA-256"]) -. &lt;&gt; .-> RegistrarPonto
-    RealocarSala -. &lt;&gt; .-> NotifJob
-    ViradaSemestre -. &lt;&gt; .-> DetectSemestre
-    SuspenderAula -. &lt;&gt; .-> NotifJob
-    AgendarReposicao -. &lt;&gt; .-> NotifJob
-    AvisarFalta -. &lt;&gt; .-> NotifJob
-    NotifJob -. &lt;&gt; .-> PushNotificationsCase
-    AbsenceProcessorCase -. &lt;&gt; .-> NotifJob
+    A["Aluno"]
+    A --- UC1(["Marcar presença"])
+    A --- UC5(["Consultar histórico e notificações"])
+    UC1 -. "include" .-> UC2(["Validar antifraude"])
+    UC1 -. "extend" .-> UC3(["Registrar presença offline"])
 
-     Aluno:::actor
-     Login:::usecase
-     AceitarLGPD:::usecase
-     ViewTurmas:::usecase
-     RegistrarPonto:::usecase
-     ViewHistorico:::usecase
-     ViewNotif:::usecase
-     Prof:::actor
-     ViewAlunosTurma:::usecase
-     RealocarSala:::usecase
-     ChamadaManual:::usecase
-     ResetDevice:::usecase
-     AvisarFalta:::usecase
-     AnexarAtestado:::usecase
-     AgendarReposicao:::usecase
-     ChamadaReposicao:::usecase
-     Coord:::actor
-     CadastrarSala:::usecase
-     MatricularAluno:::usecase
-     ViewDashboardRisk:::usecase
-     GerarRelatorio:::usecase
-     ToggleStatus:::usecase
-     ToggleConclusao:::usecase
-     ViradaSemestre:::usecase
-     SuspenderAula:::usecase
-     GerenciarFaltas:::usecase
-     AgendarReposicaoCoord:::usecase
-     Sistema:::systemActor
-     Expurgo:::usecase
-     KeepAlive:::usecase
-     NotifJob:::usecase
-     RiskNotification:::usecase
-     DetectSemestre:::usecase
-     ValidarAntiFraude:::usecase
-     RegistrarOffline:::usecase
-     AbsenceProcessorCase:::usecase
-     PushNotificationsCase:::usecase
-    classDef actor fill:#f8fafc,stroke:#94a3b8,stroke-width:2px,font-weight:bold,color:#1e293b
-    classDef systemActor fill:#fee2e2,stroke:#ef4444,stroke-width:2px,font-weight:bold,color:#991b1b
-    classDef usecase fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
+    P["Professor"]
+    P --- UC4(["Realizar chamada manual"])
+    P --- UC6(["Realocar sala temporariamente"])
+    P --- UC7(["Solicitar ausência"])
+    UC6 -. "include" .-> UC11(["Processar notificações automáticas"])
+
+    C["Coordenador"]
+    C --- UC8(["Monitorar evasão e alunos em risco (&lt;75%)"])
+    C --- UC10(["Suspender aula"])
+    UC8 -. "include" .-> UC9(["Disparar alerta de risco"])
+    UC10 -. "include" .-> UC12(["Apagar os registros de presença da data suspensa"])
+
+    X["Sistema"]
+    X --- UC11
+    X --- UC13(["Processar fechamento de faltas 15min"])
+
+    classDef ator fill:#FFFFFF,stroke:#4A4A4A,stroke-width:1.2px,color:#222222
+    classDef uc fill:#D6EAF8,stroke:#2E86C1,stroke-width:1.2px,color:#12344D
+    class A,P,C,X ator
+    class UC1,UC2,UC3,UC4,UC5,UC6,UC7,UC8,UC9,UC10,UC11,UC12,UC13 uc
 ```
+
+
+
+
+
+
+
+
+
+
+
+
 
 ---
 
@@ -127,7 +107,7 @@ flowchart LR
 
 ### CDU-15: Monitorar Evasão e Alunos em Risco (< 75%)
 * **Ator Principal:** Coordenador
-* **Descrição:** Dashboard analítico e aba dedicada "Alunos em Risco" que calcula a taxa global de faltas por semestre e lista os alunos com frequência inferior a 75%.
+* **Descrição:** Visão analítica e aba dedicada "Alunos em Risco" que calcula a taxa global de faltas por semestre e lista os alunos com frequência inferior a 75%.
 
 ### CDU-16: Exportar Relatórios PDF / XLSX
 * **Ator Principal:** Coordenador
@@ -175,7 +155,7 @@ flowchart LR
 
 ### CDU-28: Gerenciar Solicitações de Falta e Cobrança de Atestado
 * **Ator Principal:** Coordenador
-* **Descrição:** Painel de análise das solicitações de falta dos docentes. Permite visualizar detalhes e atestados médicos anexados, solicitar atestado formalmente via notificação ao professor em casos de saúde, recusar ou aprovar a solicitação com geração de presença parcial e aviso aos discentes.
+* **Descrição:** Tela de análise das solicitações de falta dos docentes. Permite visualizar detalhes e atestados médicos anexados, solicitar atestado formalmente via notificação ao professor em casos de saúde, recusar ou aprovar a solicitação com geração de presença parcial e aviso aos discentes.
 
 ### CDU-29: Agendar e Relacionar Aula de Reposição com Notificação
 * **Atores:** Professor, Coordenador

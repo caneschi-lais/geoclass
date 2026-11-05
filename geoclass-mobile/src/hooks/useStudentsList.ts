@@ -77,7 +77,9 @@ export function useStudentsList(semesterId: string) {
 
   const loadRiskStudents = async () => {
     try {
-      const response = await api.get('/coordenador/alunos-em-risco');
+      const response = await api.get('/coordenador/alunos-em-risco', {
+        params: { semester: semesterId, semesterId }
+      });
       setRiskStudents(response.data);
       setFilteredRiskStudents(response.data);
     } catch (error) {

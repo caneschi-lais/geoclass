@@ -2,7 +2,7 @@
 
 Este documento mapeia detalhadamente o passo a passo de todas as interações de cada perfil de usuário (**Aluno**, **Professor**, **Coordenador**) e das rotinas autônomas de **Infraestrutura** no ecossistema **GeoClass**.
 
-Para ilustrar o caminho de ponta a ponta (desde a ação da interface móvel/web até a resposta e persistência no banco de dados), utilizam-se **Diagramas de Sequência (UML)** na notação **Mermaid**.
+Para ilustrar o caminho de ponta a ponta (desde a ação da interface móvel até a resposta e persistência no banco de dados), utilizam-se **Diagramas de Sequência (UML)** na notação **Mermaid**.
 
 ---
 
@@ -158,7 +158,7 @@ sequenceDiagram
 
 ---
 
-### 1.4 Dashboard de Frequência, Histórico Acadêmico & Notificações
+### 1.4 Desempenho do Aluno, Histórico Acadêmico & Notificações
 Permite ao aluno acompanhar seu percentual de frequência por matéria, consultar seu histórico de chamadas e visualizar notificações.
 
 ```mermaid
@@ -169,8 +169,8 @@ sequenceDiagram
     participant API as Backend API (Render.com)
     participant DB as Banco Supabase (PostgreSQL)
 
-    %% Dashboard de Frequência (Cálculo Decrescente a partir de 100%)
-    Aluno->>App: Acessa aba "Dashboard"
+    %% Desempenho do Aluno (Cálculo Decrescente a partir de 100%)
+    Aluno->>App: Acessa aba "Desempenho"
     App->>API: GET /api/aluno/dashboard
     API->>DB: Busca matrículas e conta faltas registradas (status=FALTA)
     DB-->>API: Retorna quantidade de faltas por disciplina
@@ -439,36 +439,36 @@ sequenceDiagram
 
 Mapeia a gestão administrativa da instituição: análise de semestres letivos, identificação de alunos em risco de evasão, cadastro de infraestrutura de salas, matriculação de alunos e exportação de relatórios.
 
-### 3.1 Dashboard de Semestres & Análise de Alunos em Risco de Evasão
+### 3.1 Gestão de Semestres & Análise de Alunos em Risco de Evasão
 Permite ao coordenador visualizar a taxa geral de ausências por semestre e identificar alunos com alto índice de faltas (`< 75%` de presença).
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Coordenador
-    participant Web as Painel Coordenador / App
+    participant App as Aplicativo do Coordenador
     participant API as Backend API (Render.com)
     participant DB as Banco Supabase (PostgreSQL)
 
-    Coordenador->>Web: Acessa "Gestão de Semestres"
-    Web->>API: GET /api/coordenador/semestres
+    Coordenador->>App: Acessa "Gestão de Semestres"
+    App->>API: GET /api/coordenador/semestres
     API->>DB: Busca semestres ativos e calcula (Aulas Esperadas - Presenças Confirmadas)
     DB-->>API: Retorna percentual médio de ausência por semestre
-    API-->>Web: Exibe Cards de Semestres (ex: 2026.1 com % de falta)
+    API-->>App: Exibe Cards de Semestres (ex: 2026.1 com % de falta)
 
-    Coordenador->>Web: Clica sobre um semestre (ex: 2026.1)
-    Web->>API: GET /api/coordenador/semestre/2026.1/alunos
+    Coordenador->>App: Clica sobre um semestre (ex: 2026.1)
+    App->>API: GET /api/coordenador/semestre/2026.1/alunos
     API->>DB: Busca alunos do semestre com total de faltas acumuladas
     DB-->>API: Retorna alunos
     API->>API: Ordena alunos em ordem decrescente de faltas (Maior Risco Primeiro)
-    API-->>Web: Retorna ranking de alunos em risco
-    Web-->>Coordenador: Exibe tabela com Badges de Risco
+    API-->>App: Retorna ranking de alunos em risco
+    App-->>Coordenador: Exibe tabela com Badges de Risco
 
-    Coordenador->>Web: Clica em um aluno específico para ver detalhamento
-    Web->>API: GET /api/coordenador/aluno/:id/materias?semester=2026.1
+    Coordenador->>App: Clica em um aluno específico para ver detalhamento
+    App->>API: GET /api/coordenador/aluno/:id/materias?semester=2026.1
     API->>DB: Busca matérias matriculadas e faltas por disciplina
     DB-->>API: Retorna detalhamento
-    API-->>Web: Exibe modal com detalhamento por matéria
+    API-->>App: Exibe modal com detalhamento por matéria
 ```
 
 ---
@@ -480,29 +480,29 @@ Permite cadastrar novas salas físicas no campus (centróides GPS) e opcionalmen
 sequenceDiagram
     autonumber
     actor Coordenador
-    participant Web as Painel Coordenador / App
+    participant App as Aplicativo do Coordenador
     participant API as Backend API (Render.com)
     participant DB as Banco Supabase (PostgreSQL)
 
-    Coordenador->>Web: Preenche formulário "Cadastrar Sala" (Nome, Latitude, Longitude)
+    Coordenador->>App: Preenche formulário "Cadastrar Sala" (Nome, Latitude, Longitude)
     opt Vincular Nova Turma/Matéria
-        Coordenador->>Web: Marca "Vincular a uma Turma" e preenche Disciplina, Horário e Seleciona Professor
+        Coordenador->>App: Marca "Vincular a uma Turma" e preenche Disciplina, Horário e Seleciona Professor
     end
 
-    Web->>API: POST /api/coordenador/sala {name, latitude, longitude, assignClass, subject, schedule_time, professor_id}
+    App->>API: POST /api/coordenador/sala {name, latitude, longitude, assignClass, subject, schedule_time, professor_id}
 
     API->>DB: Verifica se já existe uma sala com esse nome (Room.findUnique)
     alt Nome de Sala Já Existe
-        API-->>Web: Erro 400: "Já existe uma sala com esse nome"
-        Web-->>Coordenador: Exibe alerta na tela
+        API-->>App: Erro 400: "Já existe uma sala com esse nome"
+        App-->>Coordenador: Exibe alerta na tela
     else Nome Livre
         API->>DB: Insere registro na tabela Room
         opt assignClass == true
             API->>DB: Insere registro na tabela Class (com raio 15m e total_classes 40)
         end
         DB-->>API: Registros criados com sucesso
-        API-->>Web: Status 201: "Sala cadastrada com sucesso!"
-        Web-->>Coordenador: Limpa formulário e atualiza lista de infraestrutura
+        API-->>App: Status 201: "Sala cadastrada com sucesso!"
+        App-->>Coordenador: Limpa formulário e atualiza lista de infraestrutura
     end
 ```
 
@@ -515,29 +515,29 @@ Permite ao coordenador vincular um aluno cadastrado no sistema a uma disciplina/
 sequenceDiagram
     autonumber
     actor Coordenador
-    participant Web as Painel Coordenador / App
+    participant App as Aplicativo do Coordenador
     participant API as Backend API (Render.com)
     participant DB as Banco Supabase (PostgreSQL)
 
-    Coordenador->>Web: Acessa tela "Matricular Aluno"
-    Web->>API: GET /api/coordenador/alunos
-    Web->>API: GET /api/coordenador/semestre/2026.1/turmas
+    Coordenador->>App: Acessa tela "Matricular Aluno"
+    App->>API: GET /api/coordenador/alunos
+    App->>API: GET /api/coordenador/semestre/2026.1/turmas
     API->>DB: Busca alunos com Role=ALUNO e turmas ativas do semestre
     DB-->>API: Retorna listas
-    API-->>Web: Popula os seletores de Alunos e Disciplinas
+    API-->>App: Popula os seletores de Alunos e Disciplinas
 
-    Coordenador->>Web: Seleciona o Aluno "João Silva" e a Disciplina "Algoritmos"
-    Web->>API: POST /api/coordenador/matricular {student_id, class_id}
+    Coordenador->>App: Seleciona o Aluno "João Silva" e a Disciplina "Algoritmos"
+    App->>API: POST /api/coordenador/matricular {student_id, class_id}
 
     API->>DB: Verifica se a matrícula já existe (Enrollment.findUnique)
     alt Matrícula Já Existente
-        API-->>Web: Erro 400: "Aluno já matriculado nesta matéria"
-        Web-->>Coordenador: Exibe mensagem de aviso
+        API-->>App: Erro 400: "Aluno já matriculado nesta matéria"
+        App-->>Coordenador: Exibe mensagem de aviso
     else Matrícula Nova
         API->>DB: Insere registro na tabela Enrollment (student_id, class_id)
         DB-->>API: Confirma inserção
-        API-->>Web: Status 201: "Aluno matriculado com sucesso!"
-        Web-->>Coordenador: Exibe modal de confirmação
+        API-->>App: Status 201: "Aluno matriculado com sucesso!"
+        App-->>Coordenador: Exibe modal de confirmação
     end
 ```
 
@@ -550,13 +550,13 @@ Permite a extração de relatórios analíticos em formatos consolidados com sup
 sequenceDiagram
     autonumber
     actor Coordenador
-    participant Web as Painel Coordenador / App
+    participant App as Aplicativo do Coordenador
     participant API as Backend API (Render.com)
     participant DB as Banco Supabase (PostgreSQL)
     participant Export as Motor de Exportação (PDF / XLSX)
 
-    Coordenador->>Web: Clica em "Exportar Relatório Geral"
-    Web->>API: GET /api/coordenador/relatorio?level=students&includeDetails=true
+    Coordenador->>App: Clica em "Exportar Relatório Geral"
+    App->>API: GET /api/coordenador/relatorio?level=students&includeDetails=true
 
     rect rgb(241, 245, 249)
         note right of API: Agregação Completa de Dados
@@ -565,16 +565,16 @@ sequenceDiagram
         API->>API: Monta estrutura JSON com estatísticas e detalhes por aluno
     end
 
-    API-->>Web: Retorna JSON estruturado do relatório
+    API-->>App: Retorna JSON estruturado do relatório
 
-    Web->>Export: Envia JSON para compilação visual do documento
+    App->>Export: Envia JSON para compilação visual do documento
     rect rgb(241, 245, 249)
         note right of Export: Geração do Arquivo
         Export->>Export: Desenha tabelas HTML, estatísticas e Badges de Risco
         Export->>Export: Compila PDF nativo (expo-print / window.print) ou planilha .XLSX
     end
-    Export-->>Web: Retorna arquivo pronto para impressão/download
-    Web-->>Coordenador: Dispara janela nativa de salvamento / impressão
+    Export-->>App: Retorna arquivo pronto para impressão/download
+    App-->>Coordenador: Dispara janela nativa de salvamento / impressão
 ```
 
 ---
@@ -672,22 +672,22 @@ Permite ao coordenador avançar em lote o semestre letivo de todos os alunos ati
 sequenceDiagram
     autonumber
     actor Coordenador
-    participant Web as Painel Coordenador / App
+    participant App as Aplicativo do Coordenador
     participant API as Backend API (Render.com)
     participant Util as Utilitário AcademicSemester
     participant DB as Banco Supabase (PostgreSQL)
 
-    Coordenador->>Web: Carrega tela de Gestão Acadêmica
-    Web->>API: GET /api/coordenador/semestre-atual
+    Coordenador->>App: Carrega tela de Gestão Acadêmica
+    App->>API: GET /api/coordenador/semestre-atual
     API->>Util: getCurrentAcademicSemester()
     Util-->>API: Retorna "2026.2" (Mês >= 7)
-    API-->>Web: Exibe Badge "Semestre Vigente: 2026.2"
+    API-->>App: Exibe Badge "Semestre Vigente: 2026.2"
 
-    Coordenador->>Web: Clica no botão "Executar Virada de Semestre (Batch)"
-    Web->>Coordenador: Exibe modal de confirmação de segurança
-    Coordenador->>Web: Confirma a virada de semestre
+    Coordenador->>App: Clica no botão "Executar Virada de Semestre (Batch)"
+    App->>Coordenador: Exibe modal de confirmação de segurança
+    Coordenador->>App: Confirma a virada de semestre
 
-    Web->>API: POST /api/coordenador/virada-semestre
+    App->>API: POST /api/coordenador/virada-semestre
     API->>DB: Busca todos os alunos ativos (User.findMany role=ALUNO active=true)
     DB-->>API: Retorna lista de alunos e seus UserCourses
 
@@ -701,8 +701,8 @@ sequenceDiagram
     end
 
     DB-->>API: Transação de lote concluída
-    API-->>Web: Retorna Sucesso 200 { message, updatedStudentsCount, completedStudentsCount }
-    Web-->>Coordenador: Exibe modal de sucesso com total de alunos promovidos e formados
+    API-->>App: Retorna Sucesso 200 { message, updatedStudentsCount, completedStudentsCount }
+    App-->>Coordenador: Exibe modal de sucesso com total de alunos promovidos e formados
 ```
 
 ---
@@ -714,25 +714,25 @@ Permite ao coordenador desativar a conta de um aluno (trancamento) ou marcar a c
 sequenceDiagram
     autonumber
     actor Coordenador
-    participant Web as Painel Coordenador / App
+    participant App as Aplicativo do Coordenador
     participant API as Backend API (Render.com)
     participant DB as Banco Supabase (PostgreSQL)
 
     %% Alternar Status Ativo / Inativo
-    Coordenador->>Web: Alterna Switch "Ativo" de um Aluno
-    Web->>API: PUT /api/coordenador/aluno/status {userId, active: false}
+    Coordenador->>App: Alterna Switch "Ativo" de um Aluno
+    App->>API: PUT /api/coordenador/aluno/status {userId, active: false}
     API->>DB: UPDATE User SET active = false WHERE id = userId
     DB-->>API: Registro atualizado
-    API-->>Web: Retorna status atualizado ("Conta desativada/trancada")
-    Web-->>Coordenador: Atualiza badge para "Inativo" na lista
+    API-->>App: Retorna status atualizado ("Conta desativada/trancada")
+    App-->>Coordenador: Atualiza badge para "Inativo" na lista
 
     %% Alternar Conclusão de Curso
-    Coordenador->>Web: Clica na Tag de Curso do Aluno ("Concluir Curso")
-    Web->>API: PUT /api/coordenador/aluno/curso-status {userId, course_name, is_completed: true}
+    Coordenador->>App: Clica na Tag de Curso do Aluno ("Concluir Curso")
+    App->>API: PUT /api/coordenador/aluno/curso-status {userId, course_name, is_completed: true}
     API->>DB: UPSERT UserCourse SET is_completed = true
     DB-->>API: Registro atualizado
-    API-->>Web: Retorna status ("Curso Concluído - Modo Leitura")
-    Web-->>Coordenador: Exibe tag com ícone de cadeado e status Concluído
+    API-->>App: Retorna status ("Curso Concluído - Modo Leitura")
+    App-->>Coordenador: Exibe tag com ícone de cadeado e status Concluído
 ```
 
 ---
@@ -744,17 +744,17 @@ O coordenador suspende aulas administrativamente (por manutenção, recesso ou i
 sequenceDiagram
     autonumber
     actor Coordenador
-    participant Web as Painel Coordenador / App
+    participant App as Aplicativo do Coordenador
     participant API as Backend API (Render.com)
     participant DB as Banco Supabase (PostgreSQL)
     actor Alunos as Alunos Matriculados
     actor Professores as Professores
 
-    Coordenador->>Web: Acessa "Solicitações & Cancelamentos" -> Aba "Suspender Aula"
-    Web-->>Coordenador: Exibe formulário com Escopo (Toda Instituição / Por Curso / Por Turma)
-    Coordenador->>Web: Seleciona o escopo, matéria/curso, data sem aula e motivo
-    Coordenador->>Web: Clica em "Confirmar Suspensão & Notificar"
-    Web->>API: POST /api/coordenador/cancelar-aulas {scope, date, reason_type, class_id, course_name, replacement_date}
+    Coordenador->>App: Acessa "Solicitações & Cancelamentos" -> Aba "Suspender Aula"
+    App-->>Coordenador: Exibe formulário com Escopo (Toda Instituição / Por Curso / Por Turma)
+    Coordenador->>App: Seleciona o escopo, matéria/curso, data sem aula e motivo
+    Coordenador->>App: Clica em "Confirmar Suspensão & Notificar"
+    App->>API: POST /api/coordenador/cancelar-aulas {scope, date, reason_type, class_id, course_name, replacement_date}
 
     rect rgb(241, 245, 249)
         note right of API: Processamento em Lote Institucional
@@ -777,47 +777,47 @@ sequenceDiagram
     end
 
     DB-->>API: Transação concluída
-    API-->>Web: Sucesso 200: "Suspensão registrada e alunos/professores notificados!"
-    Web-->>Coordenador: Exibe confirmação com contador de turmas suspensas
+    API-->>App: Sucesso 200: "Suspensão registrada e alunos/professores notificados!"
+    App-->>Coordenador: Exibe confirmação com contador de turmas suspensas
     note over Alunos, Professores: Notificação push imediata avisando da suspensão<br/>(com presença parcial em caso de reposição)
 ```
 
 ---
 
 ### 3.8 Análise de Solicitações de Falta & Solicitação de Atestado Médico
-Painel de aprovação das ausências docentes com cobrança formal de atestado médico.
+Tela de aprovação das ausências docentes com cobrança formal de atestado médico.
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Coordenador
-    participant Web as Painel Coordenador / App
+    participant App as Aplicativo do Coordenador
     participant API as Backend API (Render.com)
     participant DB as Banco Supabase (PostgreSQL)
     actor Professor
 
-    Coordenador->>Web: Acessa aba "Solicitações de Falta"
-    Web->>API: GET /api/coordenador/solicitacoes-falta
+    Coordenador->>App: Acessa aba "Solicitações de Falta"
+    App->>API: GET /api/coordenador/solicitacoes-falta
     API->>DB: Busca pedidos pendentes (ClassCancellation status=PENDENTE)
     DB-->>API: Retorna lista com justificativas e links de atestado
-    API-->>Web: Exibe cards de solicitações
+    API-->>App: Exibe cards de solicitações
 
     alt Falta por Motivo de Saúde sem Atestado
-        Coordenador->>Web: Clica em "Solicitar Atestado ao Professor"
-        Web->>API: PUT /api/coordenador/solicitacoes-falta/:id/pedir-atestado
+        Coordenador->>App: Clica em "Solicitar Atestado ao Professor"
+        App->>API: PUT /api/coordenador/solicitacoes-falta/:id/pedir-atestado
         API->>DB: INSERT INTO Notification (user_id=professor, title="Solicitação de Atestado Médico")
         DB-->>API: Notificação criada
-        API-->>Web: Sucesso 200: "Notificação enviada ao professor!"
+        API-->>App: Sucesso 200: "Notificação enviada ao professor!"
         note right of Professor: Professor recebe aviso com instrução para anexar o arquivo
     else Solicitação com Atestado Válido
-        Coordenador->>Web: Clica em "Aprovar Falta"
-        Web->>API: PUT /api/coordenador/solicitacoes-falta/:id/aprovar
+        Coordenador->>App: Clica em "Aprovar Falta"
+        App->>API: PUT /api/coordenador/solicitacoes-falta/:id/aprovar
         API->>DB: UPDATE ClassCancellation SET status = 'APROVADO'
         API->>DB: Gera presença parcial (PRESENCA_PARCIAL) para todos os alunos da matéria
         API->>DB: Dispara notificações para todos os alunos da turma
         DB-->>API: Solicitação aprovada
-        API-->>Web: Sucesso 200: "Falta aprovada e alunos notificados!"
-        Web-->>Coordenador: Remove pedido da lista de pendências
+        API-->>App: Sucesso 200: "Falta aprovada e alunos notificados!"
+        App-->>Coordenador: Remove pedido da lista de pendências
     end
 ```
 

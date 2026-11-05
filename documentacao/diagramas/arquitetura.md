@@ -84,7 +84,7 @@ flowchart TD
     GPS -->|Coordenadas + Device ID + Slot| StudentAPI
     OfflineQ -->|Sync Pacotes Assinados| StudentAPI
     UI -->|Gestão de Chamada & Salas| ProfAPI
-    UI -->|Dashboard, Risco & Virada| CoordAPI
+    UI -->|Gestão de Semestres, Risco & Virada| CoordAPI
     AbsenceModule -->|Avisos, Atestados, Suspensões & Reposições| CancellationAPI
     UI -->|Avisos & Notificações| NotifAPI
 
@@ -132,3 +132,39 @@ flowchart TD
 - **Segurança & Antifraude no Backend:** Mostra como o `Device ID` e o `Motor Geofencing` (Haversine + Janela estrita de 15 minutos) são validados diretamente no servidor.
 - **Gestão Automática de Semestres e Risco:** Demonstra o utilitário de identificação automática de semestre letivo (`YYYY.1`/`YYYY.2`), o motor de **Virada de Semestre em Lote** e os alertas proativos automáticos para alunos com frequência crítica (`< 75%`).
 - **Privacidade & Compliance LGPD:** Demonstra as rotinas agendadas `LgpdWiperJob` (expurgo de geodados antigos) e `NotificationJob` operando em segundo plano.
+
+---
+
+## Diagrama Simplificado por Camadas (Front-end / Back-end / Banco)
+
+Visão em faixas usada no slide "Arquitetura e padrões tecnológicos".
+
+```mermaid
+%%{init: {"themeVariables": {"fontSize": "24px", "nodeSpacing": 45, "rankSpacing": 60}, "flowchart": {"htmlLabels": true, "curve": "linear"}}}%%
+flowchart LR
+    subgraph FE["Front-end"]
+        direction TB
+        FE1["Módulo de GPS (expo-location)"]
+        FE2["Módulo de Device ID Binding"]
+        FE3["Fila offline (assinatura SHA-256)"]
+    end
+    subgraph BE["Back-end"]
+        direction TB
+        BE1["APIs de acesso (Student, Prof, Coord)"]
+        BE2["Motor Geofencing (Haversine Server-Side)"]
+        BE3["Push · Atestado · Cron LGPD"]
+    end
+    subgraph BD["Banco de dados"]
+        direction TB
+        BD1["Pool de Conexões"]
+        BD2["Tabelas (Attendance, User, Class)"]
+    end
+    FE ==>|"HTTPS"| BE
+    BE ==>|"Prisma ORM"| BD
+    classDef box fill:#FFFFFF,stroke:#4A4A4A,stroke-width:1.5px,color:#222222
+    class FE1,FE2,FE3,BE1,BE2,BE3,BD1,BD2 box
+    style FE fill:#EAF4FA,stroke:#9BB8CC
+    style BE fill:#EAF4FA,stroke:#9BB8CC
+    style BD fill:#EAF4FA,stroke:#9BB8CC
+```
+

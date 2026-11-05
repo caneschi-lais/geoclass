@@ -904,14 +904,30 @@ export class CoordinatorController {
     }
   }
 
-  // 12. Obter lista de alunos em risco de reprovação por falta (< 75% de presença)
+  // 12. Obter lista de alunos em risco de reprovação por falta (< 75% de presença) filtrados por semestre e curso
   async getStudentsAtRisk(req: AuthRequest, res: Response) {
     try {
       const coordinatorCourseIds = await getCoordinatorCourseIds(req.user?.id);
       const courseFilter = coordinatorCourseIds.length > 0 ? { course_id: { in: coordinatorCourseIds } } : {};
 
+      // Obter o semestre escolhido via parâmetro de rota ou query string (ex: '2026.1', '2026.2' ou ID numérico)
+      const semesterParam = req.params.id || (req.query.semester as string) || (req.query.semesterId as string) || (req.query.semester_id as string);
+      let semesterFilter: any = {};
+      let semRecord: any = null;
+
+      if (semesterParam && String(semesterParam).trim() !== '') {
+        semRecord = await findSemesterByNameOrId(semesterParam);
+        semesterFilter = semRecord ? { semester_id: semRecord.id } : { semester_id: -1 };
+      }
+
       const enrollments = await prisma.enrollment.findMany({
-        where: { class: { ...courseFilter, active: true } },
+        where: {
+          class: {
+            ...semesterFilter,
+            ...courseFilter,
+            active: true
+          }
+        },
         include: {
           student: {
             include: {
@@ -951,7 +967,7 @@ export class CoordinatorController {
         // Critério de risco: frequência < 75% (ou seja, faltas > 25%)
         if (attendancePercentage < 75) {
           const matchingCourse = student.userCourses?.find(uc => uc.course_id === cls.course_id);
-          const semesterInfo = matchingCourse?.student_term || student.userCourses?.[0]?.student_term || cls.semester?.name || '2026.2';
+          const semesterInfo = matchingCourse?.student_term || student.userCourses?.[0]?.student_term || cls.semester?.name || semRecord?.name || '2026.2';
 
           riskList.push({
             id: student.id,
@@ -963,6 +979,7 @@ export class CoordinatorController {
             room_name: cls.room?.name || 'Sala Padrão',
             course_name: cls.course?.name || 'Geral',
             semester: semesterInfo,
+            academicSemester: cls.semester?.name || semRecord?.name,
             presences: Math.max(0, totalClasses - faltas),
             totalClasses,
             attendancePercentage,
