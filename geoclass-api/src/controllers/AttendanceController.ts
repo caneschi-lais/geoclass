@@ -13,7 +13,10 @@ import {
 } from '../utils/dateUtils';
 import crypto from 'crypto';
 import prisma from '../prisma';
-const OFFLINE_SECRET = process.env.OFFLINE_SECRET || 'geoclass_offline_secret_key_2026';
+
+function getOfflineSecret(): string {
+  return process.env.OFFLINE_SECRET || 'geoclass_offline_secret_key_2026';
+}
 
 // Função utilitária: Fórmula de Haversine para calcular distância em metros
 function getDistanceFromLatLonInMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -67,7 +70,7 @@ export class AttendanceController {
 
       // 1.2 Validação de Assinatura Digital para Sincronização Offline
       if (signature && timestamp) {
-        const payloadString = `${classId}${lat}${lon}${timestamp}${deviceId || ''}${OFFLINE_SECRET}`;
+        const payloadString = `${classId}${lat}${lon}${timestamp}${deviceId || ''}${getOfflineSecret()}`;
         const expectedSignature = crypto.createHash('sha256').update(payloadString).digest('hex');
         
         if (signature !== expectedSignature) {

@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { AuthRequest } from '../middlewares/authMiddleware';
 import prisma from '../prisma';
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_geoclass_123';
+import { getJwtSecret } from '../config/jwt';
 
 export class AuthController {
   async login(req: Request, res: Response) {
@@ -35,7 +35,7 @@ export class AuthController {
 
       const token = jwt.sign(
         { id: user.id, role: user.role, name: user.name },
-        JWT_SECRET,
+        getJwtSecret(),
         { expiresIn: '7d' } // Expira em 7 dias
       );
 

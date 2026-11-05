@@ -1,8 +1,10 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 process.env.TZ = 'America/Sao_Paulo';
 
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import cron from 'node-cron';
 import { lgpdWiperJob } from './jobs/LgpdWiperJob';
 import { notificationJob } from './jobs/NotificationJob';
@@ -10,8 +12,6 @@ import router from './routes';
 
 import path from 'path';
 import fs from 'fs';
-
-dotenv.config();
 
 const app = express();
 app.use(cors({

@@ -8,7 +8,7 @@ import api from '../services/api';
 import { ClassData } from '../types';
 import { useOfflineQueue } from './useOfflineQueue';
 
-const OFFLINE_SECRET = 'geoclass_offline_secret_key_2026';
+const OFFLINE_SECRET = process.env.EXPO_PUBLIC_OFFLINE_SECRET || 'geoclass_offline_secret_key_2026';
 
 function getDistanceFromLatLonInMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371e3;
