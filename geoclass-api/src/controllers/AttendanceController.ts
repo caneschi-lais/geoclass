@@ -323,10 +323,15 @@ export class AttendanceController {
       const targetRadius = classData.radius_meters;
 
       const distance = getDistanceFromLatLonInMeters(lat, lon, targetLatitude, targetLongitude);
+      const isWithinRadius = distance - gpsAccuracy <= targetRadius;
+
+      console.log(
+        `[TESTE GPS] Aluno: ${studentId} | Distância: ${Math.round(distance)}m | Precisão GPS: ±${Math.round(gpsAccuracy)}m | Status: ${isWithinRadius ? 'ACEITO' : 'RECUSADO'} | Raio: ${targetRadius}m | Dispositivo: ${deviceId || 'N/A'}`
+      );
       
-      if (distance - gpsAccuracy > targetRadius) {
+      if (!isWithinRadius) {
         return res.status(400).json({ 
-          error: `Você está fora da área permitida. Distância atual (ajustada): ${Math.round(distance - gpsAccuracy)}m. Máximo: ${targetRadius}m.` 
+          error: `Você está fora da área permitida. Distância real: ${Math.round(distance)}m (ajustada: ${Math.round(distance - gpsAccuracy)}m) | Precisão GPS: ±${Math.round(gpsAccuracy)}m | Limite: ${targetRadius}m.` 
         });
       }
 
@@ -422,7 +427,15 @@ export class AttendanceController {
         }
       }
 
-      return res.status(201).json({ message: 'Presença registrada com sucesso!', attendance });
+      return res.status(201).json({
+        message: `Presença registrada com sucesso! Distância: ${Math.round(distance)}m | Precisão GPS: ±${Math.round(gpsAccuracy)}m`,
+        attendance,
+        metrics: {
+          distance: Math.round(distance),
+          accuracy: Math.round(gpsAccuracy),
+          status: 'ACEITO',
+        },
+      });
     } catch (error: any) {
       console.error(error);
       
