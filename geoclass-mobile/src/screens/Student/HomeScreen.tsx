@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, FlatList } from 'react-native';
+import { View, FlatList, RefreshControl } from 'react-native';
 import { useStudentHome } from '../../hooks/useStudentHome';
 import ClassCard from '../../components/ClassCard';
 import ScreenHeader from '../../components/ScreenHeader';
@@ -11,7 +11,7 @@ type Props = {
 };
 
 export default function HomeScreen({ navigation }: Props) {
-  const { classes, loadingInitial, processingId, handleConfirmAttendance } = useStudentHome();
+  const { classes, loadingInitial, refreshing, onRefresh, processingId, handleConfirmAttendance } = useStudentHome();
 
   if (loadingInitial) return <LoadingOverlay message="Buscando aulas de hoje..." />;
 
@@ -29,6 +29,14 @@ export default function HomeScreen({ navigation }: Props) {
       <FlatList
         data={classes}
         keyExtractor={(item) => item.id}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#059669']}
+            tintColor="#059669"
+          />
+        }
         renderItem={({ item }) => (
           <ClassCard
             aula={item}

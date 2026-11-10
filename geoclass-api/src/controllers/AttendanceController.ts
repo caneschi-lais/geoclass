@@ -43,6 +43,25 @@ export class AttendanceController {
       return res.status(400).json({ error: 'Dados incompletos' });
     }
 
+    let actualClassId: number;
+    let requestedSlot: string | null = null;
+
+    if (typeof classId === 'string' && classId.includes('_')) {
+      const parts = classId.split('_');
+      actualClassId = parseInt(parts[0], 10);
+      requestedSlot = parts[1] || null;
+    } else if (typeof classId === 'string' && classId.includes('-')) {
+      const parts = classId.split('-');
+      actualClassId = parseInt(parts[0], 10);
+      requestedSlot = parts[1] || null;
+    } else {
+      actualClassId = Number(classId);
+    }
+
+    if (isNaN(actualClassId)) {
+      return res.status(400).json({ error: 'ID de aula inválido' });
+    }
+
     try {
       // Determinar o momento do registro de presença no Horário de Brasília
       const checkInTime = timestamp ? new Date(timestamp) : new Date();
@@ -60,7 +79,7 @@ export class AttendanceController {
 
       // 1. Buscar informações da sala de aula
       const classData = await prisma.class.findUnique({
-        where: { id: classId },
+        where: { id: actualClassId },
         include: { room: true, course: true }
       });
 
@@ -85,13 +104,11 @@ export class AttendanceController {
       let expiredEndTime: Date | null = null;
       let nextUpcomingSlot: string | null = null;
 
-      for (let i = 0; i < slots.length; i++) {
-        const slotStr = slots[i];
-        const nextSlotStr = slots[i + 1] || null;
-        const [schedHours, schedMinutes] = slotStr.split(':').map(Number);
-        if (isNaN(schedHours) || isNaN(schedMinutes)) continue;
-
-        const { isActive, isExpired, isFuture, endMinutes } = evaluateSlotTime(slotStr, checkInTime, nextSlotStr);
+      // Se o aluno enviou um slot específico
+      if (requestedSlot && slots.includes(requestedSlot)) {
+        const targetSlotIdx = slots.indexOf(requestedSlot);
+        const targetNextSlot = targetSlotIdx !== -1 ? (slots[targetSlotIdx + 1] || null) : null;
+        const { isActive, isExpired, isFuture, endMinutes } = evaluateSlotTime(requestedSlot, checkInTime, targetNextSlot);
         const endH = Math.floor(endMinutes / 60);
         const endM = endMinutes % 60;
         const endTime = createBrazilDate(
@@ -103,13 +120,41 @@ export class AttendanceController {
         );
 
         if (isActive) {
-          activeSlot = slotStr;
-          break;
+          activeSlot = requestedSlot;
         } else if (isExpired) {
-          expiredSlot = slotStr;
+          expiredSlot = requestedSlot;
           expiredEndTime = endTime;
-        } else if (isFuture && !nextUpcomingSlot) {
-          nextUpcomingSlot = slotStr;
+        } else if (isFuture) {
+          nextUpcomingSlot = requestedSlot;
+        }
+      } else {
+        // Fallback: varre todos os slots do dia para encontrar o ativo
+        for (let i = 0; i < slots.length; i++) {
+          const slotStr = slots[i];
+          const nextSlotStr = slots[i + 1] || null;
+          const [schedHours, schedMinutes] = slotStr.split(':').map(Number);
+          if (isNaN(schedHours) || isNaN(schedMinutes)) continue;
+
+          const { isActive, isExpired, isFuture, endMinutes } = evaluateSlotTime(slotStr, checkInTime, nextSlotStr);
+          const endH = Math.floor(endMinutes / 60);
+          const endM = endMinutes % 60;
+          const endTime = createBrazilDate(
+            brazilParts.year,
+            brazilParts.month,
+            brazilParts.day,
+            endH,
+            endM
+          );
+
+          if (isActive) {
+            activeSlot = slotStr;
+            break;
+          } else if (isExpired) {
+            expiredSlot = slotStr;
+            expiredEndTime = endTime;
+          } else if (isFuture && !nextUpcomingSlot) {
+            nextUpcomingSlot = slotStr;
+          }
         }
       }
 
@@ -117,22 +162,24 @@ export class AttendanceController {
         // Se a chamada da aula ainda não abriu hoje
         if (nextUpcomingSlot && !expiredSlot) {
           return res.status(403).json({
-            error: `A chamada ainda não abriu. A próxima chamada abre às ${nextUpcomingSlot} e encerra em 15 minutos (tolerância). Horários da disciplina: ${slots.join(', ')}.`
+            error: `A chamada ainda não abriu. A chamada para o horário das ${nextUpcomingSlot} abre às ${nextUpcomingSlot} e encerra em 15 minutos (tolerância). Horários da disciplina: ${slots.join(', ')}.`
           });
         }
 
-        // Se já passou do horário de tolerância de 15 minutos, registra ausência (falta) para todos os slots expirados
+        // Se já passou do horário de tolerância de 15 minutos, registra ausência (falta) para o slot expirado
         if (expiredSlot) {
-          for (let i = 0; i < slots.length; i++) {
-            const slotStr = slots[i];
-            const nextSlotStr = slots[i + 1] || null;
+          const slotsToCheck = requestedSlot ? [requestedSlot] : slots;
+          for (let i = 0; i < slotsToCheck.length; i++) {
+            const slotStr = slotsToCheck[i];
+            const slotIdx = slots.indexOf(slotStr);
+            const nextSlotStr = slotIdx !== -1 ? (slots[slotIdx + 1] || null) : null;
             const { isExpired, endMinutes } = evaluateSlotTime(slotStr, checkInTime, nextSlotStr);
             if (!isExpired) continue;
 
             const existingExpiredAttendance = await prisma.attendance.findFirst({
               where: {
                 student_id: studentId,
-                class_id: classId,
+                class_id: actualClassId,
                 date: checkInDate,
                 slot_time: slotStr,
               },
@@ -152,7 +199,7 @@ export class AttendanceController {
               await prisma.attendance.create({
                 data: {
                   student_id: studentId,
-                  class_id: classId,
+                  class_id: actualClassId,
                   date: checkInDate,
                   slot_time: slotStr,
                   check_in_time: slotEnd,
@@ -198,7 +245,7 @@ export class AttendanceController {
           const existingPrevAttendance = await prisma.attendance.findFirst({
             where: {
               student_id: studentId,
-              class_id: classId,
+              class_id: actualClassId,
               date: checkInDate,
               slot_time: slotStr,
             },
@@ -217,7 +264,7 @@ export class AttendanceController {
             await prisma.attendance.create({
               data: {
                 student_id: studentId,
-                class_id: classId,
+                class_id: actualClassId,
                 date: checkInDate,
                 slot_time: slotStr,
                 check_in_time: prevEndTime,
@@ -241,7 +288,7 @@ export class AttendanceController {
       const existingSlotAttendance = await prisma.attendance.findFirst({
         where: {
           student_id: studentId,
-          class_id: classId,
+          class_id: actualClassId,
           date: checkInDate,
           slot_time: activeSlot
         }
@@ -258,7 +305,7 @@ export class AttendanceController {
         where: {
           student_id_class_id: {
             student_id: studentId,
-            class_id: classId
+            class_id: actualClassId
           }
         }
       });
@@ -296,7 +343,7 @@ export class AttendanceController {
       // 2.5 Verificar se a aula já foi registrada como EAD/Manual hoje pelo professor
       const manualAttendanceExists = await prisma.attendance.findFirst({
         where: {
-          class_id: classId,
+          class_id: actualClassId,
           date: checkInDate,
           manual_attendance: true
         }
@@ -311,7 +358,7 @@ export class AttendanceController {
       let tempRoom: any = null;
       try {
         tempRoom = await prisma.temporaryClassLocation.findUnique({
-          where: { class_id_date: { class_id: classId, date: checkInDate } },
+          where: { class_id_date: { class_id: actualClassId, date: checkInDate } },
           include: { room: true }
         });
       } catch (err) {
@@ -369,7 +416,7 @@ export class AttendanceController {
         attendance = await prisma.attendance.create({
           data: {
             student_id: studentId,
-            class_id: classId,
+            class_id: actualClassId,
             date: checkInDate,
             slot_time: activeSlot,
             check_in_time: checkInTime,
@@ -383,17 +430,18 @@ export class AttendanceController {
 
       // Notificar o aluno sobre a confirmação da presença
       const formattedDate = checkInDate.toLocaleDateString('pt-BR');
+      const slotInfo = activeSlot ? ` (${activeSlot})` : '';
       await prisma.notification.create({
         data: {
           user_id: studentId,
-          title: `Presença Confirmada: ${classData.subject}`,
-          body: `Sua presença na aula de ${classData.subject} em ${formattedDate} foi registrada com sucesso!`
+          title: `Presença Confirmada: ${classData.subject}${slotInfo}`,
+          body: `Sua presença na aula de ${classData.subject}${slotInfo} em ${formattedDate} foi registrada com sucesso!`
         }
       });
 
       // Checar se a frequência está em zona de risco (< 75%) e notificar o aluno
       const faltasCount = await prisma.attendance.count({
-        where: { student_id: studentId, class_id: classId, status: 'FALTA' }
+        where: { student_id: studentId, class_id: actualClassId, status: 'FALTA' }
       });
       const totalClasses = classData.total_classes || 40;
       const absencePercentage = totalClasses === 0 ? 0 : Math.round((faltasCount / totalClasses) * 100);
@@ -422,7 +470,7 @@ export class AttendanceController {
           sendPushNotification(studentId, {
             title: riskTitle,
             body: riskBody,
-            data: { type: 'RISCO_FALTAS', classId },
+            data: { type: 'RISCO_FALTAS', classId: actualClassId },
           });
         }
       }

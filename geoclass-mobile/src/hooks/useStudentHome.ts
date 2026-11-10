@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Alert, Platform } from 'react-native';
+import { useEffect, useState, useCallback } from 'react';
+import { Alert, Platform, AppState } from 'react-native';
 import * as Location from 'expo-location';
 import * as Device from 'expo-device';
 import * as Application from 'expo-application';
@@ -30,6 +30,7 @@ function deg2rad(deg: number) {
 export function useStudentHome() {
   const [classes, setClasses] = useState<ClassData[]>([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   
   const { enqueueOfflineAttendance, syncQueue } = useOfflineQueue();
@@ -37,6 +38,29 @@ export function useStudentHome() {
   useEffect(() => {
     loadInitialData();
     syncQueue(); // Tenta sincronizar registros offline salvos ao abrir o app
+
+    // Atualiza os dados a cada 30 segundos enquanto o app estiver em primeiro plano
+    const interval = setInterval(() => {
+      loadInitialData();
+    }, 30000);
+
+    // Atualiza os dados automaticamente quando o aluno retorna ao app ou desbloqueia a tela
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        loadInitialData();
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, []);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadInitialData();
+    setRefreshing(false);
   }, []);
 
   const loadInitialData = async () => {
@@ -218,8 +242,10 @@ export function useStudentHome() {
   return {
     classes,
     loadingInitial,
+    refreshing,
     processingId,
     loadInitialData,
+    onRefresh,
     handleConfirmAttendance
   };
 }

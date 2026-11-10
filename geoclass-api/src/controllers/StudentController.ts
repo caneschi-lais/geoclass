@@ -78,12 +78,13 @@ export class StudentController {
         });
 
         // Avaliar status de cada slot hoje no Horário de Brasília
-        let hasActiveSlot = false;
+        let currentActiveSlot: string | null = null;
         let checkedInActiveSlot = false;
         let anyFutureSlot = false;
         let allSlotsExpired = todaySlots.length > 0;
         let anyPresentToday = false;
         let anyAbsentToday = false;
+        let lastFinishedSlotPresent = false;
 
         for (let i = 0; i < todaySlots.length; i++) {
           const slot = todaySlots[i];
@@ -97,8 +98,10 @@ export class StudentController {
           if (isSlotAbsent) anyAbsentToday = true;
 
           if (isActive) {
-            hasActiveSlot = true;
-            if (isSlotPresent) checkedInActiveSlot = true;
+            currentActiveSlot = slot;
+            if (isSlotPresent) {
+              checkedInActiveSlot = true;
+            }
           }
 
           if (isFuture) {
@@ -108,23 +111,33 @@ export class StudentController {
 
           if (!isExpired) {
             allSlotsExpired = false;
+          } else {
+            // Este slot já encerrou: guarda se o aluno esteve presente nele
+            lastFinishedSlotPresent = isSlotPresent;
           }
         }
 
         let alreadyCheckedIn = false;
         let isAbsent = false;
 
-        if (hasActiveSlot) {
-          // Chamada aberta no momento: se já bateu, presença confirmada; se não, libera botão
+        if (currentActiveSlot) {
+          // Chamada aberta no momento (ex: slot das 19:00 ou das 19:50):
+          // Se já bateu a presença DESTA chamada ativa, exibe "Presença Confirmada"
+          // Se ainda não bateu nesta chamada ativa, LIBERA O BOTÃO para bater!
           alreadyCheckedIn = checkedInActiveSlot;
           isAbsent = false;
         } else if (anyFutureSlot) {
-          // Ainda há chamadas por vir hoje (ex: intervalo entre aulas)
-          // Não trava como falta nem como confirmado antes da aula começar
-          alreadyCheckedIn = false;
-          isAbsent = false;
+          // Não há chamada aberta neste minuto, mas ainda haverá chamadas hoje (ex: intervalo entre aulas):
+          // Se o aluno esteve presente na chamada anterior, mantém "Presença Confirmada" até a próxima abrir
+          if (anyPresentToday || lastFinishedSlotPresent) {
+            alreadyCheckedIn = true;
+            isAbsent = false;
+          } else {
+            alreadyCheckedIn = false;
+            isAbsent = false;
+          }
         } else if (allSlotsExpired) {
-          // Todas as aulas do dia já terminaram
+          // Todas as chamadas do dia já terminaram:
           if (anyPresentToday) {
             alreadyCheckedIn = true;
             isAbsent = false;
@@ -136,7 +149,7 @@ export class StudentController {
           alreadyCheckedIn = anyPresentToday;
           isAbsent = anyAbsentToday && !anyPresentToday;
         }
-        
+
         const enrollment = await prisma.enrollment.findUnique({
           where: {
             student_id_class_id: {
@@ -156,10 +169,8 @@ export class StudentController {
         }) : null;
 
         const isCourseCompleted = userCourse?.is_completed || enrollment?.is_completed || false;
-
-        const lastAttendance = allAttendancesToday.length > 0 ? allAttendancesToday[allAttendancesToday.length - 1] : null;
-
         const effectiveRoom = tempLoc?.room || c.room;
+        const lastAttendance = allAttendancesToday.length > 0 ? allAttendancesToday[allAttendancesToday.length - 1] : null;
 
         return {
           id: c.id,
