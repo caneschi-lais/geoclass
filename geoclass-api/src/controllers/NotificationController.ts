@@ -5,6 +5,7 @@ import prisma from '../prisma';
 export class NotificationController {
   async getNotifications(req: AuthRequest, res: Response) {
     const userId = req.user?.id;
+    const userRole = req.user?.role;
 
     if (!userId) {
       return res.status(401).json({ error: 'Não autorizado' });
@@ -15,6 +16,64 @@ export class NotificationController {
         where: { user_id: userId },
         orderBy: { created_at: 'desc' }
       });
+
+      // Se for Coordenador, filtra as notificações pelo curso que ele coordena
+      if (userRole === 'COORDENADOR') {
+        const coordCourses = await prisma.userCourse.findMany({
+          where: { user_id: userId },
+          select: { course_id: true }
+        });
+        const coordCourseIds = coordCourses.map(uc => uc.course_id);
+
+        if (coordCourseIds.length > 0) {
+          const students = await prisma.user.findMany({
+            where: { role: 'ALUNO' },
+            select: {
+              name: true,
+              userCourses: { select: { course_id: true } },
+              enrollments: { select: { class: { select: { course_id: true } } } }
+            }
+          });
+
+          const classes = await prisma.class.findMany({
+            select: { subject: true, course_id: true }
+          });
+
+          const filtered = notifications.filter(n => {
+            // 1. Risco de Evasão por Aluno
+            if (n.title.startsWith('Risco de Evasão:')) {
+              const studentName = n.title.replace('Risco de Evasão:', '').trim();
+              const std = students.find(s => s.name.toLowerCase() === studentName.toLowerCase());
+              if (!std) return false;
+              const stdCourses = [
+                ...std.userCourses.map(uc => uc.course_id),
+                ...std.enrollments.map(e => e.class.course_id).filter((id): id is number => id !== null)
+              ];
+              return stdCourses.some(cId => coordCourseIds.includes(cId));
+            }
+
+            // 2. Absenteísmo Elevado por Turma
+            if (n.title.startsWith('Absenteísmo Elevado:')) {
+              const subject = n.title.replace('Absenteísmo Elevado:', '').trim();
+              const cls = classes.find(c => c.subject.toLowerCase() === subject.toLowerCase());
+              if (!cls || !cls.course_id) return false;
+              return coordCourseIds.includes(cls.course_id);
+            }
+
+            // 3. Aviso de Falta ou Atestado Médico de Professor
+            if (n.title.includes('Aviso de Falta:') || n.title.includes('Atestado Enviado:')) {
+              const matchingClass = classes.find(c => n.body.includes(c.subject));
+              if (matchingClass && matchingClass.course_id) {
+                return coordCourseIds.includes(matchingClass.course_id);
+              }
+            }
+
+            return true;
+          });
+
+          return res.json(filtered);
+        }
+      }
 
       return res.json(notifications);
     } catch (error) {

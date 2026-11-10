@@ -264,9 +264,14 @@ export async function notificationJob() {
     // rodaremos este bloco apenas uma vez por dia (ex: às 12:00) ou se quisermos testar rápido.
     // Para garantir facilidade de demonstração/testes sem travar por hora, rodamos sempre mas com throttle de 7 dias nas notificações geradas.
     
-    // Obter todos os coordenadores
+    // Obter todos os coordenadores com seus cursos vinculados
     const coordinators = await prisma.user.findMany({
-      where: { role: 'COORDENADOR' },
+      where: { role: 'COORDENADOR', active: true },
+      include: {
+        userCourses: {
+          select: { course_id: true }
+        }
+      }
     });
 
     const sevenDaysAgo = new Date();
@@ -371,7 +376,28 @@ export async function notificationJob() {
 
             if (studentAverageAbsenceRate > 25) {
               const coordTitle = `Risco de Evasão: ${student.name}`;
-              for (const coord of coordinators) {
+
+              // Identificar todos os cursos aos quais o aluno está vinculado
+              const studentCourseIds = studentEnrollments
+                .map((se) => se.class.course_id)
+                .filter((id): id is number => id !== null);
+
+              const studentDirectCourses = await prisma.userCourse.findMany({
+                where: { user_id: student.id },
+                select: { course_id: true }
+              });
+              for (const sdc of studentDirectCourses) {
+                if (!studentCourseIds.includes(sdc.course_id)) {
+                  studentCourseIds.push(sdc.course_id);
+                }
+              }
+
+              // Filtrar coordenadores apenas dos cursos do aluno
+              const targetCoords = coordinators.filter((coord) =>
+                coord.userCourses.some((uc) => studentCourseIds.includes(uc.course_id))
+              );
+
+              for (const coord of targetCoords) {
                 const coordAlreadyAlerted = await prisma.notification.findFirst({
                   where: {
                     user_id: coord.id,
@@ -390,6 +416,12 @@ export async function notificationJob() {
                       body: `O aluno ${student.name} (RA: ${student.ra || 'N/A'}) apresenta uma taxa média de faltas de ${studentAverageAbsenceRate}% no semestre.`,
                     },
                   });
+
+                  sendPushNotification(coord.id, {
+                    title: coordTitle,
+                    body: `O aluno ${student.name} apresenta uma taxa média de faltas de ${studentAverageAbsenceRate}% no semestre.`,
+                    data: { type: 'RISCO_EVASAO', studentId: student.id },
+                  });
                 }
               }
             }
@@ -402,7 +434,15 @@ export async function notificationJob() {
 
           if (classAverageAbsenceRate > 30) {
             const classTitle = `Absenteísmo Elevado: ${cls.subject}`;
-            for (const coord of coordinators) {
+
+            // Filtrar coordenadores apenas do curso desta matéria
+            const targetCoords = cls.course_id
+              ? coordinators.filter((coord) =>
+                  coord.userCourses.some((uc) => uc.course_id === cls.course_id)
+                )
+              : coordinators;
+
+            for (const coord of targetCoords) {
               const coordClassAlreadyAlerted = await prisma.notification.findFirst({
                 where: {
                   user_id: coord.id,
@@ -420,6 +460,12 @@ export async function notificationJob() {
                     title: classTitle,
                     body: `A matéria ${cls.subject} (Professor: ${cls.professor.name}) apresenta uma taxa de absenteísmo preocupante de ${classAverageAbsenceRate}% entre os alunos matriculados.`,
                   },
+                });
+
+                sendPushNotification(coord.id, {
+                  title: classTitle,
+                  body: `A matéria ${cls.subject} atingiu ${classAverageAbsenceRate}% de absenteísmo.`,
+                  data: { type: 'ABSENTEISMO_TURMA', classId: cls.id },
                 });
               }
             }

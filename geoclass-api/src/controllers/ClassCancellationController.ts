@@ -170,14 +170,19 @@ export class ClassCancellationController {
         });
       }
 
-      // Notificar Coordenadores
+      // Notificar Coordenadores do curso da matéria
       const coordinators = await prisma.user.findMany({
         where: { role: 'COORDENADOR', active: true },
+        include: { userCourses: true }
       });
+
+      const targetCoords = classData.course_id
+        ? coordinators.filter((c) => c.userCourses.some((uc) => uc.course_id === classData.course_id))
+        : coordinators;
 
       const reasonLabel = REASON_LABELS[reason_type] || reason_type;
 
-      for (const coord of coordinators) {
+      for (const coord of targetCoords) {
         await prisma.notification.create({
           data: {
             user_id: coord.id,
@@ -187,8 +192,8 @@ export class ClassCancellationController {
         });
       }
 
-      // Enviar push notification para os coordenadores
-      const coordIds = coordinators.map((c) => c.id);
+      // Enviar push notification para os coordenadores do curso
+      const coordIds = targetCoords.map((c) => c.id);
       sendPushNotification(coordIds, {
         title: `Aviso de Falta: Prof. ${professorName}`,
         body: `O prof. ${professorName} informou ausência para ${classData.subject} em ${formattedDate}.`,
@@ -510,9 +515,14 @@ export class ClassCancellationController {
       // Notificar coordenadores sobre o envio
       const coordinators = await prisma.user.findMany({
         where: { role: 'COORDENADOR', active: true },
+        include: { userCourses: true }
       });
 
-      for (const coord of coordinators) {
+      const targetCoords = cancellation.class?.course_id
+        ? coordinators.filter((c) => c.userCourses.some((uc) => uc.course_id === cancellation.class.course_id))
+        : coordinators;
+
+      for (const coord of targetCoords) {
         await prisma.notification.create({
           data: {
             user_id: coord.id,
@@ -523,7 +533,7 @@ export class ClassCancellationController {
       }
 
       // Enviar push notification para os coordenadores
-      const coordIds = coordinators.map((c) => c.id);
+      const coordIds = targetCoords.map((c) => c.id);
       sendPushNotification(coordIds, {
         title: `Atestado Enviado: ${professorName}`,
         body: `O professor ${professorName} enviou atestado médico referente a ${cancellation.class?.subject} em ${formattedDate}.`,
@@ -1240,12 +1250,17 @@ export class ClassCancellationController {
         data: { certificate_url: certificateUrl },
       });
 
-      // Notificar coordenadores
+      // Notificar coordenadores do curso
       const coordinators = await prisma.user.findMany({
         where: { role: 'COORDENADOR', active: true },
+        include: { userCourses: true }
       });
 
-      for (const coord of coordinators) {
+      const targetCoords = cancellation.class?.course_id
+        ? coordinators.filter((c) => c.userCourses.some((uc) => uc.course_id === cancellation.class.course_id))
+        : coordinators;
+
+      for (const coord of targetCoords) {
         await prisma.notification.create({
           data: {
             user_id: coord.id,
