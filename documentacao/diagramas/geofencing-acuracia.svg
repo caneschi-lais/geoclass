@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 620" width="100%" height="100%" style="background-color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <!-- Marcadores de Seta -->
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0284c7" />
+    </marker>
+    <marker id="arrow-purple" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7c3aed" />
+    </marker>
+    <marker id="arrow-dim" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569" />
+    </marker>
+    <marker id="arrow-emerald" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#059669" />
+    </marker>
+
+    <!-- Gradientes -->
+    <radialGradient id="roomGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.32" />
+      <stop offset="85%" stop-color="#10b981" stop-opacity="0.12" />
+      <stop offset="100%" stop-color="#10b981" stop-opacity="0.04" />
+    </radialGradient>
+    <radialGradient id="accGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.38" />
+      <stop offset="85%" stop-color="#f59e0b" stop-opacity="0.15" />
+      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.05" />
+    </radialGradient>
+    <pattern id="deskGrid" width="30" height="24" patternUnits="userSpaceOnUse">
+      <rect x="5" y="4" width="20" height="15" rx="3" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="1" opacity="0.7"/>
+    </pattern>
+  </defs>
+
+  <!-- Cabeçalho -->
+  <text x="450" y="34" text-anchor="middle" font-size="20" font-weight="bold" fill="#0f172a">Dimensionamento da Sala e Validação Espacial no GeoClass</text>
+  <text x="450" y="56" text-anchor="middle" font-size="12" fill="#475569">Sala Retangular (Maior lado = 8,50 m) ➔ Raio Adotado = 5,00 m (Metade de 8,50 m arredondada para cima)</text>
+
+  <!-- ========================================== -->
+  <!-- ÁREA DE DESENHO GEOMÉTRICO (Escala: 1m = 26px) -->
+  <!-- Centro da sala (X0, Y0) = (270, 230) -->
+  <!-- ========================================== -->
+
+  <!-- Círculo de Geofencing da Sala (Raio = 5,00m = 130px) -->
+  <!-- Centro: (270, 230), Raio: 130 -->
+  <circle cx="270" cy="230" r="130" fill="url(#roomGrad)" stroke="#10b981" stroke-width="2.5" stroke-dasharray="6 3" />
+
+  <!-- Paredes da Sala de Aula Retangular (8,50m x 6,00m => 221px x 156px) -->
+  <!-- X: 270 - 110.5 = 159.5, Y: 230 - 78 = 152 -->
+  <rect x="159.5" y="152" width="221" height="156" rx="6" fill="#f8fafc" stroke="#334155" stroke-width="3" />
+  
+  <!-- Preenchimento esquemático de carteiras da sala -->
+  <rect x="165" y="158" width="210" height="144" fill="url(#deskGrid)" />
+
+  <!-- Indicação do Quadro / Lousa na parede frontal (esquerda) -->
+  <line x1="161" y1="185" x2="161" y2="275" stroke="#0f172a" stroke-width="6" stroke-linecap="round" />
+  <text x="168" y="233" font-size="9" font-weight="bold" fill="#64748b" transform="rotate(-90 168 233)" text-anchor="middle">LOUSA / PROFESSOR</text>
+
+  <!-- Ponto Central da Sala (Coordenada cadastrada no banco) -->
+  <circle cx="270" cy="230" r="8" fill="#047857" />
+  <circle cx="270" cy="230" r="3" fill="#ffffff" />
+  <text x="270" y="250" text-anchor="middle" font-size="11" font-weight="bold" fill="#065f46">Centro da Sala</text>
+  <text x="270" y="263" text-anchor="middle" font-size="9" fill="#64748b">(GPS da Sala no Banco)</text>
+
+  <!-- Cota Horizontal do Maior Lado da Sala (8,50 m) -->
+  <!-- Linhas de chamada -->
+  <line x1="159.5" y1="145" x2="159.5" y2="95" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3 2" />
+  <line x1="380.5" y1="145" x2="380.5" y2="95" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3 2" />
+  <!-- Linha de cota com setas duplas -->
+  <line x1="165" y1="102" x2="375" y2="102" stroke="#334155" stroke-width="1.8" marker-start="url(#arrow-dim)" marker-end="url(#arrow-dim)" />
+  <rect x="215" y="91" width="110" height="22" rx="4" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+  <text x="270" y="106" text-anchor="middle" font-size="11" font-weight="bold" fill="#0f172a">Maior Lado = 8,50 m</text>
+
+  <!-- Cota da Metade do Maior Lado (4,25 m) do Centro à Parede Direita -->
+  <line x1="270" y1="152" x2="270" y2="120" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3 2" />
+  <line x1="275" y1="126" x2="375" y2="126" stroke="#475569" stroke-width="1.5" marker-start="url(#arrow-dim)" marker-end="url(#arrow-dim)" />
+  <rect x="290" y="117" width="70" height="18" rx="3" fill="#ffffff" stroke="#cbd5e1" stroke-width="0.8" />
+  <text x="325" y="130" text-anchor="middle" font-size="10" font-weight="bold" fill="#475569">4,25 m</text>
+
+  <!-- Cota Vertical do Menor Lado da Sala (Largura ~6,00 m = 156px) -->
+  <line x1="152" y1="152" x2="110" y2="152" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3 2" />
+  <line x1="152" y1="308" x2="110" y2="308" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3 2" />
+  <line x1="118" y1="158" x2="118" y2="302" stroke="#334155" stroke-width="1.8" marker-start="url(#arrow-dim)" marker-end="url(#arrow-dim)" />
+  <rect x="75" y="219" width="76" height="22" rx="4" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+  <text x="113" y="234" text-anchor="middle" font-size="10" font-weight="bold" fill="#0f172a">Lado: 6,00 m</text>
+
+  <!-- Cota do Raio de Geofencing R = 5,00 m (130px) traçado na diagonal superior -->
+  <!-- Centro: (270, 230), Direção: ângulo -135 graus ou para o canto (270 - 92, 230 - 92) = (178, 138) -->
+  <!-- Vamos traçar para baixo na diagonal: (270, 230) -> (270 + 85, 230 + 98) onde 85^2 + 98^2 = 7225 + 9604 = 16829 ~= 130^2 (16900) -->
+  <line x1="270" y1="230" x2="178" y2="322" stroke="#059669" stroke-width="2.2" stroke-dasharray="4 3" marker-end="url(#arrow-emerald)" />
+  <rect x="140" y="326" width="168" height="22" rx="4" fill="#ecfdf5" stroke="#10b981" stroke-width="1" />
+  <text x="224" y="341" text-anchor="middle" font-size="10" font-weight="bold" fill="#047857">Raio Geofence: 5,00 m (&gt; 4,25 m)</text>
+
+  <!-- ========================================== -->
+  <!-- CENÁRIO DO ALUNO E ACURÁCIA GPS -->
+  <!-- Aluno medido pelo GPS a 7,00m do centro (270 + 7*26 = 452, 230) -->
+  <!-- ========================================== -->
+
+  <!-- Vetor da Distância Bruta Haversine (7,00m = 182px): de (270, 230) até (446, 230) -->
+  <line x1="270" y1="230" x2="446" y2="230" stroke="#0284c7" stroke-width="2.5" marker-end="url(#arrow-blue)" />
+
+  <!-- Círculo de Incerteza/Acurácia do Aluno (±3,00 m = 78px de raio) -->
+  <!-- Centro: (452, 230), Raio: 78px -->
+  <circle cx="452" cy="230" r="78" fill="url(#accGrad)" stroke="#d97706" stroke-width="2" stroke-dasharray="5 3" />
+
+  <!-- Ponto do Celular do Aluno (Medição GPS) -->
+  <circle cx="452" cy="230" r="8" fill="#2563eb" />
+  <circle cx="452" cy="230" r="3" fill="#ffffff" />
+  <text x="452" y="210" text-anchor="middle" font-size="12" font-weight="bold" fill="#1d4ed8">Celular do Aluno</text>
+  <text x="452" y="196" text-anchor="middle" font-size="9" fill="#64748b">(Estimativa do sensor)</text>
+
+  <!-- Raio da Incerteza do GPS (±3,00 m = 78px) -->
+  <line x1="452" y1="230" x2="452" y2="152" stroke="#d97706" stroke-width="1.8" stroke-dasharray="3 2" />
+  <rect x="460" y="172" width="105" height="20" rx="3" fill="#fffbeb" stroke="#fcd34d" stroke-width="0.8" />
+  <text x="512" y="186" text-anchor="middle" font-size="10" font-weight="bold" fill="#b45309">Acurácia: ±3,00 m</text>
+
+  <!-- Cota da Distância Haversine (7,00 m) -->
+  <rect x="330" y="206" width="95" height="20" rx="4" fill="#e0f2fe" stroke="#38bdf8" stroke-width="1" />
+  <text x="377" y="220" text-anchor="middle" font-size="10.5" font-weight="bold" fill="#0369a1">Distância: 7,00 m</text>
+
+  <!-- Ponto de Interseção da Incerteza mais próxima do centro (452 - 78 = 374px, ou seja, 4,00m do centro) -->
+  <circle cx="374" cy="230" r="5" fill="#7c3aed" />
+  <line x1="374" y1="230" x2="374" y2="370" stroke="#7c3aed" stroke-width="1.2" stroke-dasharray="3 3" />
+  <line x1="270" y1="265" x2="270" y2="370" stroke="#7c3aed" stroke-width="1.2" stroke-dasharray="3 3" />
+
+  <!-- Barra de Distância Ajustada (7,00m - 3,00m = 4,00m) -->
+  <line x1="270" y1="365" x2="368" y2="365" stroke="#7c3aed" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-purple)" />
+  <rect x="250" y="375" width="220" height="22" rx="4" fill="#f3e8ff" stroke="#c084fc" stroke-width="1" />
+  <text x="360" y="390" text-anchor="middle" font-size="11" font-weight="bold" fill="#6b21a8">Distância Ajustada: 7m - 3m = 4,00 m (≤ 5m)</text>
+
+  <!-- ========================================== -->
+  <!-- PAINÉIS EXPLICATIVOS INFERIORES -->
+  <!-- ========================================== -->
+
+  <!-- Box 1: Por que o Raio de 5m? (Geometria da Sala) -->
+  <g transform="translate(45, 420)">
+    <rect width="385" height="175" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" />
+    <rect x="0" y="0" width="385" height="32" rx="8" fill="#f1f5f9" />
+    <text x="15" y="21" font-size="12" font-weight="bold" fill="#334155">📐 Justificativa Geométrica do Raio de 5 metros</text>
+    
+    <text x="15" y="55" font-size="11" fill="#1e293b">• <tspan font-weight="bold">Medição real da sala:</tspan> Formato retangular com <tspan font-weight="bold">8,50 m</tspan> no maior lado.</text>
+    <text x="15" y="75" font-size="11" fill="#1e293b">• <tspan font-weight="bold">Distância do centro à parede:</tspan> 8,50 m / 2 = <tspan font-weight="bold">4,25 m</tspan>.</text>
+    <text x="15" y="95" font-size="11" fill="#1e293b">• <tspan font-weight="bold">Arredondamento preventivo:</tspan> O raio foi fixado em <tspan font-weight="bold">5,00 m</tspan>.</text>
+    <text x="15" y="115" font-size="11" fill="#475569">  Isso garante que o círculo de geofence (diâmetro de 10 m)</text>
+    <text x="15" y="132" font-size="11" fill="#475569">  englobe <tspan font-weight="bold">100% da sala</tspan>, incluindo as carteiras nos cantos</text>
+    <text x="15" y="150" font-size="11" fill="#475569">  e extremidades mais distantes do centro.</text>
+  </g>
+
+  <!-- Box 2: Validação da Presença com Acurácia -->
+  <g transform="translate(450, 420)">
+    <rect width="405" height="175" rx="8" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5" />
+    <rect x="0" y="0" width="405" height="32" rx="8" fill="#d1fae5" />
+    <text x="15" y="21" font-size="12" font-weight="bold" fill="#065f46">✓ Validação Prática do Aluno (Presença Confirmada)</text>
+    
+    <text x="15" y="55" font-size="11" fill="#047857">• <tspan font-weight="bold">Raio da sala no banco:</tspan> 5,00 m (Class.radius_meters = 5)</text>
+    <text x="15" y="75" font-size="11" fill="#047857">• <tspan font-weight="bold">Distância bruta (Haversine):</tspan> 7,00 m (devido a reflexões em paredes)</text>
+    <text x="15" y="95" font-size="11" fill="#047857">• <tspan font-weight="bold">Acurácia informada pelo GPS:</tspan> ±3,00 m (raio de incerteza)</text>
+    <text x="15" y="120" font-size="11.5" font-weight="bold" fill="#065f46">• Cálculo do GeoClass: 7,00 m - 3,00 m = 4,00 m</text>
+    <text x="15" y="142" font-size="11" font-weight="bold" fill="#047857">  Como 4,00 m ≤ 5,00 m ➔ STATUS: DENTRO DA SALA (Válido)</text>
+    <text x="15" y="160" font-size="10" fill="#065f46">  O sistema compensa a oscilação do GPS interno sem falso negativo.</text>
+  </g>
+</svg>
