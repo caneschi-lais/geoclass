@@ -7,7 +7,7 @@ import express from 'express';
 import cors from 'cors';
 import cron from 'node-cron';
 import { lgpdWiperJob } from './jobs/LgpdWiperJob';
-import { notificationJob } from './jobs/NotificationJob';
+import { notificationJob, evasionRiskJob } from './jobs/NotificationJob';
 import router from './routes';
 
 import path from 'path';
@@ -73,16 +73,27 @@ app.listen(PORT, () => {
   });
   console.log('⏰ Cron Job LGPD agendado para as 03:00 AM diariamente.');
 
-  // Iniciar Cron Job de Notificações
-  // Expressão cron '* * * * *' = Roda a cada minuto
-  cron.schedule('* * * * *', async () => {
+  // Iniciar Cron Job de Notificações de Aula (Lembretes e Fechamento de Tolerância)
+  // Expressão cron '* 7-23 * * 1-6' = Roda a cada minuto apenas nos dias/horários de aula (Seg-Sáb, 07h às 23h)
+  cron.schedule('* 7-23 * * 1-6', async () => {
     try {
       await notificationJob();
     } catch (err) {
       console.error('[CRON] Erro ao processar notificações:', err);
     }
   });
-  console.log('⏰ Cron Job de Notificações agendado para rodar a cada minuto.');
+  console.log('⏰ Cron Job de Notificações agendado para rodar nos horários de aula (Seg-Sáb, 07h-23h).');
+
+  // Cron Job de Risco de Evasão e Absenteísmo
+  // Expressão cron '30 12,22 * * 1-5' = Roda 2x ao dia (às 12:30 e às 22:30, após os turnos de aula)
+  cron.schedule('30 12,22 * * 1-5', async () => {
+    try {
+      await evasionRiskJob();
+    } catch (err) {
+      console.error('[CRON] Erro ao processar cálculo de risco de evasão:', err);
+    }
+  });
+  console.log('⏰ Cron Job de Risco de Evasão agendado para 12:30 e 22:30 (Seg-Sex).');
 });
 
 process.on('uncaughtException', (err) => {

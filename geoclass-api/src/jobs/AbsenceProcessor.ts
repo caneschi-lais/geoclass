@@ -22,6 +22,14 @@ export function isClassScheduledToday(weekDays?: string | null, date: Date = new
   return days.some((d) => d.includes(dayName) || dayName.includes(d));
 }
 
+// Cache em memória de slots de chamada já finalizados hoje para evitar re-consultas redundantes a cada minuto
+let lastCacheDateStr: string = '';
+const finalizedSlotsToday = new Set<string>();
+
+export function clearFinalizedSlotsCache() {
+  finalizedSlotsToday.clear();
+}
+
 /**
  * Processa o fechamento de tolerância (15 minutos) para todos os slots de aulas de hoje.
  * Se o dia for letivo e o aluno estiver matriculado, o curso/disciplina não estiver concluído e
@@ -34,11 +42,22 @@ export async function processExpiredAttendanceSlots(currentDate: Date = new Date
   const brazilParts = getBrazilParts(currentDate);
   const todayStr = getBrazilDateString(currentDate);
 
+  // Se virou o dia, reseta o cache de slots finalizados
+  if (todayStr !== lastCacheDateStr) {
+    lastCacheDateStr = todayStr;
+    finalizedSlotsToday.clear();
+  }
+
+  // Não executa se estiver fora do horário de aulas (07h às 23h30) ou domingo
+  const dayOfWeek = currentDate.getDay();
+  if (dayOfWeek === 0 || brazilParts.hour < 7 || (brazilParts.hour >= 23 && brazilParts.minute > 30)) {
+    return;
+  }
+
   try {
     // 0. Validar se hoje é um dia letivo no Calendário Acadêmico
     const calendarCheck = await isAcademicInstructionalDay(currentDate);
     if (!calendarCheck.isInstructional) {
-      console.log(`[ABSENCE] Hoje (${todayStr}) não é dia letivo: ${calendarCheck.reason}. Faltas suspensas.`);
       return;
     }
 
@@ -76,72 +95,25 @@ export async function processExpiredAttendanceSlots(currentDate: Date = new Date
         if (!isScheduledToday) continue;
       }
 
-      // 2. Se a aula foi marcada manualmente como EAD pelo professor hoje, ignorar
-      const manualToday = await prisma.attendance.findFirst({
-        where: {
-          class_id: cls.id,
-          date: todayDate,
-          manual_attendance: true,
-        },
-      });
-      if (manualToday) continue;
-
-      // 2.1. Se a aula possui cancelamento aprovado para hoje (falta do professor ou institucional), ignorar
-      let cancellationToday = null;
-      try {
-        if ((prisma as any).classCancellation) {
-          cancellationToday = await (prisma as any).classCancellation.findFirst({
-            where: {
-              status: 'APROVADO',
-              date: todayDate,
-              OR: [
-                { class_id: cls.id },
-                { scope: 'INSTITUICAO' },
-                ...(cls.course_id ? [{ scope: 'CURSO', course_id: cls.course_id }] : []),
-              ],
-            },
-          });
-        }
-      } catch (err) {
-        // Modelo ClassCancellation pode ainda não estar gerado
-      }
-
-      if (cancellationToday) continue;
-
-      // 3. Processar cada slot relativo ao dia atual (ex: 19:00, 19:50 na terça e 20:50, 21:40 na quarta)
+      // 2. Processar cada slot relativo ao dia atual (ex: 19:00, 19:50 na terça)
       const slots = getScheduleSlotsForDay(cls.schedule_time, cls.week_days, currentDayName);
 
-      // Auto-remediação: se existirem faltas automáticas gravadas prematuramente para slots que ainda NÃO expiraram hoje, remove
       for (let i = 0; i < slots.length; i++) {
         const slotStr = slots[i];
-        const nextSlotStr = slots[i + 1] || null;
-        const { isExpired } = evaluateSlotTime(slotStr, currentDate, nextSlotStr);
-        if (!isExpired) {
-          try {
-            await prisma.attendance.deleteMany({
-              where: {
-                class_id: cls.id,
-                date: todayDate,
-                slot_time: slotStr,
-                status: 'FALTA',
-                manual_attendance: false,
-              },
-            });
-          } catch (cleanErr) {
-            // Ignora se não houver registros
-          }
-        }
-      }
+        const slotKey = `${cls.id}_${slotStr}`;
 
-      for (let i = 0; i < slots.length; i++) {
-        const slotStr = slots[i];
+        // Se este slot já expirou e foi completamente finalizado hoje, pula sem consultar o banco
+        if (finalizedSlotsToday.has(slotKey)) {
+          continue;
+        }
+
         const nextSlotStr = slots[i + 1] || null;
         const [schedHours, schedMinutes] = slotStr.split(':').map(Number);
         if (isNaN(schedHours) || isNaN(schedMinutes)) continue;
 
         const { isExpired, endMinutes } = evaluateSlotTime(slotStr, currentDate, nextSlotStr);
 
-        // A tolerância já passou hoje no Horário de Brasília?
+        // A tolerância já encerrou hoje no Horário de Brasília?
         if (isExpired) {
           const endH = Math.floor(endMinutes / 60);
           const endM = endMinutes % 60;
@@ -153,6 +125,17 @@ export async function processExpiredAttendanceSlots(currentDate: Date = new Date
             endM
           );
 
+          // Buscar todos os registros de presença ou falta já existentes para este slot hoje (1 única query para a turma inteira)
+          const existingAttendances = await prisma.attendance.findMany({
+            where: {
+              class_id: cls.id,
+              date: todayDate,
+              slot_time: slotStr,
+            },
+            select: { student_id: true },
+          });
+          const attendedStudentIds = new Set(existingAttendances.map((a) => a.student_id));
+
           for (const enrollment of cls.enrollments) {
             const student = enrollment.student;
 
@@ -162,18 +145,8 @@ export async function processExpiredAttendanceSlots(currentDate: Date = new Date
               if (userCourse?.is_completed) continue;
             }
 
-            // Verificar se já existe registro de presença ou falta para este slot hoje
-            const existingAttendance = await prisma.attendance.findFirst({
-              where: {
-                student_id: student.id,
-                class_id: cls.id,
-                date: todayDate,
-                slot_time: slotStr,
-              },
-            });
-
             // Se NÃO houver registro, insere FALTA no banco
-            if (!existingAttendance) {
+            if (!attendedStudentIds.has(student.id)) {
               try {
                 await prisma.attendance.create({
                   data: {
@@ -213,6 +186,9 @@ export async function processExpiredAttendanceSlots(currentDate: Date = new Date
               }
             }
           }
+
+          // Slot expirado e processado para todos os alunos: salva no cache da memória para não consultar mais hoje
+          finalizedSlotsToday.add(slotKey);
         }
       }
     }

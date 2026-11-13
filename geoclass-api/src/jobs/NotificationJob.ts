@@ -47,14 +47,18 @@ function getSlotExpiringTimeStr(slotStr: string, nextSlotStr?: string | null): s
 
 export async function notificationJob() {
   const now = new Date();
-  const todayDate = getBrazilMidnightDate(now);
   const brazilParts = getBrazilParts(now);
 
+  // Não executa fora do horário escolar (07h às 23h15) nem aos domingos
+  const dayOfWeek = now.getDay();
+  if (dayOfWeek === 0 || brazilParts.hour < 7 || (brazilParts.hour >= 23 && brazilParts.minute > 15)) {
+    return;
+  }
+
+  const todayDate = getBrazilMidnightDate(now);
   const currentHours = String(brazilParts.hour).padStart(2, '0');
   const currentMinutes = String(brazilParts.minute).padStart(2, '0');
   const currentTimeStr = `${currentHours}:${currentMinutes}`;
-
-  console.log(`[NOTIFICATION JOB] Iniciando execução às ${currentTimeStr} (Horário de Brasília)`);
 
   try {
     // 0. Processar fechamento de faltas para horários cuja tolerância de 15 minutos já expirou hoje
@@ -63,7 +67,6 @@ export async function notificationJob() {
     // 0.1 Se hoje não for dia letivo, não dispara notificações de início ou fechamento de aula
     const calendarCheck = await isAcademicInstructionalDay(now);
     if (!calendarCheck.isInstructional) {
-      console.log(`[NOTIFICATION JOB] Hoje não é dia letivo: ${calendarCheck.reason}. Lembretes de aula suspensos.`);
       return;
     }
 
@@ -258,20 +261,40 @@ export async function notificationJob() {
         }
       }
     }
+  } catch (error) {
+    console.error('[NOTIFICATION JOB] Erro ao executar job de notificações:', error);
+  }
+}
 
-    // 3. Alertas de Evasão e Absenteísmo (Aluno e Coordenador)
-    // Para evitar rodar cálculos complexos de porcentagem a cada minuto, ou spammar notificações,
-    // rodaremos este bloco apenas uma vez por dia (ex: às 12:00) ou se quisermos testar rápido.
-    // Para garantir facilidade de demonstração/testes sem travar por hora, rodamos sempre mas com throttle de 7 dias nas notificações geradas.
-    
+/**
+ * Rotina diária de Risco de Evasão e Absenteísmo.
+ * Executada apenas em horários específicos (ex: 12:30 e 22:30) para evitar milhões
+ * de consultas desnecessárias no banco de dados Supabase ao longo do dia.
+ */
+export async function evasionRiskJob() {
+  console.log('[EVASION JOB] Iniciando verificação diária de Risco de Evasão e Absenteísmo...');
+
+  try {
+    const activeClasses = await prisma.class.findMany({
+      where: { active: true },
+      include: {
+        professor: true,
+        enrollments: {
+          include: {
+            student: true,
+          },
+        },
+      },
+    });
+
     // Obter todos os coordenadores com seus cursos vinculados
     const coordinators = await prisma.user.findMany({
       where: { role: 'COORDENADOR', active: true },
       include: {
         userCourses: {
-          select: { course_id: true }
-        }
-      }
+          select: { course_id: true },
+        },
+      },
     });
 
     const sevenDaysAgo = new Date();
@@ -340,7 +363,6 @@ export async function notificationJob() {
           }
 
           // B) Coordenador (Risco de Evasão Individual do Aluno >= 25% na média geral)
-          // Vamos calcular a média geral do aluno de forma independente
           const studentEnrollments = await prisma.enrollment.findMany({
             where: { student_id: student.id },
             include: { class: true },
@@ -384,7 +406,7 @@ export async function notificationJob() {
 
               const studentDirectCourses = await prisma.userCourse.findMany({
                 where: { user_id: student.id },
-                select: { course_id: true }
+                select: { course_id: true },
               });
               for (const sdc of studentDirectCourses) {
                 if (!studentCourseIds.includes(sdc.course_id)) {
@@ -473,7 +495,8 @@ export async function notificationJob() {
         }
       }
     }
+    console.log('[EVASION JOB] Verificação diária de Risco de Evasão concluída.');
   } catch (error) {
-    console.error('[NOTIFICATION JOB] Erro ao executar job de notificações:', error);
+    console.error('[EVASION JOB] Erro ao executar verificação de evasão:', error);
   }
 }
